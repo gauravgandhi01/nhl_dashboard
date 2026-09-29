@@ -269,6 +269,31 @@ or settlement conditions not captured by their listed price. No bets are placed.
 There are no player-specific historical hit-rate calculations in this change;
 existing L5/L10/season form remains alongside the quotes.
 
+## Render Deployment
+
+Deploy as a Docker web service. The Docker build creates a compact
+`data/seed.sqlite3` with normalized MoneyPuck rows for the previous NHL season
+and the current season when MoneyPuck has published it.
+At runtime the app copies that seed to `NHL_DASHBOARD_DB`, which should stay on
+Render's writable ephemeral disk:
+
+```text
+NHL_DASHBOARD_DB=/tmp/dashboard.sqlite3
+```
+
+Optional build/runtime settings:
+
+- `NHL_SEED_SEASONS=20252026,20262027` seeds explicit seasons during Docker
+  build. If omitted, the previous and current seasons are attempted.
+- `NHL_MONEYPUCK_REFRESH_HOURS=24` controls how long normalized MoneyPuck rows
+  are trusted before a runtime refresh attempt. Use `0` to trust seeded rows
+  indefinitely on small free instances; the Docker image defaults to `0`.
+- `THE_ODDS_API_KEY=...` enables moneylines, player props, and first-period odds.
+
+The daily slate is designed to render from small NHL/Daily Faceoff/odds feeds
+plus normalized MoneyPuck rows when available; large MoneyPuck CSV/ZIP files are
+not stored as raw SQLite response blobs.
+
 ## Development and Checks
 
 ```sh

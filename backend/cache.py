@@ -52,7 +52,7 @@ class Store:
         self.db.close()
 
     async def fetch(self, url: str, source: str, ttl: int, parser: Callable = json.loads,
-                    params: dict | None = None) -> Feed:
+                    params: dict | None = None, store_body: bool = True) -> Feed:
         request_url = str(httpx.URL(url, params=params)) if params else url
         key = hashlib.sha256(request_url.encode()).hexdigest()
         async with self.locks.setdefault(key, asyncio.Lock()):
@@ -78,7 +78,7 @@ class Store:
                         response = await self.client.get(request_url)
                     response.raise_for_status()
                     data = await asyncio.to_thread(parser, response.content)
-                    body = response.content
+                    body = response.content if store_body else None
                     self.db.execute("INSERT OR REPLACE INTO responses VALUES(?,?,?,?,?,0,NULL)",
                                     (key, request_url, source, body, now))
                     self.db.commit()
@@ -100,3 +100,27 @@ class Store:
             (provider, season, str(r[entity_key]), str(r['gameId']), json.dumps(r)) for r in rows
             if r.get(entity_key) is not None and r.get('gameId') is not None])
         self.db.commit()
+
+    def save_moneypuck(self, kind: str, season: int, rows: list[dict], entity_key: str):
+        now = time.time()
+        self.db.execute("""CREATE TABLE IF NOT EXISTS moneypuck_rows (
+            kind TEXT, season INTEGER, entity TEXT, game_id TEXT, situation TEXT,
+            body TEXT, fetched REAL,
+            PRIMARY KEY(kind, season, entity, game_id, situation)
+        )""")
+        self.db.executemany("INSERT OR REPLACE INTO moneypuck_rows VALUES(?,?,?,?,?,?,?)", [
+            (kind, season, str(r[entity_key]), str(r['gameId']), str(r.get('situation') or ''), json.dumps(r), now)
+            for r in rows if r.get(entity_key) is not None and r.get('gameId') is not None])
+        self.db.commit()
+
+    def load_moneypuck(self, kind: str, season: int) -> tuple[list[dict], float | None]:
+        table = self.db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='moneypuck_rows'"
+        ).fetchone()
+        if not table:
+            return [], None
+        rows = self.db.execute(
+            "SELECT body,fetched FROM moneypuck_rows WHERE kind=? AND season=?",
+            (kind, season),
+        ).fetchall()
+        return [json.loads(r[0]) for r in rows], max((r[1] for r in rows), default=None)

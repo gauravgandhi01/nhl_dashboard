@@ -105,6 +105,33 @@ def test_pagination_advances_by_actual_page_size(tmp_path):
     asyncio.run(scenario())
 
 
+def test_moneypuck_rows_are_normalized_without_raw_blob(tmp_path):
+    async def scenario():
+        store = Store(tmp_path / 'mp.sqlite3')
+        body = (
+            'team,gameId,gameDate,season,situation,playoffGame,iceTime,xGoalsFor,xGoalsAgainst,shotAttemptsFor,shotAttemptsAgainst\n'
+            'CAR,2025020001,2025-10-10,2025,5on5,0,3000,2.1,1.4,41,30\n'
+            'CAR,2025030001,2025-05-10,2025,5on5,1,3000,2.1,1.4,41,30\n'
+        ).encode()
+        await store.client.aclose()
+        store.client = httpx.AsyncClient(transport=httpx.MockTransport(lambda request: httpx.Response(200, content=body)))
+        providers = Providers(store)
+        feed = await providers.mp('teams', 20252026)
+        assert len(feed.data) == 1
+        rows, fetched = store.load_moneypuck('teams', 20252026)
+        assert len(rows) == 1
+        assert fetched is not None
+        raw = store.db.execute("SELECT body FROM responses WHERE source='MoneyPuck'").fetchone()
+        assert raw is None or raw[0] is None
+        await store.client.aclose()
+        store.client = httpx.AsyncClient(transport=httpx.MockTransport(lambda request: (_ for _ in ()).throw(AssertionError('network should not be used'))))
+        providers = Providers(store)
+        cached = await providers.mp('teams', 20252026)
+        assert cached.data == rows
+        await store.close()
+    asyncio.run(scenario())
+
+
 def test_last_ten_excludes_live_game_and_preserves_advanced_coverage():
     from unittest.mock import Mock
     class Fake:

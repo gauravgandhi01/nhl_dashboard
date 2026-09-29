@@ -4,8 +4,10 @@ import asyncio
 import csv
 import io
 import json
+import os
+import time
 import zipfile
-from datetime import datetime
+from datetime import datetime, timezone
 from urllib.robotparser import RobotFileParser
 
 from bs4 import BeautifulSoup
@@ -218,18 +220,28 @@ class Providers:
 
     async def mp(self, kind, season):
         key = (kind, season)
-        import time
         async with self.locks.setdefault(key, asyncio.Lock()):
             existing = self.memo.get(key)
             if existing and time.monotonic() - existing[0] < 600:
                 return existing[1]
             year = season // 10000
             url = MP_TEAMS if kind == 'teams' else f'https://peter-tanner.com/moneypuck/downloads/seasonPlayersSummary/{kind}/{year}.zip'
+            cached, fetched = self.store.load_moneypuck(kind, season)
+            refresh_hours = float(os.environ.get('NHL_MONEYPUCK_REFRESH_HOURS', '24'))
+            if cached and (refresh_hours <= 0 or not fetched or time.time() - fetched < refresh_hours * 3600):
+                feed = Feed(cached, 'MoneyPuck', url, datetime.fromtimestamp(fetched, timezone.utc).isoformat() if fetched else None)
+                self.memo[key] = (time.monotonic(), feed)
+                return feed
             parser = (lambda raw: parse_mp_teams(raw, year)) if kind == 'teams' else parse_mp_skaters if kind == 'skaters' else parse_mp_goalies
-            feed = await self.store.fetch(url, 'MoneyPuck', 21600, parser)
+            feed = await self.store.fetch(url, 'MoneyPuck', 21600, parser, store_body=False)
             self.memo[key] = (time.monotonic(), feed)
             if feed.data:
+                self.store.save_moneypuck(kind, season, feed.data, 'team' if kind == 'teams' else 'playerId')
                 self.store.save_games('moneypuck_' + kind, season, feed.data, 'team' if kind == 'teams' else 'playerId')
+            elif cached:
+                feed = Feed(cached, 'MoneyPuck', url, datetime.fromtimestamp(fetched, timezone.utc).isoformat() if fetched else None,
+                            True, feed.error or 'MoneyPuck refresh unavailable')
+                self.memo[key] = (time.monotonic(), feed)
             return feed
 
     async def dfo(self, path, parser):

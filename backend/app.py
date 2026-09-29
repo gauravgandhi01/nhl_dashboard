@@ -2,7 +2,6 @@ from contextlib import asynccontextmanager
 from datetime import date as Date
 from pathlib import Path
 from typing import Literal
-import os
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, Response
@@ -17,13 +16,14 @@ from .first_period_odds import FirstPeriodOdds
 from .streaks import Streaks
 from .moneyline import Moneylines
 from .player_props import PlayerProps
+from .runtime_db import database_path
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 @asynccontextmanager
 async def lifespan(app):
-    store = Store(Path(os.environ.get('NHL_DASHBOARD_DB', ROOT / 'data' / 'dashboard.sqlite3')))
+    store = Store(database_path(ROOT))
     providers = Providers(store)
     app.state.dashboard = Dashboard(providers)
     app.state.first_period = FirstPeriod(providers)
