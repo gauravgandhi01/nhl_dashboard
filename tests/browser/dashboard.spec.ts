@@ -8,7 +8,7 @@ test("signal flags identify the team and reveal their reasons on desktop and mob
 }) => {
   const response = await request.get(`/api/slate?date=${slateDate}`);
   const slate = await response.json();
-  const game = slate.games[0];
+  const game = { ...slate.games[0], state: "FUT" };
   slate.games = [game];
   const comparison = slate.comparisons[String(game.id)];
   comparison.away.signals = [
@@ -59,9 +59,13 @@ test("signal flags identify the team and reveal their reasons on desktop and mob
 
 test("desktop slate, matchup controls, lineup, and back navigation", async ({
   page,
+  request,
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  const slate = await (await request.get(`/api/slate?date=${slateDate}`)).json();
+  slate.games = slate.games.map((g: { state: string }) => ({ ...g, state: "FUT" }));
+  await page.route("**/api/slate?*", (route) => route.fulfill({ json: slate }));
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(`/?date=${slateDate}`);
   await expect(page.locator(".game-card").first()).toBeVisible();
@@ -144,11 +148,40 @@ test("desktop slate, matchup controls, lineup, and back navigation", async ({
   expect(errors).toEqual([]);
 });
 
+test("slate defaults to upcoming and filters started games", async ({
+  page,
+  request,
+}) => {
+  const slate = await (await request.get(`/api/slate?date=${slateDate}`)).json();
+  const games = slate.games.slice(0, 3).map((g: { state: string }, i: number) => ({
+    ...g,
+    state: i === 0 ? "FUT" : i === 1 ? "LIVE" : "OFF",
+  }));
+  slate.games = games;
+  slate.comparisons = Object.fromEntries(
+    games.map((g: { id: number }) => [String(g.id), slate.comparisons[String(g.id)]]),
+  );
+  await page.route("**/api/slate?*", (route) => route.fulfill({ json: slate }));
+  await page.goto(`/?date=${slateDate}`);
+  await expect(
+    page.getByRole("button", { name: /All games/i }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /Upcoming/i }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".game-card")).toHaveCount(1);
+  await page.getByRole("button", { name: /Started/i }).click();
+  await expect(page.locator(".game-card")).toHaveCount(2);
+  await page.getByRole("button", { name: /Final/i }).click();
+  await expect(page.locator(".game-card")).toHaveCount(1);
+});
+
 test("phone layout has no page overflow and controls remain usable", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto(`/?date=${slateDate}`);
+  await page.getByRole("button", { name: /Started/i }).click();
   await expect(page.locator(".game-card").first()).toBeVisible();
   const firstCard = await page.locator(".game-card").nth(0).boundingBox();
   const secondCard = await page.locator(".game-card").nth(1).boundingBox();

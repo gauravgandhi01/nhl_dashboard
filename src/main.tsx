@@ -77,6 +77,8 @@ const fmt = (n: number | null | undefined, digits = 1, suffix = "") =>
 const record = (s: Stats) =>
   s.wins == null ? "--" : `${s.wins}-${s.losses}-${s.ot_losses}`;
 const isFinal = (g: Game) => ["OFF", "FINAL"].includes(g.state);
+const isUpcoming = (g: Game) => ["FUT", "PRE"].includes(g.state);
+const isStarted = (g: Game) => !isUpcoming(g);
 const keyName = (value: string) =>
   value
     .normalize("NFKD")
@@ -477,14 +479,17 @@ function Slate() {
   const { data, error, loading, refreshing, refresh } = useData<SlateData>(
     slateUrl,
   );
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState("upcoming");
   const odds = useMoneylines(date);
   const [search, setSearch] = useState("");
   const games = data?.games || [];
   const filtered = games.filter(
     (g) =>
-      (filter === "all" ||
-        (filter === "final" ? isFinal(g) : ["FUT", "PRE"].includes(g.state))) &&
+      (filter === "final"
+        ? isFinal(g)
+        : filter === "started"
+          ? isStarted(g)
+          : isUpcoming(g)) &&
       `${g.away.name} ${g.home.name} ${g.away.abbrev} ${g.home.abbrev}`
         .toLowerCase()
         .includes(search.toLowerCase()),
@@ -492,7 +497,7 @@ function Slate() {
   const changeDate = (value: string) => {
     if (value) {
       setParams({ date: value });
-      setFilter("all");
+      setFilter("upcoming");
     }
   };
   return (
@@ -543,8 +548,8 @@ function Slate() {
       <div className="toolbar">
         <div className="segments" aria-label="Game status">
           {[
-            ["all", "All games"],
             ["upcoming", "Upcoming"],
+            ["started", "Started"],
             ["final", "Final"],
           ].map(([key, label]) => (
             <button
@@ -554,7 +559,13 @@ function Slate() {
               onClick={() => setFilter(key)}
             >
               {label}
-              {key === "all" && <span className="count">{games.length}</span>}
+              <span className="count">
+                {key === "upcoming"
+                  ? games.filter(isUpcoming).length
+                  : key === "started"
+                    ? games.filter(isStarted).length
+                    : games.filter(isFinal).length}
+              </span>
             </button>
           ))}
         </div>
