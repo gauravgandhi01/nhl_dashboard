@@ -123,7 +123,7 @@ async def frontend(path: str):
     index = ROOT / 'dist' / 'index.html'
     if not index.exists():
         raise HTTPException(503, 'Build the frontend first with npm run build.')
-    return FileResponse(index)
+    return FileResponse(index, headers={'Cache-Control': 'no-store'})
 
 
 @app.head('/{path:path}')
@@ -131,4 +131,5 @@ async def frontend_head(path: str):
     if path.startswith('api/'):
         raise HTTPException(404, 'Unknown API route')
     index = ROOT / 'dist' / 'index.html'
-    return Response(status_code=200 if index.exists() else 503)
+    return Response(status_code=200 if index.exists() else 503,
+                    headers={'Cache-Control': 'no-store'})

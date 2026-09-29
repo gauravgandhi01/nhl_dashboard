@@ -105,7 +105,8 @@ function useData<T>(url: string) {
       busy = true;
       setState((s) => ({ ...s, refreshing: true }));
       try {
-        const r = await fetch(url, { signal: controller.signal });
+        const requestUrl = new URL(url, window.location.origin).toString();
+        const r = await fetch(requestUrl, { signal: controller.signal });
         const body = await r.json();
         if (!r.ok) throw new Error(body.detail || "Unable to load data.");
         if (active)
@@ -472,8 +473,9 @@ function Slate() {
   const date = /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") || "")
     ? params.get("date")!
     : today();
+  const slateUrl = `/api/slate?${new URLSearchParams({ date })}`;
   const { data, error, loading, refreshing, refresh } = useData<SlateData>(
-    `/api/slate?date=${date}`,
+    slateUrl,
   );
   const [filter, setFilter] = useState("all");
   const odds = useMoneylines(date);
