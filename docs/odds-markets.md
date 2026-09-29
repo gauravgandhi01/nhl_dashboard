@@ -1,5 +1,22 @@
 # NHL Odds: Observed Coverage and Integration
 
+## Implemented Player Integration
+
+The Players expansion, Lines tiles, and On-slate skater Streaks now share cached
+props keyed by NHL game and player IDs. The dedicated book allowlist is
+`ballybet,betonlineag,draftkings,fanatics,fanduel,kalshi,novig,prophetx,williamhill_us`.
+Only explicit load actions request paid odds. See the README's Shared Player Props
+section for selection rules, matching safeguards, aliases, and endpoints.
+Anytime Yes and goals Over 0.5 are one displayed market (likewise No/Under 0.5),
+including alternate 0.5-goal offers. Best prices compete across both feeds in all
+three views. Higher thresholds stay separate; raw market provenance is retained.
+
+One September 29 live verification fetched ten markets for FLA/CAR, matched 36
+players uniquely to NHL rosters, and had zero unresolved provider names in that
+response. It cost ten credits, leaving 448 at retrieval. This is a new snapshot,
+not evidence that the earlier roster anomaly never occurred. Historical research
+notes below describe the coverage at their respective probe times.
+
 ## Expanded US/US2 Probe: September 29, 2026, 03:07 UTC
 
 This follow-up used the then-current `us,us2` configuration, checked the FLA/CAR and
@@ -80,8 +97,8 @@ coverage can vary. Set `config/odds.json` `"player_prop_market_limit"` to cap
 the sample odds request. The report now includes
 `bookmaker_coverage`, `bookmaker_regions`, `us_exchange_bookmakers`,
 `available_bookmaker_options`, `odds_scope`, request params, selected markets,
-and the sampled event. Player props remain research-only in the dashboard; this
-follow-up does not add a prop UI.
+and the sampled event. This diagnostic is separate from the now-implemented
+shared player-prop cache and UI described above.
 
 ## US Exchange Probe: September 29, 2026, 03:30 UTC
 
@@ -190,8 +207,8 @@ Over 0.5 corresponds to 1+, Over 1.5 to 2+, etc.; preserve actual lines in stora
 
 Start with shots, points, assists, and anytime goalscorer. Use one explicit
 "Load props" action for selected events/markets, cache and deduplicate, and show
-source/time/availability. Do not fetch all props on navigation. No player-prop UI
-or automated matching is shipped here; this is the requested research proposal.
+source/time/availability. Do not fetch all props on navigation. This original
+proposal is now partly implemented; historical games-over-line counts remain deferred.
 
 ## Moneyline Behavior and Cost
 

@@ -70,6 +70,7 @@ export type Side = {
     updated_at: string | null;
   } | null;
   lineup_usage: Record<string, Stats>;
+  lineup_player_ids?: Record<string, number | null>;
   lineup_source: Source;
   injuries: {
     name: string;

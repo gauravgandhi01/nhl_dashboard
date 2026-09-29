@@ -16,6 +16,7 @@ from .first_period import FirstPeriod
 from .first_period_odds import FirstPeriodOdds
 from .streaks import Streaks
 from .moneyline import Moneylines
+from .player_props import PlayerProps
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -29,6 +30,7 @@ async def lifespan(app):
     app.state.first_period_odds = FirstPeriodOdds(providers)
     app.state.streaks = Streaks(providers)
     app.state.moneylines = Moneylines(providers)
+    app.state.player_props = PlayerProps(providers)
     yield
     await app.state.first_period.close()
     await app.state.streaks.close()
@@ -66,6 +68,16 @@ async def moneyline_refresh(date: Date | None = None):
 @app.get('/api/streaks')
 async def streaks(date: Date | None = None, scope: Literal['league', 'tonight'] = 'league'):
     return await app.state.streaks.view(date.isoformat() if date else today_et(), scope)
+
+
+@app.get('/api/player-props')
+async def player_props(date: Date | None = None, game_id: int | None = None):
+    return await app.state.player_props.view(date.isoformat() if date else today_et(), game_id)
+
+
+@app.post('/api/player-props/refresh')
+async def player_props_refresh(date: Date | None = None, game_id: int | None = None):
+    return await app.state.player_props.view(date.isoformat() if date else today_et(), game_id, refresh=True)
 
 
 @app.get('/api/first-period')

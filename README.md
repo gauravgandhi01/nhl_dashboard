@@ -220,8 +220,54 @@ include `fanduel`, `draftkings`, `betmgm`, `espnbet`, `fanatics`, `ballybet`,
 - `POST /api/odds/moneyline/refresh?date=YYYY-MM-DD` (explicit loading)
 
 See [the odds coverage report](docs/odds-markets.md) for the live probe, actual
-player-prop coverage, quota costs, identity caveats, and proposed Players/Streaks
-integration. Player props are researched, not yet added to the UI.
+player-prop coverage, quota costs, and identity caveats.
+
+## Shared Player Props
+
+Player odds appear in expanded Players rows (assists, goals/anytime, points,
+shots on goal, and first goalscorer), compact Lines tiles, and the relevant
+On-slate skater Streaks rows. League-wide streaks and goalie boards do not load
+player props. Goalies remain outside this skater integration.
+
+Prop requests and responses are restricted to `ballybet`, `betonlineag`,
+`draftkings`, `fanatics`, `fanduel`, `kalshi`, `novig`, `prophetx`, and
+`williamhill_us`. This dedicated allowlist does not change the broader moneyline
+or first-period configuration. Prices may be missing at any of these books.
+
+**Load game props** fetches one event; **Load slate props** fetches uncached
+eligible games for the selected date. Navigation/expansion only reads the shared
+SQLite cache. Ten requested markets across nine books cost at most ten credits
+per game with nonempty coverage; each load button's tooltip gives an upper bound.
+Prices cache for 30 minutes, concurrent refreshes deduplicate, failures back off
+for ten minutes, and last-good quotes remain visibly stale. Started games do
+not fetch new prices. Postponed/canceled games suppress cached player quotes.
+
+Canonical identity is `(NHL game ID, NHL player ID)`. Both event rosters must be
+current before fetching paid prices. Match complete normalized names only,
+with accent/punctuation normalization; never guess from surnames or initials.
+`config/player_aliases.json` optionally maps verified alternate full names to NHL
+IDs, for example `{"Verified Alternate Name": 1234567}`. An alias is accepted
+only when that ID uniquely belongs to the event rosters and does not conflict
+with an exact match. Ambiguous and out-of-roster names are excluded and counted.
+Daily Faceoff line entries use the same resolver to expose `lineup_player_ids`.
+
+Expanded rows default to the best available price on each side of the displayed
+line, with alternative thresholds and individual books selectable. Same-stat,
+same-threshold standard/alternate prices can compete; different thresholds never
+do. Anytime Yes/No and goals Over/Under 0.5 share one option and compete for the
+best price; higher goal thresholds stay separate. Original provider markets
+remain in the cache, with source details retained in quote tooltips. Points default to
+the lowest offered threshold; SOG defaults to the most widely offered standard
+threshold. Lines use only standard SOG prices, lowest-threshold points Over, and
+the best Anytime/goals Over 0.5 price. Missing sides stay unavailable.
+Book/time and stale status are exposed on quotes; exchanges may have liquidity
+or settlement conditions not captured by their listed price. No bets are placed.
+
+- `GET /api/player-props?date=YYYY-MM-DD&game_id=...` reads cached props; game ID optional.
+- `POST /api/player-props/refresh?date=YYYY-MM-DD&game_id=...` explicitly fetches props.
+
+There are no player-specific historical hit-rate calculations in this change;
+existing L5/L10/season form remains alongside the quotes.
 
 ## Development and Checks
 

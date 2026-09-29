@@ -5,6 +5,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from .cache import Feed
+from .player_identity import resolve_player
 from .signals import career_nhl_games, matchup_signals
 from .providers import ALIASES, TEAM_NAMES, Providers, starter_for
 from .stats import (advanced_summary, choose_season, goalie_summary, match_player, normalized_name,
@@ -258,5 +259,8 @@ class Dashboard:
         return ({'team': team_info(raw_team), 'summary': team_summary(selected), 'advanced': advanced_summary(advanced),
                  'recent': logs, 'rest': rest_context((schedule.data or {}).get('games', []), game['gameDate']),
                  'starter': starter, 'goalies': goalie_players, 'roster': players, 'roster_source': roster.meta(),
-                 'lineup': lineup.data, 'lineup_usage': usage, 'lineup_source': lineup.meta(), 'injuries': team_injuries,
+                 'lineup': lineup.data, 'lineup_usage': usage,
+                 'lineup_player_ids': {name: (resolve_player(name, skater_players) or {}).get('id')
+                    for names in (lineup.data or {}).get('sections', {}).values() for name in names},
+                 'lineup_source': lineup.meta(), 'injuries': team_injuries,
                  'injury_source': injuries.meta(), 'stats_source': summary.meta()}, sources)

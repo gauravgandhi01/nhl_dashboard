@@ -1,0 +1,461 @@
+import { useEffect, useRef, useState } from "react";
+import { Download } from "lucide-react";
+
+export type Quote = {
+  side: string;
+  price: number;
+  bookmaker: string;
+  book: string;
+  market?: string;
+  source_side?: string;
+  source_point?: number;
+  updated_at: string | null;
+};
+export type PropLine = {
+  id: string;
+  market: string;
+  point: number | null;
+  alternate: boolean;
+  quotes: Quote[];
+};
+export type PropPlayer = {
+  id: number;
+  name: string;
+  team: string;
+  markets: Record<string, PropLine[]>;
+};
+type PropGame = {
+  game_id: number;
+  eligible: boolean;
+  status: string;
+  retrieved_at: string | null;
+  error: string | null;
+  players: Record<string, PropPlayer>;
+  unmatched_names: string[];
+};
+type PropData = {
+  date: string;
+  configured: boolean;
+  games: Record<string, PropGame>;
+  error: string | null;
+  max_credits_per_game: number;
+};
+export type PropsState = ReturnType<typeof usePlayerProps>;
+
+export const american = (n: number) => (n > 0 ? `+${n}` : String(n));
+const shortBook: Record<string, string> = {
+  ballybet: "Bally",
+  betonlineag: "BOL",
+  draftkings: "DK",
+  fanatics: "FAN",
+  fanduel: "FD",
+  kalshi: "KAL",
+  novig: "NV",
+  prophetx: "PX",
+  williamhill_us: "CZR",
+};
+const stamp = (s: string | null) =>
+  s
+    ? new Date(s).toLocaleString("en-US", {
+        timeZone: "America/New_York",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      }) + " ET"
+    : "time unavailable";
+const old = (q: Quote) =>
+  !q.updated_at ||
+  !Number.isFinite(Date.parse(q.updated_at)) ||
+  Date.now() - Date.parse(q.updated_at) >= 1800000;
+
+export function bestQuote(line: PropLine | undefined, side: string) {
+  const all = line?.quotes.filter((q) => q.side === side) || [];
+  const fresh = all.filter((q) => !old(q));
+  return [...(fresh.length ? fresh : all)].sort(
+    (a, b) => b.price - a.price || a.bookmaker.localeCompare(b.bookmaker),
+  )[0];
+}
+
+export function propLines(
+  player: PropPlayer | undefined,
+  family: string,
+  standardOnly = false,
+) {
+  const lines =
+    family === "scorer"
+      ? [...(player?.markets.anytime || []), ...(player?.markets.goals || [])]
+      : player?.markets[family] || [];
+  const grouped = new Map<string, PropLine>();
+  for (const raw of lines.filter((l) => !standardOnly || !l.alternate)) {
+    // One goal is the same outcome whether offered as Anytime Yes or goals O0.5.
+    const line =
+      family === "scorer" && raw.point === 0.5
+        ? {
+            ...raw,
+            market: "player_goal_scorer_anytime",
+            point: null,
+            alternate: false,
+            quotes: raw.quotes.map((q) => ({
+              ...q,
+              source_side: q.side,
+              source_point: 0.5,
+              side:
+                q.side === "over" ? "yes" : q.side === "under" ? "no" : q.side,
+            })),
+          }
+        : raw;
+    const key = line.point == null ? line.market : String(line.point);
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.quotes.push(...line.quotes);
+      existing.alternate = existing.alternate && line.alternate;
+    } else
+      grouped.set(key, {
+        ...line,
+        id: `${family}:${key}`,
+        quotes: [...line.quotes],
+      });
+  }
+  return [...grouped.values()].sort((a, b) => {
+    if (family === "scorer" && (a.point == null) !== (b.point == null))
+      return a.point == null ? -1 : 1;
+    if (family === "shots") {
+      if (a.alternate !== b.alternate) return a.alternate ? 1 : -1;
+      const count = (l: PropLine) =>
+        new Set(
+          l.quotes
+            .filter((q) => l.alternate || !q.market?.endsWith("_alternate"))
+            .map((q) => q.bookmaker),
+        ).size;
+      if (count(a) !== count(b)) return count(b) - count(a);
+    }
+    return (
+      (a.point ?? 0) - (b.point ?? 0) ||
+      Number(a.alternate) - Number(b.alternate) ||
+      a.id.localeCompare(b.id)
+    );
+  });
+}
+
+export function usePlayerProps(date: string, gameId?: number, enabled = true) {
+  const [data, setData] = useState<PropData | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const controller = useRef<AbortController | null>(null);
+  const request = async (refresh = false, target = gameId) => {
+    controller.current?.abort();
+    const current = new AbortController();
+    controller.current = current;
+    setBusy(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({ date });
+      if (target != null) params.set("game_id", String(target));
+      const r = await fetch(
+        `/api/player-props${refresh ? "/refresh" : ""}?${params}`,
+        { method: refresh ? "POST" : "GET", signal: current.signal },
+      );
+      if (!r.ok) throw new Error();
+      const body: PropData = await r.json();
+      if (!current.signal.aborted)
+        setData((previous) => ({
+          ...body,
+          games: {
+            ...(previous?.date === date ? previous.games : {}),
+            ...body.games,
+          },
+        }));
+    } catch {
+      if (!current.signal.aborted) setError("Player odds unavailable");
+    } finally {
+      if (!current.signal.aborted) setBusy(false);
+    }
+  };
+  useEffect(() => {
+    setData(null);
+    setError(null);
+    setBusy(false);
+    if (enabled) void request();
+    return () => controller.current?.abort();
+  }, [date, gameId, enabled]);
+  return {
+    data: enabled && data?.date === date ? data : null,
+    busy,
+    error,
+    load: (id?: number) => void request(true, id ?? gameId),
+  };
+}
+
+export function PropsControls({
+  state,
+  gameId,
+}: {
+  state: PropsState;
+  gameId?: number;
+}) {
+  const games = Object.values(state.data?.games || {}).filter(
+    (g) => gameId == null || g.game_id === gameId,
+  );
+  const eligible = games.filter((g) => g.eligible);
+  const pending = eligible.filter((g) => g.status !== "available");
+  const unmatched = games.reduce(
+    (n, g) => n + (g.unmatched_names?.length || 0),
+    0,
+  );
+  const status =
+    state.error || state.data?.error || games.find((g) => g.error)?.error;
+  return (
+    <div className="props-controls">
+      <button
+        className="text-button"
+        disabled={state.busy || !state.data?.configured || !eligible.length}
+        onClick={() => state.load(gameId)}
+        title={`Selected nine sportsbooks. At most ${(state.data?.max_credits_per_game || 10) * pending.length} credits for uncached games. 30-minute cache. Exchange prices may depend on liquidity; check book terms.`}
+      >
+        <Download size={13} />
+        {state.busy
+          ? "Loading props"
+          : gameId != null
+            ? "Load game props"
+            : "Load slate props"}
+      </button>
+      <span className={status ? "warning" : "muted"} role="status">
+        {status ||
+          (state.data?.configured === false
+            ? "Odds not configured"
+            : state.data
+              ? `${games.filter((g) => g.status === "available").length}/${games.length} games cached`
+              : "Checking prop cache")}
+      </span>
+      {games.some((g) => g.status === "stale") && (
+        <span className="warning">Stale prices</span>
+      )}
+      {unmatched > 0 && (
+        <span
+          className="warning"
+          title="Provider names without a unique match on this game's NHL rosters are excluded"
+        >
+          {unmatched} unmatched names
+        </span>
+      )}
+      <a href="https://the-odds-api.com/" target="_blank" rel="noreferrer">
+        The Odds API
+      </a>
+    </div>
+  );
+}
+
+function Price({
+  quote,
+  prefix = "",
+  stale,
+  showBook = true,
+}: {
+  quote?: Quote;
+  prefix?: string;
+  stale?: boolean;
+  showBook?: boolean;
+}) {
+  if (!quote) return <span className="prop-missing">{prefix} --</span>;
+  const title = `${quote.book}: ${quote.side} ${american(quote.price)}${quote.source_side ? `; source: goals ${quote.source_side} ${quote.source_point}` : ""}${quote.market?.endsWith("_alternate") ? "; alternate market" : ""}; updated ${stamp(quote.updated_at)}${stale || old(quote) ? "; stale snapshot" : ""}`;
+  return (
+    <span
+      className={`prop-quote ${stale || old(quote) ? "prop-stale" : ""}`}
+      title={title}
+      tabIndex={0}
+      aria-label={title}
+    >
+      {prefix && <span>{prefix} </span>}
+      <b>{american(quote.price)}</b>
+      {showBook && <small>{shortBook[quote.bookmaker] || quote.book}</small>}
+      {(stale || old(quote)) && <small>stale</small>}
+    </span>
+  );
+}
+
+const lineLabel = (line: PropLine) =>
+  line.market === "player_goal_scorer_anytime"
+    ? "ATG / O0.5"
+    : line.point == null
+      ? "First goal"
+      : `${line.point}${line.alternate ? " alt" : ""}`;
+
+function MarketRow({
+  player,
+  family,
+  label,
+  stale,
+}: {
+  player?: PropPlayer;
+  family: string;
+  label: string;
+  stale: boolean;
+}) {
+  const lines = propLines(player, family);
+  const [choice, setChoice] = useState("");
+  const [book, setBook] = useState("best");
+  const selected = lines.find((l) => l.id === choice) || lines[0];
+  const books = [
+    ...new Map(
+      (selected?.quotes || []).map((q) => [q.bookmaker, q.book]),
+    ).entries(),
+  ];
+  const selectedBook = books.some(([id]) => id === book) ? book : "best";
+  const line =
+    selectedBook === "best"
+      ? selected
+      : selected && {
+          ...selected,
+          quotes: selected.quotes.filter((q) => q.bookmaker === selectedBook),
+        };
+  const binary = selected?.point == null;
+  return (
+    <div className="prop-market-row">
+      <span className="prop-market-label">{label}</span>
+      {lines.length ? (
+        <select
+          aria-label={`${label} line`}
+          value={selected.id}
+          onChange={(e) => setChoice(e.target.value)}
+        >
+          {lines.map((l) => (
+            <option key={l.id} value={l.id}>
+              {lineLabel(l)}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <span className="prop-missing">Unavailable</span>
+      )}
+      <Price
+        quote={bestQuote(line, binary ? "yes" : "over")}
+        prefix={binary ? "Yes" : "O"}
+        stale={stale}
+      />
+      <Price
+        quote={bestQuote(line, binary ? "no" : "under")}
+        prefix={binary ? "No" : "U"}
+        stale={stale}
+      />
+      <select
+        aria-label={`${label} sportsbook`}
+        value={selectedBook}
+        disabled={!books.length}
+        onChange={(e) => setBook(e.target.value)}
+      >
+        <option value="best">Best prices</option>
+        {books.map(([key, name]) => (
+          <option key={key} value={key}>
+            {name}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+export function PlayerPropPanel({
+  state,
+  gameId,
+  playerId,
+}: {
+  state: PropsState;
+  gameId: number;
+  playerId: number;
+}) {
+  const game = state.data?.games[String(gameId)];
+  const player = game?.players[String(playerId)];
+  return (
+    <section className="player-prop-panel" aria-label="Player props">
+      <div className="prop-panel-heading">
+        <h3>Player odds</h3>
+        <span>
+          {game?.retrieved_at
+            ? `${!game.eligible ? "Pregame snapshot / " : ""}${stamp(game.retrieved_at)}`
+            : "Not loaded"}
+        </span>
+      </div>
+      <PropsControls state={state} gameId={gameId} />
+      {[
+        ["assists", "Assists"],
+        ["scorer", "Goals"],
+        ["points", "Points"],
+        ["shots", "Shots on goal"],
+        ["first_goal", "First goalscorer"],
+      ].map(([family, label]) => (
+        <MarketRow
+          key={`${gameId}-${playerId}-${family}`}
+          player={player}
+          family={family}
+          label={label}
+          stale={game?.status === "stale" || !!state.error}
+        />
+      ))}
+    </section>
+  );
+}
+
+export function CompactProps({
+  state,
+  gameId,
+  playerId,
+  family,
+}: {
+  state: PropsState;
+  gameId: number;
+  playerId?: number | null;
+  family?: string;
+}) {
+  const game = state.data?.games[String(gameId)];
+  const player = playerId != null ? game?.players[String(playerId)] : undefined;
+  const families = family ? [family] : ["points", "shots", "scorer"];
+  const stale = game?.status === "stale" || !!state.error;
+  const rows = families.flatMap((f) => {
+    const lines = propLines(player, f, f === "shots" && !family);
+    const line =
+      f === "scorer"
+        ? lines.find((l) => l.point == null) || lines.find((l) => l.point === 0.5)
+        : lines[0];
+    const binary = f === "scorer";
+    const over = bestQuote(line, line?.point == null ? "yes" : "over");
+    const under = bestQuote(line, line?.point == null ? "no" : "under");
+    if (!over && !under) return [];
+    const label = f === "points" ? "PTS" : f === "shots" ? "SOG" : "ATG";
+    return [{ f, line, binary, over, under, label }];
+  });
+  if (!rows.length) return null;
+  return (
+    <div
+      className={`compact-props ${family ? "single-prop" : ""}`}
+      aria-label="Quick player odds"
+    >
+      {rows.map(({ f, line, binary, over, under, label }) => {
+        return (
+          <div className="compact-prop-row" key={f}>
+            <span className="compact-prop-label">
+              {label}
+              {line?.point != null && !binary
+                ? ` ${line.point}`
+                : ""}
+            </span>
+            {over && (
+              <Price
+                quote={over}
+                stale={stale}
+                showBook={false}
+              />
+            )}
+            {over && under && <span className="prop-slash">/</span>}
+            {under && (
+              <Price quote={under} stale={stale} showBook={false} />
+            )}
+          </div>
+        );
+      })}
+      {game && !game.eligible && (
+        <span className="prop-snapshot">Pregame snapshot</span>
+      )}
+    </div>
+  );
+}

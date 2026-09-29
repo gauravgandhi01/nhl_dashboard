@@ -40,6 +40,7 @@ import "./style.css";
 import { Players } from "./Players";
 import { FirstPeriod } from "./FirstPeriod";
 import { Streaks } from "./Streaks";
+import { usePlayerProps, PropsControls, CompactProps, type PropsState } from "./PlayerProps";
 import { useMoneylines, MoneylineControls, TeamMoneyline } from "./Moneylines";
 
 const et = "America/New_York";
@@ -1034,7 +1035,7 @@ function Roster({ side, season }: { side: Side; season: string }) {
   );
 }
 
-function Lineups({ side }: { side: Side }) {
+function Lineups({ side, props, gameId }: { side: Side; props: PropsState; gameId: number }) {
   const sections = side.lineup?.sections;
   const [strength, setStrength] = useState<"all" | "5v5">("all");
   const hasFiveOnFive = Object.values(side.lineup_usage || {}).some(
@@ -1082,7 +1083,7 @@ function Lineups({ side }: { side: Side }) {
                 >
                   {players.map((p, i) => (
                     <div className="line-player" key={p + i}>
-                      <strong>{p}</strong>
+                      <strong title={p}>{p.replace(/^(\S+)\s+/, (_, first: string) => first[0] + ". ")}</strong>
                       <span>
                         <b>S</b> {usageValue(p, "season")}
                       </span>
@@ -1092,6 +1093,7 @@ function Lineups({ side }: { side: Side }) {
                       <span>
                         <b>L5</b> {usageValue(p, "l5")}
                       </span>
+                      <CompactProps state={props} gameId={gameId} playerId={side.lineup_player_ids?.[p]} />
                     </div>
                   ))}
                 </div>
@@ -1141,7 +1143,7 @@ function Matchup() {
   const { id } = useParams();
   const [params, setParams] = useSearchParams();
   const window = params.get("window") === "last10" ? "last10" : "season";
-  const tab = ["comparison", "rosters", "lineups"].includes(
+  const tab = ["comparison", "lineups"].includes(
     params.get("tab") || "",
   )
     ? params.get("tab")!
@@ -1162,6 +1164,7 @@ function Matchup() {
     };
   }, [data]);
   const slateDate = params.get("date") || data?.game.date || today();
+  const props = usePlayerProps(data?.game.date || slateDate, Number(id), tab === "lineups" && !!data);
   return (
     <>
       <Link className="back-link" to={`/?date=${slateDate}`}>
@@ -1225,7 +1228,6 @@ function Matchup() {
             <nav className="tabs" aria-label="Matchup views">
               {[
                 ["comparison", "Comparison"],
-                ["rosters", "Rosters"],
                 ["lineups", "Lines & injuries"],
               ].map(([key, name]) => (
                 <button
@@ -1310,16 +1312,14 @@ function Matchup() {
                 </div>
               </section>
             </>
-          ) : tab === "rosters" ? (
-            <div className="two-columns tab-content">
-              <Roster side={data.away} season={data.season_label} />
-              <Roster side={data.home} season={data.season_label} />
-            </div>
           ) : (
-            <div className="two-columns tab-content">
-              <Lineups side={data.away} />
-              <Lineups side={data.home} />
-            </div>
+            <>
+              <PropsControls state={props} gameId={data.game.id} />
+              <div className="two-columns tab-content">
+                <Lineups side={data.away} props={props} gameId={data.game.id} />
+                <Lineups side={data.home} props={props} gameId={data.game.id} />
+              </div>
+            </>
           )}
           <Sources sources={data.sources} />
         </>

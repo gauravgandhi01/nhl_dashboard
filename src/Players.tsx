@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import type { Source, Stats } from "./types";
 import { buildPeers, cellFormat, type Peers } from "./playerFormatting";
+import { usePlayerProps, PropsControls, PlayerPropPanel, type PropsState } from "./PlayerProps";
 
 type Window = "last5" | "last10" | "season";
 type Skater = {
@@ -138,6 +139,7 @@ export function Players({
   const [position, setPosition] = useState("all");
   const [sort, setSort] = useState({ key: "points_pg", desc: true });
   const [expanded, setExpanded] = useState<string | null>(null);
+  const props = usePlayerProps(date);
   const update = (key: string, value: string) => {
     if (!value) return;
     const next = new URLSearchParams(params);
@@ -304,6 +306,7 @@ export function Players({
           </select>
         </div>
       </div>
+      <PropsControls state={props} />
       {!data && !error ? (
         <div className="loading-label" role="status">
           <RefreshCw className="spin" size={14} />
@@ -402,6 +405,7 @@ export function Players({
                           date={date}
                           format={format}
                           peers={peers}
+                          props={props}
                         />
                       );
                     })}
@@ -443,6 +447,7 @@ function PlayerRows({
   date,
   format,
   peers,
+  props,
 }: {
   p: Skater;
   window: Window;
@@ -450,6 +455,7 @@ function PlayerRows({
   toggle: () => void;
   date: string;
   peers: Peers;
+  props: PropsState;
   format: (
     key: string,
     n: number | null | undefined,
@@ -585,6 +591,7 @@ function PlayerRows({
                   ))}
                 </tbody>
               </table>
+              <PlayerPropPanel state={props} gameId={p.game_id} playerId={p.id} />
             </div>
           </td>
         </tr>

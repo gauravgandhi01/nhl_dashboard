@@ -8,6 +8,7 @@ import pytest
 from backend.cache import Store, Feed
 import backend.first_period_odds as first_period_module
 from backend.first_period_odds import FirstPeriodOdds, event_game, market_price
+from backend.odds_config import configured_bookmakers
 
 
 def event():
@@ -65,8 +66,8 @@ def test_odds_opt_in_caching_quota_and_secret_redaction(tmp_path,monkeypatch,mod
                 assert request.url.params['bookmakers']=='fanduel,espnbet'
                 assert 'regions' not in request.url.params
             else:
-                assert request.url.params['regions']=='us,us2,us_ex'
-                assert 'bookmakers' not in request.url.params
+                assert request.url.params['bookmakers']==','.join(configured_bookmakers())
+                assert 'regions' not in request.url.params
             body={**event(),**market()}
             if mode=='missing':body['bookmakers']=[]
             if mode=='mismatch':body['home_team']='Boston Bruins'
@@ -77,7 +78,7 @@ def test_odds_opt_in_caching_quota_and_secret_redaction(tmp_path,monkeypatch,mod
         results=await asyncio.gather(odds.refresh('2026-09-28'),odds.refresh('2026-09-28'))
         if mode in ['success','bookmaker_filter']:
             assert results[0]['prices']['2026020001']['total']==1.5
-            assert results[0]['odds_scope']['mode']==('bookmakers' if mode=='bookmaker_filter' else 'regions')
+            assert results[0]['odds_scope']['mode']=='bookmakers'
             assert len(calls)==2
             store.db.execute('UPDATE first_period_odds SET fetched=0,attempted=0');store.db.commit()
             async def fail(request):return httpx.Response(403)

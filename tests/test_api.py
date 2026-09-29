@@ -71,6 +71,8 @@ def test_api_validation_and_spa_routes(tmp_path, monkeypatch):
     with TestClient(app) as client:
         assert client.get('/api/health').json()['status'] == 'ok'
         assert client.get('/api/slate?date=not-a-date').status_code == 422
+        assert client.get('/api/player-props?date=not-a-date').status_code == 422
+        assert client.post('/api/player-props/refresh?game_id=invalid').status_code == 422
         assert client.get('/api/odds/moneyline?date=not-a-date').status_code == 422
         assert client.post('/api/odds/moneyline/refresh?date=not-a-date').status_code == 422
         assert client.get('/api/odds/moneyline?date=2026-09-28').json()['prices'] == {}

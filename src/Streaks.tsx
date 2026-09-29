@@ -11,6 +11,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import type { Source } from "./types";
+import { usePlayerProps, PropsControls, CompactProps, type PropsState } from "./PlayerProps";
 
 type Entry = {
   id: number;
@@ -136,10 +137,12 @@ function Leaderboard({
   board,
   date,
   unavailable,
+  props,
 }: {
   board: Board;
   date: string;
   unavailable: boolean;
+  props?: PropsState;
 }) {
   const streak = board.id.endsWith("streak");
   const lastTen =
@@ -187,6 +190,10 @@ function Leaderboard({
                       </Link>
                     ))}
                   </div>
+                  {props && board.kind === "skater" && p.matchups.map(m => (
+                    <CompactProps key={m.game_id} state={props} gameId={m.game_id} playerId={p.id}
+                      family={board.id === "shots10" ? "shots" : ["goals10", "goal_streak"].includes(board.id) ? "scorer" : "points"} />
+                  ))}
                   {(p.seasons.length > 1 || p.stale) && (
                     <div className="streak-last-game">
                       {p.seasons.length > 1 && (
@@ -266,6 +273,7 @@ export function Streaks({
     : today();
   const scope = params.get("scope") === "tonight" ? "tonight" : "league";
   const kind = params.get("kind") === "goalie" ? "goalie" : "skater";
+  const props = usePlayerProps(date, undefined, scope === "tonight" && kind === "skater");
   const update = (key: string, value: string) => {
     if (!value) return;
     const next = new URLSearchParams(params);
@@ -355,6 +363,7 @@ export function Streaks({
           <RefreshCw size={15} className={busy ? "spin" : ""} />
         </button>
       </div>
+      {scope === "tonight" && kind === "skater" && <PropsControls state={props} />}
       {error ? (
         <div className="state-message">
           <h2>Streaks unavailable</h2>
@@ -427,6 +436,7 @@ export function Streaks({
                       key={b.id}
                       board={b}
                       date={date}
+                      props={scope === "tonight" && kind === "skater" ? props : undefined}
                       unavailable={
                         scope === "tonight" && !data.schedule_available
                       }

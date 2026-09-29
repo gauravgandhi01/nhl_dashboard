@@ -9,6 +9,7 @@ import pytest
 from backend.cache import Store, Feed
 import backend.moneyline as moneyline_module
 from backend.moneyline import Moneylines, moneyline_prices
+from backend.odds_config import configured_bookmakers
 from backend.odds_client import odds_client
 
 
@@ -73,8 +74,8 @@ def test_cache_and_failure_isolation(tmp_path, monkeypatch, mode):
                 assert request.url.params['bookmakers'] == 'fanduel,espnbet'
                 assert 'regions' not in request.url.params
             else:
-                assert request.url.params['regions'] == 'us,us2,us_ex'
-                assert 'bookmakers' not in request.url.params
+                assert request.url.params['bookmakers'] == ','.join(configured_bookmakers())
+                assert 'regions' not in request.url.params
             assert request.url.params['commenceTimeFrom'] == '2026-11-01T04:00:00Z'
             assert request.url.params['commenceTimeTo'] == '2026-11-02T04:59:59Z'
             if mode in ['quota', 'failure']:
@@ -88,7 +89,7 @@ def test_cache_and_failure_isolation(tmp_path, monkeypatch, mode):
         if mode in ['success', 'bookmaker_filter']:
             assert results[0]['prices']['2026020001'][0]['away'] == 120
             assert results[0]['prices']['2026020001'][0]['name'] == 'Best available'
-            assert results[0]['odds_scope']['mode'] == ('bookmakers' if mode == 'bookmaker_filter' else 'regions')
+            assert results[0]['odds_scope']['mode'] == 'bookmakers'
             assert len(calls) == 1
             store.db.execute('UPDATE moneyline_odds SET fetched=0,attempted=0'); store.db.commit()
             async def fail(request): raise httpx.ConnectError('Secret-bearing URL must not escape', request=request)

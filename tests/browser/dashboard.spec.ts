@@ -57,7 +57,7 @@ test("signal flags identify the team and reveal their reasons on desktop and mob
   }
 });
 
-test("desktop slate, matchup controls, roster, lineup, and back navigation", async ({
+test("desktop slate, matchup controls, lineup, and back navigation", async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -115,9 +115,9 @@ test("desktop slate, matchup controls, roster, lineup, and back navigation", asy
       starter,
     );
   }
-  await page.getByRole("button", { name: "Rosters", exact: true }).click();
-  await expect(page.locator(".roster-table")).toHaveCount(2);
-  await expect(page.locator(".roster-table tbody tr").first()).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Rosters", exact: true }),
+  ).toHaveCount(0);
   await page
     .getByRole("button", { name: "Lines & injuries", exact: true })
     .click();
@@ -176,8 +176,9 @@ test("phone layout has no page overflow and controls remain usable", async ({
     path: "test-results/matchup-mobile.png",
     fullPage: true,
   });
-  await page.getByRole("button", { name: "Rosters", exact: true }).click();
-  await expect(page.locator(".roster-table").first()).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Rosters", exact: true }),
+  ).toHaveCount(0);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

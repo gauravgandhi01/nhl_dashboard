@@ -1,4 +1,19 @@
 {
-  "bookmakers": [],
+  "bookmakers": [
+    "ballybet",
+    "betmgm",
+    "betonlineag",
+    "betrivers",
+    "draftkings",
+    "fanatics",
+    "fanduel",
+    "kalshi",
+    "lowvig",
+    "mybookieag",
+    "novig",
+    "polymarket",
+    "prophetx",
+    "williamhill_us"
+  ],
   "player_prop_market_limit": 8
 }
