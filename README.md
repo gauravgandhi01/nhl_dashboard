@@ -288,6 +288,8 @@ Optional build/runtime settings:
 - `NHL_MONEYPUCK_REFRESH_HOURS=24` controls how long normalized MoneyPuck rows
   are trusted before a runtime refresh attempt. Use `0` to trust seeded rows
   indefinitely on small free instances; the Docker image defaults to `0`.
+- `NHL_DFO_GOALIES_TTL=120` controls the Daily Faceoff starting-goalie cache in
+  seconds. The default is two minutes so confirmed starters appear quickly.
 - `THE_ODDS_API_KEY=...` enables moneylines, player props, and first-period odds.
 
 The daily slate is designed to render from small NHL/Daily Faceoff/odds feeds
