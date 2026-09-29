@@ -1,0 +1,10 @@
+.git
+.pytest_cache
+.runtime
+.venv
+data
+dist
+node_modules
+test-results
+__pycache__
+*.log
