@@ -52,7 +52,8 @@ class Store:
         self.db.close()
 
     async def fetch(self, url: str, source: str, ttl: int, parser: Callable = json.loads,
-                    params: dict | None = None, store_body: bool = True) -> Feed:
+                    params: dict | None = None, store_body: bool = True,
+                    failure_ttl: int = 600) -> Feed:
         request_url = str(httpx.URL(url, params=params)) if params else url
         key = hashlib.sha256(request_url.encode()).hexdigest()
         async with self.locks.setdefault(key, asyncio.Lock()):
@@ -91,7 +92,7 @@ class Store:
                         await asyncio.sleep(1)
             self.db.execute("INSERT INTO responses(key,url,source,body,fetched,failed_until,error) VALUES(?,?,?,NULL,0,?,?) "
                             "ON CONFLICT(key) DO UPDATE SET failed_until=excluded.failed_until,error=excluded.error",
-                            (key, request_url, source, now + 600, error))
+                            (key, request_url, source, now + failure_ttl, error))
             self.db.commit()
             return await cached(True, error)
 

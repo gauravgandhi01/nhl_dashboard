@@ -244,7 +244,10 @@ class Providers:
                 self.memo[key] = (time.monotonic(), feed)
             return feed
 
-    async def dfo(self, path, parser, ttl=600):
+    def dfo_fast_ttl(self):
+        return int(os.environ.get('NHL_DFO_TTL', os.environ.get('NHL_DFO_GOALIES_TTL', '120')))
+
+    async def dfo(self, path, parser, ttl=600, failure_ttl=None):
         url = DFO + path
         robots = await self.store.fetch(DFO + '/robots.txt', 'Daily Faceoff', 86400, lambda raw: raw.decode())
         if robots.data is None:
@@ -253,10 +256,10 @@ class Providers:
         rules.parse(robots.data.splitlines())
         if not rules.can_fetch('NHLMatchupDashboard', url):
             return Feed(None, 'Daily Faceoff', url, error='Automated access unavailable')
-        return await self.store.fetch(url, 'Daily Faceoff', ttl, parser)
+        return await self.store.fetch(url, 'Daily Faceoff', ttl, parser, failure_ttl=failure_ttl or ttl)
 
     async def goalies(self, date):
-        ttl = int(os.environ.get('NHL_DFO_GOALIES_TTL', '120'))
+        ttl = self.dfo_fast_ttl()
         return await self.dfo(f'/starting-goalies/{date}', parse_goalies, ttl)
 
     async def lineup(self, abbrev):
@@ -264,7 +267,8 @@ class Providers:
         if not name:
             return Feed(None, 'Daily Faceoff', DFO, error='Team mapping unavailable')
         slug = name.lower().replace(' ', '-')
-        return await self.dfo(f'/teams/{slug}/line-combinations', parse_lineups, 600)
+        ttl = self.dfo_fast_ttl()
+        return await self.dfo(f'/teams/{slug}/line-combinations', parse_lineups, ttl)
 
     async def injuries(self):
         return await self.store.fetch('https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/injuries', 'ESPN', 3600, object_json)

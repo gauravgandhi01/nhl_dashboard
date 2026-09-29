@@ -156,26 +156,34 @@ def test_pagination_advances_by_actual_page_size(tmp_path):
     asyncio.run(scenario())
 
 
-def test_daily_faceoff_goalies_use_short_configurable_ttl(tmp_path, monkeypatch):
+def test_daily_faceoff_goalies_and_lineups_use_short_configurable_ttl(tmp_path, monkeypatch):
     async def scenario():
-        monkeypatch.setenv('NHL_DFO_GOALIES_TTL', '1')
+        monkeypatch.setenv('NHL_DFO_TTL', '1')
         store = Store(tmp_path / 'dfo.sqlite3')
         calls = []
-        html = b'<script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"data":[]}}}</script>'
+        goalie_html = b'<script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"data":[]}}}</script>'
+        lineup_html = b'<script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"combinations":{"updatedAt":"2026-09-29T12:00:00Z","players":[{"categoryIdentifier":"ev","groupIdentifier":"f1","name":"Player A"}]}}}}</script>'
         robots = b'User-agent: *\nAllow: /\n'
         def respond(request):
-            calls.append(str(request.url))
-            return httpx.Response(200, content=robots if str(request.url).endswith('/robots.txt') else html)
+            url = str(request.url)
+            calls.append(url)
+            content = robots if url.endswith('/robots.txt') else lineup_html if 'line-combinations' in url else goalie_html
+            return httpx.Response(200, content=content)
         await store.client.aclose()
         store.client = httpx.AsyncClient(transport=httpx.MockTransport(respond))
         providers = Providers(store)
         await providers.goalies('2026-09-29')
         await providers.goalies('2026-09-29')
+        await providers.lineup('TOR')
+        await providers.lineup('TOR')
         assert sum('/starting-goalies/' in url for url in calls) == 1
-        store.db.execute("UPDATE responses SET fetched=0 WHERE url LIKE '%starting-goalies%'")
+        assert sum('/line-combinations' in url for url in calls) == 1
+        store.db.execute("UPDATE responses SET fetched=0 WHERE url LIKE '%starting-goalies%' OR url LIKE '%line-combinations%'")
         store.db.commit()
         await providers.goalies('2026-09-29')
+        await providers.lineup('TOR')
         assert sum('/starting-goalies/' in url for url in calls) == 2
+        assert sum('/line-combinations' in url for url in calls) == 2
         await store.close()
     asyncio.run(scenario())
 
