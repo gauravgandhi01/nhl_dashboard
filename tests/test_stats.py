@@ -83,6 +83,29 @@ def test_goalie_confirmation_requires_exact_matchup_time():
     assert starter_for(game, [row])['away']['status'] == 'Unknown'
 
 
+def test_confirmed_daily_faceoff_starters_map_to_slate_games():
+    games = [
+        {'awayTeam': {'abbrev': 'MTL'}, 'homeTeam': {'abbrev': 'TOR'}, 'startTimeUTC': '2026-09-29T23:00:00Z'},
+        {'awayTeam': {'abbrev': 'NYR'}, 'homeTeam': {'abbrev': 'BOS'}, 'startTimeUTC': '2026-09-30T00:00:00Z'},
+    ]
+    rows = [
+        {'awayTeamName': 'Montreal Canadiens', 'homeTeamName': 'Toronto Maple Leafs',
+         'dateGmt': '2026-09-29T23:00:00Z', 'awayGoalieName': 'Jakub Dobes',
+         'awayNewsStrengthName': 'Confirmed', 'awayNewsCreatedAt': '2026-09-29T16:56:27.996Z',
+         'homeGoalieName': 'Sergei Bobrovsky', 'homeNewsStrengthName': 'Likely'},
+        {'awayTeamName': 'New York Rangers', 'homeTeamName': 'Boston Bruins',
+         'dateGmt': '2026-09-30T00:00:00Z', 'awayGoalieName': 'Igor Shesterkin',
+         'awayNewsStrengthName': 'Likely', 'homeGoalieName': 'Jeremy Swayman',
+         'homeNewsStrengthName': 'Confirmed', 'homeNewsCreatedAt': '2026-09-29T15:02:24.985Z'},
+    ]
+    mtl_tor = starter_for(games[0], rows)
+    nyr_bos = starter_for(games[1], rows)
+    assert mtl_tor['away'] == {'name': 'Jakub Dobes', 'status': 'Confirmed',
+                               'updated_at': '2026-09-29T16:56:27.996Z'}
+    assert nyr_bos['home'] == {'name': 'Jeremy Swayman', 'status': 'Confirmed',
+                               'updated_at': '2026-09-29T15:02:24.985Z'}
+
+
 def test_goalie_parser_rejects_challenge_and_schema_changes():
     with pytest.raises(ValueError):
         parse_goalies(b'<html>Blocked</html>')

@@ -105,6 +105,30 @@ def test_pagination_advances_by_actual_page_size(tmp_path):
     asyncio.run(scenario())
 
 
+def test_daily_faceoff_goalies_use_short_configurable_ttl(tmp_path, monkeypatch):
+    async def scenario():
+        monkeypatch.setenv('NHL_DFO_GOALIES_TTL', '1')
+        store = Store(tmp_path / 'dfo.sqlite3')
+        calls = []
+        html = b'<script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"data":[]}}}</script>'
+        robots = b'User-agent: *\nAllow: /\n'
+        def respond(request):
+            calls.append(str(request.url))
+            return httpx.Response(200, content=robots if str(request.url).endswith('/robots.txt') else html)
+        await store.client.aclose()
+        store.client = httpx.AsyncClient(transport=httpx.MockTransport(respond))
+        providers = Providers(store)
+        await providers.goalies('2026-09-29')
+        await providers.goalies('2026-09-29')
+        assert sum('/starting-goalies/' in url for url in calls) == 1
+        store.db.execute("UPDATE responses SET fetched=0 WHERE url LIKE '%starting-goalies%'")
+        store.db.commit()
+        await providers.goalies('2026-09-29')
+        assert sum('/starting-goalies/' in url for url in calls) == 2
+        await store.close()
+    asyncio.run(scenario())
+
+
 def test_moneypuck_rows_are_normalized_without_raw_blob(tmp_path):
     async def scenario():
         store = Store(tmp_path / 'mp.sqlite3')
