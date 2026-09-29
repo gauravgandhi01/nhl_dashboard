@@ -42,15 +42,9 @@ import { FirstPeriod } from "./FirstPeriod";
 import { Streaks } from "./Streaks";
 import { usePlayerProps, PropsControls, CompactProps, type PropsState } from "./PlayerProps";
 import { useMoneylines, MoneylineControls, TeamMoneyline } from "./Moneylines";
+import { et, todayEt } from "./dates";
 
-const et = "America/New_York";
-const today = () =>
-  new Intl.DateTimeFormat("en-CA", {
-    timeZone: et,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
+const today = todayEt;
 const time = (value: string) =>
   new Date(value).toLocaleTimeString("en-US", {
     timeZone: et,

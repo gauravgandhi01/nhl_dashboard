@@ -5,7 +5,7 @@ from typing import Literal
 import os
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from .cache import Store
@@ -124,3 +124,11 @@ async def frontend(path: str):
     if not index.exists():
         raise HTTPException(503, 'Build the frontend first with npm run build.')
     return FileResponse(index)
+
+
+@app.head('/{path:path}')
+async def frontend_head(path: str):
+    if path.startswith('api/'):
+        raise HTTPException(404, 'Unknown API route')
+    index = ROOT / 'dist' / 'index.html'
+    return Response(status_code=200 if index.exists() else 503)

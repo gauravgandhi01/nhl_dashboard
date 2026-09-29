@@ -10,6 +10,7 @@ import {
   ArrowUp,
 } from "lucide-react";
 import type { Game, Source, Stats, Starter, Team } from "./types";
+import { todayEt } from "./dates";
 
 type Window = "season" | "last5" | "last10";
 type Windows = Record<Window, Stats>;
@@ -85,13 +86,7 @@ const windows: [Window, string][] = [
   ["last5", "Last 5"],
   ["last10", "Last 10"],
 ];
-const today = () =>
-  new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/New_York",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
+const today = todayEt;
 const f = (value: number | null | undefined, digits = 2) =>
   value == null ? "--" : value.toFixed(digits);
 const pct = (value: number | null | undefined) =>

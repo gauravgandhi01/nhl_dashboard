@@ -11,6 +11,7 @@ import {
 import type { Source, Stats } from "./types";
 import { buildPeers, cellFormat, type Peers } from "./playerFormatting";
 import { usePlayerProps, PropsControls, PlayerPropPanel, type PropsState } from "./PlayerProps";
+import { todayEt } from "./dates";
 
 type Window = "last5" | "last10" | "season";
 type Skater = {
@@ -38,13 +39,7 @@ type Data = {
   sources: Source[];
   error: string | null;
 };
-const today = () =>
-  new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/New_York",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
+const today = todayEt;
 const shift = (date: string, days: number) => {
   const d = new Date(date + "T12:00:00Z");
   d.setUTCDate(d.getUTCDate() + days);

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { Source } from "./types";
 import { usePlayerProps, PropsControls, CompactProps, type PropsState } from "./PlayerProps";
+import { todayEt } from "./dates";
 
 type Entry = {
   id: number;
@@ -60,13 +61,7 @@ type Data = {
   };
   sources: Source[];
 };
-const today = () =>
-  new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/New_York",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
+const today = todayEt;
 const shift = (date: string, days: number) => {
   const d = new Date(date + "T12:00:00Z");
   d.setUTCDate(d.getUTCDate() + days);
