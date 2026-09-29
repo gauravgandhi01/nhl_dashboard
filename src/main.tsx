@@ -1008,7 +1008,10 @@ function Roster({ side, season }: { side: Side; season: string }) {
 }
 
 function Lineups({ side, props, gameId }: { side: Side; props: PropsState; gameId: number }) {
-  const sections = side.lineup?.sections;
+  const sections = Object.entries(side.lineup?.sections || {}).filter(
+    ([name, players]) => !["Injuries", "Goalies"].includes(name) && players.length > 0,
+  );
+  const rosterSkaters = side.roster.filter((p) => p.position !== "G");
   const [strength, setStrength] = useState<"all" | "5v5">("all");
   const hasFiveOnFive = Object.values(side.lineup_usage || {}).some(
     (usage) =>
@@ -1040,13 +1043,15 @@ function Lineups({ side, props, gameId }: { side: Side; props: PropsState; gameI
             </button>
           </div>
         ) : (
-          <span className="eyebrow">LATEST PROJECTION</span>
+          <span className="eyebrow">{sections.length ? "LATEST PROJECTION" : "ROSTER ONLY"}</span>
         )}
       </div>
-      {sections ? (
+      {sections.length ? (
         <>
-          {Object.entries(sections)
-            .filter(([name]) => !["Injuries", "Goalies"].includes(name))
+          {side.lineup_source.status === "stale" && (
+            <p className="confirmation warning">Cached projection; refresh unavailable. {side.lineup_source.error}</p>
+          )}
+          {sections
             .map(([name, players]) => (
               <div className="line-section" key={name}>
                 <h3>{name}</h3>
@@ -1084,6 +1089,21 @@ function Lineups({ side, props, gameId }: { side: Side; props: PropsState; gameI
             Daily Faceoff <ExternalLink size={12} />
           </a>
           <p>{side.lineup_source.error || "No published lineup available."}</p>
+        </div>
+      )}
+      {!sections.length && rosterSkaters.length > 0 && (
+        <div className="line-section">
+          <h3>NHL roster only</h3>
+          <p className="footnote">Line assignments and game participation unconfirmed. Retrieved {stamp(side.roster_source.retrieved_at)}{side.roster_source.status === "stale" ? " (stale)" : ""}.</p>
+          <div className="line-grid">
+            {rosterSkaters.map((p) => (
+              <div className="line-player" key={p.id}>
+                <strong title={p.name}>{p.name.replace(/^(\S+)\s+/, (_, first: string) => first[0] + ". ")}</strong>
+                <span>{p.position}</span>
+                <CompactProps state={props} gameId={gameId} playerId={p.id} />
+              </div>
+            ))}
+          </div>
         </div>
       )}
       <div className="section-heading injury-heading">

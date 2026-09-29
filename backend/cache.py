@@ -51,6 +51,19 @@ class Store:
         await self.client.aclose()
         self.db.close()
 
+    async def last_good(self, url: str, source: str, parser: Callable, error: str) -> Feed:
+        """Read an existing response without attempting network access."""
+        key = hashlib.sha256(url.encode()).hexdigest()
+        row = self.db.execute('SELECT body,fetched FROM responses WHERE key=?', (key,)).fetchone()
+        data = None
+        try:
+            if row and row[0] is not None:
+                data = await asyncio.to_thread(parser, row[0])
+        except (ValueError, KeyError, TypeError):
+            pass
+        stamp = datetime.fromtimestamp(row[1], timezone.utc).isoformat() if row and row[1] else None
+        return Feed(data, source, url, stamp, data is not None, error)
+
     async def fetch(self, url: str, source: str, ttl: int, parser: Callable = json.loads,
                     params: dict | None = None, store_body: bool = True,
                     failure_ttl: int = 600) -> Feed:

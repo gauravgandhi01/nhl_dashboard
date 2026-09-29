@@ -4,6 +4,7 @@ import asyncio
 import csv
 import io
 import json
+import logging
 import os
 import time
 import zipfile
@@ -19,6 +20,7 @@ WEB = 'https://api-web.nhle.com/v1'
 STATS = 'https://api.nhle.com/stats/rest/en'
 MP_TEAMS = 'https://moneypuck.com/moneypuck/playerData/careers/gameByGame/all_teams.csv'
 DFO = 'https://www.dailyfaceoff.com'
+logger = logging.getLogger(__name__)
 TEAM_NAMES = {
     'ANA': 'Anaheim Ducks', 'BOS': 'Boston Bruins', 'BUF': 'Buffalo Sabres', 'CAR': 'Carolina Hurricanes',
     'CBJ': 'Columbus Blue Jackets', 'CGY': 'Calgary Flames', 'CHI': 'Chicago Blackhawks', 'COL': 'Colorado Avalanche',
@@ -251,12 +253,17 @@ class Providers:
         url = DFO + path
         robots = await self.store.fetch(DFO + '/robots.txt', 'Daily Faceoff', 86400, lambda raw: raw.decode())
         if robots.data is None:
-            return Feed(None, 'Daily Faceoff', url, error='Source access rules unavailable')
+            reason = f'Source access rules unavailable ({robots.error or "no robots.txt response"})'
+            logger.warning('Daily Faceoff unavailable path=%s stage=robots reason=%s', path, reason)
+            return await self.store.last_good(url, 'Daily Faceoff', parser, reason)
         rules = RobotFileParser()
         rules.parse(robots.data.splitlines())
         if not rules.can_fetch('NHLMatchupDashboard', url):
             return Feed(None, 'Daily Faceoff', url, error='Automated access unavailable')
-        return await self.store.fetch(url, 'Daily Faceoff', ttl, parser, failure_ttl=failure_ttl or ttl)
+        feed = await self.store.fetch(url, 'Daily Faceoff', ttl, parser, failure_ttl=failure_ttl or ttl)
+        if feed.error:
+            logger.warning('Daily Faceoff unavailable path=%s stage=page reason=%s cached=%s', path, feed.error, feed.data is not None)
+        return feed
 
     async def goalies(self, date):
         ttl = self.dfo_fast_ttl()

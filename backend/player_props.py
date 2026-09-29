@@ -1,13 +1,14 @@
 """Shared event/player-ID prop cache. Paid requests refresh hourly as needed."""
 import asyncio
 import json
+import logging
 import math
 import os
 import time
 from datetime import datetime, timezone
 
 from .first_period_odds import event_game, SOURCE
-from .odds_client import odds_client
+from .odds_client import OddsError, odds_client
 from .player_identity import resolve_player
 from .service import display_name
 from .stats import number
@@ -23,6 +24,11 @@ MARKETS = {
     'player_goal_scorer_first': ('first_goal', False),
 }
 VERSION = '1:' + ','.join(BOOKS)
+logger = logging.getLogger(__name__)
+
+
+class PropUnavailable(ValueError):
+    pass
 
 
 def timestamp(value):
@@ -103,6 +109,7 @@ class PlayerProps:
                 'error': row[3] if row else None}
 
     def failure(self, game, error):
+        logger.warning('Player props unavailable game_id=%s reason=%s', game['id'], error)
         self.p.store.db.execute('''INSERT INTO player_prop_odds VALUES(?,?,NULL,0,?,?)
             ON CONFLICT(game_id) DO UPDATE SET attempted=excluded.attempted,error=excluded.error''',
             (game['id'], VERSION, time.time(), error))
@@ -113,36 +120,38 @@ class PlayerProps:
         try:
             matches = [e for e in events if (event_game(e, [game]) or {}).get('id') == game['id']]
             if len(matches) != 1:
-                raise ValueError('No unique provider event')
+                raise PropUnavailable('No unique odds event matches this NHL matchup')
             event = matches[0]
             eid = event.get('id', '')
             if not isinstance(eid, str) or not eid.isalnum() or (timestamp(event.get('commence_time')) or 0) <= now:
-                raise ValueError('Event not eligible')
+                raise PropUnavailable('Odds event has started or has an invalid identifier')
             roster, sources = [], []
             for side in ['awayTeam', 'homeTeam']:
                 team = game[side]['abbrev']
                 feed = await self.p.nhl(f'roster/{team}/current', 3600)
                 if feed.data is None or feed.stale:
-                    raise ValueError('Current roster unavailable; prices not requested')
+                    raise PropUnavailable(f'Current NHL roster unavailable or stale for {team}; prices not requested')
                 sources.append(feed.meta())
                 for group in ['forwards', 'defensemen']:
                     for p in feed.data.get(group, []):
                         roster.append({'id': p['id'], 'name': f"{display_name(p.get('firstName'))} {display_name(p.get('lastName'))}", 'team': team})
                 if not any(p['team'] == team for p in roster):
-                    raise ValueError('Current roster empty')
+                    raise PropUnavailable(f'Current NHL roster is empty for {team}; prices not requested')
             if not eligible(game):
-                raise ValueError('Game already started')
+                raise PropUnavailable('Game already started; pregame prices not requested')
             body = await self.client.request(f'/events/{eid}/odds', {
                 'bookmakers': ','.join(BOOKS), 'markets': ','.join(MARKETS), 'oddsFormat': 'american'})
             if body.get('id') != eid or (event_game(body, [game]) or {}).get('id') != game['id']:
-                raise ValueError('Provider identity mismatch')
+                raise PropUnavailable('Odds response does not match the requested NHL matchup')
             result = {**normalize_props(body, roster), 'event_id': eid, 'roster_sources': sources,
                       'usage': dict(self.client.usage)}
             self.p.store.db.execute('INSERT OR REPLACE INTO player_prop_odds VALUES(?,?,?,?,?,NULL)',
                 (game['id'], VERSION, json.dumps(result), now, now))
             self.p.store.db.commit()
+        except (PropUnavailable, OddsError) as exc:
+            self.failure(game, str(exc))
         except (ValueError, KeyError, TypeError, AttributeError):
-            self.failure(game, 'Props unavailable; current roster, event, provider, or quota could not be verified')
+            self.failure(game, 'Props response schema invalid; cached prices retained when available')
 
     async def view(self, date, game_id=None, refresh=False):
         schedule = await self.p.nhl(f'score/{date}', 600)
@@ -171,8 +180,11 @@ class PlayerProps:
                         events = [e for e in events if event_game(e, schedule.data['games']) is not None]
                         for game in pending:
                             await self.refresh_game(game, events)
+                    except OddsError as exc:
+                        for game in pending:
+                            self.failure(game, str(exc))
                     except (ValueError, KeyError, TypeError):
                         for game in pending:
-                            self.failure(game, 'Props provider unavailable or quota exhausted')
+                            self.failure(game, 'Odds event discovery returned an invalid response')
         result['games'] = {str(g['id']): self.cached(g) for g in games}
         return result

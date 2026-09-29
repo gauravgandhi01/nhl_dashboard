@@ -305,6 +305,19 @@ Optional build/runtime settings:
   compatibility.
 - `THE_ODDS_API_KEY=...` enables moneylines, player props, and first-period odds.
 
+Daily Faceoff access can differ between your machine and the hosted server.
+If `robots.txt` cannot be retrieved, no lineup-page request is made. The app
+retains a dated last-good projection when available; otherwise Lines shows an
+explicit NHL roster-only fallback, not inferred line assignments. Server logs
+identify the failing stage (`robots` or `page`) and HTTP status when available.
+The default `/tmp` database does not survive instance replacement; preserving
+last-good feeds across deployments requires a persistent mounted database path.
+
+Player-prop failures are independent of lineup availability. Responses and logs
+distinguish roster/event validation, rejected credentials, provider errors, and
+insufficient odds quota without exposing the API key. A multi-market request can
+exceed the remaining quota even when the account still has some credits.
+
 The daily slate is designed to render from small NHL/Daily Faceoff/odds feeds
 plus normalized MoneyPuck rows when available; large MoneyPuck CSV/ZIP files are
 not stored as raw SQLite response blobs.
