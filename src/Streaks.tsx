@@ -261,11 +261,7 @@ function Leaderboard({
   );
 }
 
-export function Streaks({
-  Sources,
-}: {
-  Sources: React.ComponentType<{ sources: Source[] }>;
-}) {
+export function Streaks() {
   const [params, setParams] = useSearchParams();
   const date = /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") || "")
     ? params.get("date")!
@@ -446,7 +442,6 @@ export function Streaks({
               <h2>Streak history unavailable</h2>
             </div>
           ) : null}
-          <Sources sources={data.sources} />
         </>
       ) : (
         <div className="loading-label" role="status">

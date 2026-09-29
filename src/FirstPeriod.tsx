@@ -706,11 +706,7 @@ function Rankings({ data, window }: { data: Data; window: Window }) {
   );
 }
 
-export function FirstPeriod({
-  Sources,
-}: {
-  Sources: React.ComponentType<{ sources: Source[] }>;
-}) {
+export function FirstPeriod() {
   const { id } = useParams();
   const [params, setParams] = useSearchParams();
   const date = /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") || "")
@@ -744,7 +740,6 @@ export function FirstPeriod({
     <PeriodContent
       key={`${id || "slate"}-${oddsDate}`}
       {...{
-        Sources,
         id,
         date,
         window,
@@ -759,7 +754,6 @@ export function FirstPeriod({
   );
 }
 function PeriodContent({
-  Sources,
   id,
   date,
   window,
@@ -770,7 +764,6 @@ function PeriodContent({
   refresh,
   oddsDate,
 }: {
-  Sources: React.ComponentType<{ sources: Source[] }>;
   id?: string;
   date: string;
   window: Window;
@@ -1059,7 +1052,6 @@ function PeriodContent({
                 <Rankings data={data} window={window} />
               </>
             )}
-            <Sources sources={data.sources} />
           </>
         )
       )}

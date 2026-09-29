@@ -114,11 +114,7 @@ const columns = [
   },
 ];
 
-export function Players({
-  Sources,
-}: {
-  Sources: React.ComponentType<{ sources: Source[] }>;
-}) {
+export function Players() {
   const [params, setParams] = useSearchParams();
   const date = /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") || "")
     ? params.get("date")!
@@ -438,7 +434,6 @@ export function Players({
           </>
         )
       )}
-      {data && <Sources sources={data.sources} />}
     </>
   );
 }

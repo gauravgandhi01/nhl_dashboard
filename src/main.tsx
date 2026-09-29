@@ -21,7 +21,6 @@ import {
   RefreshCw,
   Search,
   X,
-  Database,
   Clock3,
 } from "lucide-react";
 import type {
@@ -30,7 +29,6 @@ import type {
   Player,
   Side,
   SlateData,
-  Source,
   CardComparison,
   CardSide,
   Stats,
@@ -180,38 +178,6 @@ function GameStatus({ game }: { game: Game }) {
     <span className="status">
       {time(game.start)} <span className="muted">ET</span>
     </span>
-  );
-}
-
-function Sources({ sources }: { sources: Source[] }) {
-  const unavailable = sources.filter((s) => s.status !== "available");
-  return (
-    <details className="sources">
-      <summary>
-        <Database size={13} />
-        <span>Data sources</span>
-        <span className="muted">
-          {unavailable.length
-            ? `${unavailable.length} delayed or unavailable`
-            : "Up to date"}
-        </span>
-      </summary>
-      <div className="source-list">
-        {sources.map((s, i) => (
-          <div className="source-row" key={s.url + i}>
-            <a href={s.url} target="_blank" rel="noreferrer">
-              {s.source}
-              <ExternalLink size={11} />
-            </a>
-            <span className={s.status === "available" ? "muted" : "warning"}>
-              {s.status}
-              {s.error ? ` / ${s.error}` : ""}
-            </span>
-            <time>{stamp(s.retrieved_at)}</time>
-          </div>
-        ))}
-      </div>
-    </details>
   );
 }
 
@@ -634,7 +600,6 @@ function Slate() {
           ))}
         </div>
       )}
-      {data && <Sources sources={data.sources} />}
     </>
   );
 }
@@ -1328,7 +1293,6 @@ function Matchup() {
               </div>
             </>
           )}
-          <Sources sources={data.sources} />
         </>
       )}
     </>
@@ -1383,15 +1347,15 @@ function App() {
       <main>
         <Routes>
           <Route path="/" element={<Slate />} />
-          <Route path="/players" element={<Players Sources={Sources} />} />
-          <Route path="/streaks" element={<Streaks Sources={Sources} />} />
+          <Route path="/players" element={<Players />} />
+          <Route path="/streaks" element={<Streaks />} />
           <Route
             path="/first-period"
-            element={<FirstPeriod Sources={Sources} />}
+            element={<FirstPeriod />}
           />
           <Route
             path="/first-period/matchups/:id"
-            element={<FirstPeriod Sources={Sources} />}
+            element={<FirstPeriod />}
           />
           <Route path="/matchups/:id" element={<Matchup />} />
           <Route path="*" element={<StateMessage title="Page not found" />} />

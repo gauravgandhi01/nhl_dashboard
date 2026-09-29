@@ -680,49 +680,6 @@ main {
 .game-card:hover .card-arrow {
   color: #d8dadf;
 }
-.sources {
-  margin-top: 24px;
-  border-top: 1px solid var(--border);
-  font-size: 11px;
-}
-.sources summary {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  cursor: pointer;
-  list-style: none;
-  padding: 14px 0;
-  color: #b7bac0;
-}
-.sources summary::-webkit-details-marker {
-  display: none;
-}
-.sources summary .muted {
-  margin-left: auto;
-}
-.source-list {
-  padding-bottom: 8px;
-}
-.source-row {
-  display: grid;
-  grid-template-columns: 140px 1fr 180px;
-  gap: 12px;
-  padding: 8px 0;
-  border-top: 1px solid #242629;
-  font-size: 10px;
-}
-.source-row a {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.source-row time {
-  color: var(--muted);
-  text-align: right;
-}
-.source-row a:hover {
-  text-decoration: underline;
-}
 .state-message {
   text-align: center;
   padding: 80px 20px;
@@ -1413,14 +1370,6 @@ tr:hover td {
     line-height: 1.6;
     margin-bottom: 22px;
   }
-  .source-row {
-    grid-template-columns: 95px 1fr;
-    gap: 7px;
-  }
-  .source-row time {
-    grid-column: 2;
-    text-align: left;
-  }
   .footer-right {
     float: none;
     display: block;
@@ -1441,9 +1390,6 @@ tr:hover td {
   }
   .goalie-panel {
     padding: 16px;
-  }
-  .source-row {
-    overflow-wrap: anywhere;
   }
 }
 @media (max-width: 430px) {
