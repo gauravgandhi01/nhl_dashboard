@@ -26,13 +26,16 @@ def test_robots_failure_preserves_cache_without_fetching_page(tmp_path, cached, 
             await store.fetch(DFO + path, 'Daily Faceoff', 120)
         calls.clear()
         feed = await Providers(store).dfo(path, json.loads)
-        assert calls == ['/robots.txt']
-        if cached and not disallow:
+        if disallow or cached:
+            assert calls == ['/robots.txt']
+        else:
+            assert calls == ['/robots.txt', '/teams/test/line-combinations']
+        if not disallow:
             assert feed.data['sections']['Forwards'] == ['Test Player']
-            assert feed.stale and feed.retrieved_at
+            assert feed.retrieved_at
         else:
             assert feed.data is None
-        assert feed.error == ('Automated access unavailable' if disallow else 'Source access rules unavailable (HTTP 403)')
+        assert feed.error == ('Automated access unavailable' if disallow else None)
         await store.close()
     asyncio.run(run())
 

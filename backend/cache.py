@@ -66,7 +66,7 @@ class Store:
 
     async def fetch(self, url: str, source: str, ttl: int, parser: Callable = json.loads,
                     params: dict | None = None, store_body: bool = True,
-                    failure_ttl: int = 600) -> Feed:
+                    failure_ttl: int = 600, headers: dict | None = None) -> Feed:
         request_url = str(httpx.URL(url, params=params)) if params else url
         key = hashlib.sha256(request_url.encode()).hexdigest()
         async with self.locks.setdefault(key, asyncio.Lock()):
@@ -89,7 +89,7 @@ class Store:
             for attempt in range(2):
                 try:
                     async with self.limit:
-                        response = await self.client.get(request_url)
+                        response = await self.client.get(request_url, headers=headers)
                     response.raise_for_status()
                     data = await asyncio.to_thread(parser, response.content)
                     body = response.content if store_body else None

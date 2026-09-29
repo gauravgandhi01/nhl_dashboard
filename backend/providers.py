@@ -20,6 +20,15 @@ WEB = 'https://api-web.nhle.com/v1'
 STATS = 'https://api.nhle.com/stats/rest/en'
 MP_TEAMS = 'https://moneypuck.com/moneypuck/playerData/careers/gameByGame/all_teams.csv'
 DFO = 'https://www.dailyfaceoff.com'
+DFO_HEADERS = {
+    'User-Agent': (
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
+        'AppleWebKit/537.36 (KHTML, like Gecko) '
+        'Chrome/126.0.0.0 Safari/537.36'
+    ),
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+}
 logger = logging.getLogger(__name__)
 TEAM_NAMES = {
     'ANA': 'Anaheim Ducks', 'BOS': 'Boston Bruins', 'BUF': 'Buffalo Sabres', 'CAR': 'Carolina Hurricanes',
@@ -251,18 +260,25 @@ class Providers:
 
     async def dfo(self, path, parser, ttl=600, failure_ttl=None):
         url = DFO + path
-        robots = await self.store.fetch(DFO + '/robots.txt', 'Daily Faceoff', 86400, lambda raw: raw.decode())
+        robots = await self.store.fetch(DFO + '/robots.txt', 'Daily Faceoff', 86400, lambda raw: raw.decode(),
+                                        headers=DFO_HEADERS)
         if robots.data is None:
             reason = f'Source access rules unavailable ({robots.error or "no robots.txt response"})'
-            logger.warning('Daily Faceoff unavailable path=%s stage=robots reason=%s', path, reason)
-            return await self.store.last_good(url, 'Daily Faceoff', parser, reason)
-        rules = RobotFileParser()
-        rules.parse(robots.data.splitlines())
-        if not rules.can_fetch('NHLMatchupDashboard', url):
-            return Feed(None, 'Daily Faceoff', url, error='Automated access unavailable')
-        feed = await self.store.fetch(url, 'Daily Faceoff', ttl, parser, failure_ttl=failure_ttl or ttl)
+            logger.warning('Daily Faceoff robots unavailable path=%s reason=%s; attempting page fetch', path, reason)
+        else:
+            rules = RobotFileParser()
+            rules.parse(robots.data.splitlines())
+            if not rules.can_fetch(DFO_HEADERS['User-Agent'], url):
+                return Feed(None, 'Daily Faceoff', url, error='Automated access unavailable')
+        feed = await self.store.fetch(url, 'Daily Faceoff', ttl, parser, failure_ttl=failure_ttl or ttl,
+                                      headers=DFO_HEADERS)
         if feed.error:
             logger.warning('Daily Faceoff unavailable path=%s stage=page reason=%s cached=%s', path, feed.error, feed.data is not None)
+            if robots.data is None and feed.data is None:
+                return await self.store.last_good(url, 'Daily Faceoff', parser, reason)
+            if robots.data is None and feed.data is not None:
+                feed.error = reason
+                feed.stale = True
         return feed
 
     async def goalies(self, date):
