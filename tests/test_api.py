@@ -66,6 +66,57 @@ def test_no_games_and_source_failure_are_distinct():
     asyncio.run(scenario())
 
 
+def test_slate_card_goalie_includes_normalized_gsax():
+    class Fake:
+        store = None
+
+        async def nhl(self, path, *args):
+            if path.startswith('score'):
+                return Feed({'games': [{
+                    'id': 2026020001, 'season': 20262027, 'gameDate': '2026-09-29',
+                    'startTimeUTC': '2026-09-29T23:00:00Z', 'gameState': 'FUT',
+                    'gameScheduleState': 'OK', 'gameType': 2, 'venue': {'default': 'Test'},
+                    'awayTeam': {'id': 1, 'abbrev': 'MTL', 'name': {'default': 'Canadiens'}},
+                    'homeTeam': {'id': 2, 'abbrev': 'TOR', 'name': {'default': 'Maple Leafs'}},
+                }]}, 'NHL', path)
+            if path.startswith('roster/MTL'):
+                return Feed({'goalies': [{'id': 10, 'firstName': {'default': 'Jakub'}, 'lastName': {'default': 'Dobes'}}]}, 'NHL', path)
+            if path.startswith('roster/TOR'):
+                return Feed({'goalies': [{'id': 20, 'firstName': {'default': 'Sergei'}, 'lastName': {'default': 'Bobrovsky'}}]}, 'NHL', path)
+            if path.startswith('club-schedule-season'):
+                return Feed({'games': []}, 'NHL', path)
+            if path.startswith('player/'):
+                return Feed({'playerId': 10, 'featuredStats': {'regularSeason': {'career': {'gamesPlayed': 10}}}}, 'NHL', path)
+            return Feed({}, 'NHL', path)
+
+        async def goalies(self, *args):
+            return Feed([{'awayTeamName': 'Montreal Canadiens', 'homeTeamName': 'Toronto Maple Leafs',
+                          'dateGmt': '2026-09-29T23:00:00Z', 'awayGoalieName': 'Jakub Dobes',
+                          'awayNewsStrengthName': 'Confirmed', 'homeGoalieName': 'Sergei Bobrovsky',
+                          'homeNewsStrengthName': 'Likely'}], 'Daily Faceoff', 'goalies')
+
+        async def stats(self, report, *args, **kwargs):
+            if report == 'team/summary':
+                return Feed([{'teamId': 1, 'gamesPlayed': 1}, {'teamId': 2, 'gamesPlayed': 1}], 'NHL Stats', report)
+            if report == 'goalie/summary':
+                return Feed([{'playerId': 10, 'gamesPlayed': 5, 'savePct': .91, 'goalsAgainstAverage': 2.5},
+                             {'playerId': 20, 'gamesPlayed': 5, 'savePct': .9, 'goalsAgainstAverage': 2.8}], 'NHL Stats', report)
+            return Feed([], 'NHL Stats', report)
+
+        async def mp(self, kind, *args):
+            data = [{'playerId': '10', 'gameId': '1', 'xGoals': 3, 'goals': 1},
+                    {'playerId': '20', 'gameId': '1', 'xGoals': 2, 'goals': 3}] if kind == 'goalies' else []
+            return Feed(data, 'MoneyPuck', kind)
+
+    async def scenario():
+        slate = await Dashboard(Fake()).slate('2026-09-29')
+        card = slate['comparisons']['2026020001']
+        assert card['away']['goalie']['stats']['gsax'] == 2
+        assert card['away']['goalie']['advanced_games'] == 1
+        assert card['home']['goalie']['stats']['gsax'] == -1
+    asyncio.run(scenario())
+
+
 def test_api_validation_and_spa_routes(tmp_path, monkeypatch):
     monkeypatch.setenv('NHL_DASHBOARD_DB', str(tmp_path / 'api.sqlite3'))
     with TestClient(app) as client:
