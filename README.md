@@ -269,6 +269,17 @@ or settlement conditions not captured by their listed price. No bets are placed.
 There are no player-specific historical hit-rate calculations in this change;
 existing L5/L10/season form remains alongside the quotes.
 
+Player prop provider names are matched to the current NHL rosters by normalized
+name. When a provider name is ambiguous or does not match the roster, its prices
+are excluded and the UI reports names needing aliases. Add explicit mappings in
+`config/player_aliases.json` as provider display name to NHL player ID:
+
+```json
+{
+  "Provider Name": 8480018
+}
+```
+
 ## Render Deployment
 
 Deploy as a Docker web service. The Docker build creates a compact

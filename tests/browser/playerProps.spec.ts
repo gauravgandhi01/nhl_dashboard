@@ -127,7 +127,7 @@ test("shared player props render in expansion, lines, and only on-slate relevant
         status: "available",
         error: null,
         retrieved_at: now,
-        unmatched_names: [],
+        unmatched_names: ["Provider Alias"],
         players: { [p.id]: entity },
       },
     },
@@ -146,6 +146,16 @@ test("shared player props render in expansion, lines, and only on-slate relevant
   for (const width of [1440, 375]) {
     await page.setViewportSize({ width, height: 1000 });
     await page.goto(`/players?date=${date}`);
+    await expect(page.locator(".props-controls")).toContainText(
+      "Player odds checked",
+    );
+    await expect(page.locator(".props-controls")).not.toContainText(
+      "games cached",
+    );
+    await expect(page.locator(".props-controls .warning")).toHaveAttribute(
+      "title",
+      /Provider Alias/,
+    );
     await page.locator(".player-name").first().click();
     const panel = page.getByRole("region", {
       name: "Player props",

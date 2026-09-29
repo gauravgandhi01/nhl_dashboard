@@ -202,6 +202,7 @@ export function PropsControls({
     (n, g) => n + (g.unmatched_names?.length || 0),
     0,
   );
+  const unmatchedNames = games.flatMap((g) => g.unmatched_names || []);
   const status =
     state.error || state.data?.error || games.find((g) => g.error)?.error;
   return (
@@ -213,15 +214,15 @@ export function PropsControls({
           (state.data?.configured === false
             ? oddsNotConfigured
             : state.data
-              ? `${games.filter((g) => g.status === "available").length}/${games.length} games cached`
+              ? "Player odds checked"
               : "Checking prop cache")}
       </span>
       {unmatched > 0 && (
         <span
           className="warning"
-          title="Provider names without a unique match on this game's NHL rosters are excluded"
+          title={`Provider names without a unique match on this game's NHL rosters are excluded. Add aliases in config/player_aliases.json using provider name to NHL player ID. Names: ${unmatchedNames.join(", ")}`}
         >
-          {unmatched} unmatched names
+          {unmatched} names need aliases
         </span>
       )}
     </div>
