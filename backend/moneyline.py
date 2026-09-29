@@ -63,7 +63,7 @@ class Moneylines:
         row = self.p.store.db.execute('SELECT body,fetched,attempted,error FROM moneyline_odds WHERE date=?', (date,)).fetchone()
         configured = bool(os.environ.get('THE_ODDS_API_KEY', '').strip())
         data = json.loads(row[0]) if row and row[0] else {'prices': {}}
-        fresh = bool(row and row[0] and time.time() - row[1] < 1800)
+        fresh = bool(row and row[0] and time.time() - row[1] < 3600)
         return {**data, 'date': date, 'configured': configured, 'source': SOURCE,
                 'retrieved_at': datetime.fromtimestamp(row[1], timezone.utc).isoformat() if row and row[1] else None,
                 'status': ('stale' if row[3] or not fresh else 'available') if row and row[0]

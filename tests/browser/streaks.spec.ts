@@ -9,6 +9,9 @@ test("top-ten streak boards, slate filter, mobile layout and preserved dates", a
   const league = await (
     await request.get("/api/streaks?date=2026-09-28&scope=league")
   ).json();
+  const slate = await (
+    await request.get("/api/streaks?date=2026-09-28&scope=tonight")
+  ).json();
   const skaterBoardCount = league.boards.filter(
     (b: { kind: string }) => b.kind === "skater",
   ).length;
@@ -25,14 +28,24 @@ test("top-ten streak boards, slate filter, mobile layout and preserved dates", a
       page.getByRole("button", { name: "Skaters", exact: true }),
     ).toHaveAttribute("aria-current", "page");
     await expect(
-      page.getByRole("button", { name: "League-wide", exact: true }),
+      page.getByRole("button", { name: "On slate", exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
+    const rows = page.locator(".streak-row");
+    await expect(rows).toHaveCount(
+      slate.boards
+        .filter((b: { kind: string }) => b.kind === "skater")
+        .reduce(
+          (n: number, b: { entries: unknown[] }) => n + b.entries.length,
+          0,
+        ),
+    );
     for (const board of await page.locator(".streak-board").all()) {
       const count = await board.locator(".streak-row").count();
-      expect(count).toBeGreaterThan(0);
       expect(count).toBeLessThanOrEqual(10);
-      const listBox = await board.locator(".streak-list").boundingBox();
-      expect(listBox!.height).toBeLessThanOrEqual(270);
+      if (count > 0) {
+        const listBox = await board.locator(".streak-list").boundingBox();
+        expect(listBox!.height).toBeLessThanOrEqual(270);
+      }
     }
     await expect(
       page.getByRole("region", { name: "Active win streak", exact: true }),
@@ -42,13 +55,15 @@ test("top-ten streak boards, slate filter, mobile layout and preserved dates", a
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBeTruthy();
-    await page.waitForFunction(() => {
-      const img = document.querySelector<HTMLImageElement>(".streak-row img");
-      return !!img && img.complete && img.naturalWidth > 0;
-    });
-    await expect(page.locator(".streak-row").first()).not.toContainText(
-      "Last GP",
-    );
+    if ((await page.locator(".streak-row").count()) > 0) {
+      await page.waitForFunction(() => {
+        const img = document.querySelector<HTMLImageElement>(".streak-row img");
+        return !!img && img.complete && img.naturalWidth > 0;
+      });
+      await expect(page.locator(".streak-row").first()).not.toContainText(
+        "Last GP",
+      );
+    }
     await page.screenshot({
       path: `test-results/streaks-${width}.png`,
       fullPage: true,
@@ -65,27 +80,16 @@ test("top-ten streak boards, slate filter, mobile layout and preserved dates", a
       page.getByRole("region", { name: "Starts with 0-1 GA", exact: true }),
     ).toContainText("Last 10 starts");
     await page.getByRole("button", { name: "Skaters", exact: true }).click();
-    const slateResponse = page.waitForResponse(
+    const leagueResponse = page.waitForResponse(
       (r) =>
-        r.url().includes("/api/streaks?") && r.url().includes("scope=tonight"),
+        r.url().includes("/api/streaks?") && r.url().includes("scope=league"),
     );
-    await page.getByRole("button", { name: "On slate", exact: true }).click();
-    const slate = await (await slateResponse).json();
-    await expect(page).toHaveURL(/scope=tonight/);
+    await page.getByRole("button", { name: "League-wide", exact: true }).click();
+    await leagueResponse;
+    await expect(page).toHaveURL(/scope=league/);
     await expect(page.locator(".streak-board")).toHaveCount(skaterBoardCount);
-    const rows = page.locator(".streak-row");
-    await expect(rows).toHaveCount(
-      slate.boards
-        .filter((b: { kind: string }) => b.kind === "skater")
-        .reduce(
-          (n: number, b: { entries: unknown[] }) => n + b.entries.length,
-          0,
-        ),
-    );
-    for (const row of await rows.all())
-      expect(
-        await row.locator(".streak-player-meta a").count(),
-      ).toBeGreaterThan(0);
+    await page.getByRole("button", { name: "On slate", exact: true }).click();
+    await expect(page).toHaveURL(/scope=tonight/);
     await page
       .getByRole("navigation", { name: "Dashboard views" })
       .getByRole("link", { name: "Players", exact: true })
@@ -122,6 +126,7 @@ test("streaks cross-season, partial, empty slate and failed provider states", as
   ).toBeVisible();
   await expect(page.getByText(/Partial leaderboard coverage/)).toBeVisible();
   data.boards.forEach((b: { entries: unknown[] }) => (b.entries = []));
+  await page.getByRole("button", { name: "League-wide", exact: true }).click();
   await page.getByRole("button", { name: "On slate", exact: true }).click();
   await expect(page.getByText("No qualifying results.").first()).toBeVisible();
   await page.route("**/api/streaks?*", (r) =>

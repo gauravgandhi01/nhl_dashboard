@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Download } from "lucide-react";
 import type { Game } from "./types";
 
 type Price = {
@@ -36,6 +35,8 @@ const stamp = (s: string | null) =>
       }) + " ET"
     : "Unknown";
 const american = (n: number) => (n > 0 ? `+${n}` : String(n));
+const oddsNotConfigured =
+  "Odds not configured: set THE_ODDS_API_KEY before starting the backend.";
 
 export function useMoneylines(date: string) {
   const [data, setData] = useState<Odds | null>(null);
@@ -49,10 +50,9 @@ export function useMoneylines(date: string) {
     setBusy(true);
     setError(null);
     try {
-      const r = await fetch(
-        `/api/odds/moneyline${post ? "/refresh" : ""}?date=${date}`,
-        { method: post ? "POST" : "GET", signal: current.signal },
-      );
+      const r = await fetch(`/api/odds/moneyline?date=${date}`, {
+        signal: current.signal,
+      });
       if (!r.ok) throw new Error();
       const result = await r.json();
       if (!current.signal.aborted) setData(result);
@@ -71,7 +71,7 @@ export function useMoneylines(date: string) {
     data: data?.date === date ? data : null,
     busy,
     error,
-    load: () => void request(true),
+    load: () => void request(false),
   };
 }
 
@@ -80,44 +80,28 @@ export function MoneylineControls({
 }: {
   odds: ReturnType<typeof useMoneylines>;
 }) {
-  const { data, busy, error, load } = odds;
+  const { data, busy, error } = odds;
   return (
     <div className="moneyline-controls">
-      <button
-        className="text-button"
-        disabled={busy || !data?.configured}
-        onClick={load}
-        title={
-          data?.configured
-            ? "Fetch pregame moneylines; cached for 30 minutes"
-            : "THE_ODDS_API_KEY is not configured in the backend environment"
-        }
-      >
-        <Download size={14} />
-        {busy ? "Loading moneylines" : "Load moneylines"}
-      </button>
       <span
-        className={data?.status === "stale" || error ? "warning-text" : "muted"}
+        className={error || data?.error ? "warning-text" : "muted"}
         role="status"
       >
-        {error ||
+        {busy
+          ? "Checking moneylines"
+          : error ||
           data?.error ||
           (data?.status === "available"
             ? Object.keys(data.prices).length
               ? "Moneylines loaded"
               : "No pregame prices available"
-            : data?.status.replaceAll("_", " ") || "Checking cache")}
+            : data?.status === "not_configured"
+              ? oddsNotConfigured
+              : data?.status.replaceAll("_", " ") || "Checking cache")}
         {data?.retrieved_at && ` / Retrieved ${stamp(data.retrieved_at)}`}
         {data?.usage?.remaining != null &&
           ` / ${data.usage.remaining} credits at retrieval`}
       </span>
-      <a
-        href="https://the-odds-api.com/sports/nhl-odds.html"
-        target="_blank"
-        rel="noreferrer"
-      >
-        The Odds API
-      </a>
     </div>
   );
 }
@@ -135,26 +119,20 @@ export function MoneylineRows({
     !["FUT", "PRE"].includes(game.state) ||
     new Date(game.start).getTime() <= Date.now();
   const postponed = ["PPD", "CNCL"].includes(game.schedule_state);
-  const stale = data?.status === "stale" || !!error;
   return (
     <section className="moneyline-card" aria-label="Moneylines">
       <div className="moneyline-heading">
         <span>Moneyline / best available</span>
-        <span className={stale ? "warning-text" : "muted"}>
+        <span className="muted">
           {postponed
             ? "Postponed / canceled"
             : snapshot
               ? "Pregame snapshot"
-              : stale
-                ? "Stale snapshot"
-                : "American"}
+              : "American"}
         </span>
       </div>
       {!postponed && prices.length ? (
         prices.map((p) => {
-          const old =
-            !p.updated_at ||
-            Date.now() - new Date(p.updated_at).getTime() > 1800000;
           const favorite =
             p.away < p.home ? "away" : p.home < p.away ? "home" : null;
           return (
@@ -165,7 +143,7 @@ export function MoneylineRows({
             >
               <strong className={favorite === "away" ? "ml-favorite" : ""}>
                 {american(p.away)}
-                <small className={old || stale ? "warning-text" : ""}>
+                <small>
                   {p.away_name || p.name}
                   {" / "}
                   {stamp(p.away_updated_at || p.updated_at)}
@@ -173,13 +151,10 @@ export function MoneylineRows({
               </strong>
               <span>
                 {p.name}
-                {(old || stale) && (
-                  <small className="warning-text">Stale</small>
-                )}
               </span>
               <strong className={favorite === "home" ? "ml-favorite" : ""}>
                 {american(p.home)}
-                <small className={old || stale ? "warning-text" : ""}>
+                <small>
                   {p.home_name || p.name}
                   {" / "}
                   {stamp(p.home_updated_at || p.updated_at)}
@@ -191,7 +166,7 @@ export function MoneylineRows({
       ) : (
         <div className="moneyline-empty">
           {data?.status === "not_configured"
-            ? "Odds not configured"
+            ? oddsNotConfigured
             : data?.status === "not_loaded"
               ? "Odds not loaded"
               : "Moneylines unavailable"}
@@ -214,14 +189,13 @@ export function TeamMoneyline({
   const price = data?.prices[String(game.id)]?.[0];
   const postponed = ["PPD", "CNCL"].includes(game.schedule_state);
   if (!price || postponed) return null;
-  const stale = data?.status === "stale" || !!error;
   const favorite =
     price.away < price.home ? "away" : price.home < price.away ? "home" : null;
   const book = side === "away" ? price.away_name : price.home_name;
   const value = side === "away" ? price.away : price.home;
   return (
     <span
-      className={`team-moneyline ${favorite === side ? "ml-favorite" : ""} ${stale ? "warning-text" : ""}`}
+      className={`team-moneyline ${favorite === side ? "ml-favorite" : ""}`}
       title={`${game[side].abbrev} best moneyline at ${book || price.name}`}
     >
       <span>{american(value)}</span>

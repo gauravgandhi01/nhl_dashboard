@@ -57,7 +57,7 @@ async def players(date: Date | None = None):
 
 @app.get('/api/odds/moneyline')
 async def moneyline(date: Date | None = None):
-    return app.state.moneylines.cached(date.isoformat() if date else today_et())
+    return await app.state.moneylines.refresh(date.isoformat() if date else today_et())
 
 
 @app.post('/api/odds/moneyline/refresh')
@@ -94,7 +94,7 @@ async def first_period_matchup(game_id: int, window: Literal['season', 'last5', 
 
 @app.get('/api/first-period/odds')
 async def first_period_odds(date: Date | None = None):
-    return app.state.first_period_odds.cached(date.isoformat() if date else today_et())
+    return await app.state.first_period_odds.refresh(date.isoformat() if date else today_et())
 
 
 @app.post('/api/first-period/odds/refresh')

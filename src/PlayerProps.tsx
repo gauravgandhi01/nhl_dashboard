@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Download } from "lucide-react";
 
 export type Quote = {
   side: string;
@@ -67,7 +66,9 @@ const stamp = (s: string | null) =>
 const old = (q: Quote) =>
   !q.updated_at ||
   !Number.isFinite(Date.parse(q.updated_at)) ||
-  Date.now() - Date.parse(q.updated_at) >= 1800000;
+  Date.now() - Date.parse(q.updated_at) >= 3600000;
+const oddsNotConfigured =
+  "Odds not configured: set THE_ODDS_API_KEY before starting the backend.";
 
 export function bestQuote(line: PropLine | undefined, side: string) {
   const all = line?.quotes.filter((q) => q.side === side) || [];
@@ -197,8 +198,6 @@ export function PropsControls({
   const games = Object.values(state.data?.games || {}).filter(
     (g) => gameId == null || g.game_id === gameId,
   );
-  const eligible = games.filter((g) => g.eligible);
-  const pending = eligible.filter((g) => g.status !== "available");
   const unmatched = games.reduce(
     (n, g) => n + (g.unmatched_names?.length || 0),
     0,
@@ -207,30 +206,16 @@ export function PropsControls({
     state.error || state.data?.error || games.find((g) => g.error)?.error;
   return (
     <div className="props-controls">
-      <button
-        className="text-button"
-        disabled={state.busy || !state.data?.configured || !eligible.length}
-        onClick={() => state.load(gameId)}
-        title={`Selected nine sportsbooks. At most ${(state.data?.max_credits_per_game || 10) * pending.length} credits for uncached games. 30-minute cache. Exchange prices may depend on liquidity; check book terms.`}
-      >
-        <Download size={13} />
-        {state.busy
-          ? "Loading props"
-          : gameId != null
-            ? "Load game props"
-            : "Load slate props"}
-      </button>
       <span className={status ? "warning" : "muted"} role="status">
-        {status ||
+        {state.busy
+          ? "Checking player odds"
+          : status ||
           (state.data?.configured === false
-            ? "Odds not configured"
+            ? oddsNotConfigured
             : state.data
               ? `${games.filter((g) => g.status === "available").length}/${games.length} games cached`
               : "Checking prop cache")}
       </span>
-      {games.some((g) => g.status === "stale") && (
-        <span className="warning">Stale prices</span>
-      )}
       {unmatched > 0 && (
         <span
           className="warning"
@@ -239,9 +224,6 @@ export function PropsControls({
           {unmatched} unmatched names
         </span>
       )}
-      <a href="https://the-odds-api.com/" target="_blank" rel="noreferrer">
-        The Odds API
-      </a>
     </div>
   );
 }
@@ -249,19 +231,17 @@ export function PropsControls({
 function Price({
   quote,
   prefix = "",
-  stale,
   showBook = true,
 }: {
   quote?: Quote;
   prefix?: string;
-  stale?: boolean;
   showBook?: boolean;
 }) {
   if (!quote) return <span className="prop-missing">{prefix} --</span>;
-  const title = `${quote.book}: ${quote.side} ${american(quote.price)}${quote.source_side ? `; source: goals ${quote.source_side} ${quote.source_point}` : ""}${quote.market?.endsWith("_alternate") ? "; alternate market" : ""}; updated ${stamp(quote.updated_at)}${stale || old(quote) ? "; stale snapshot" : ""}`;
+  const title = `${quote.book}: ${quote.side} ${american(quote.price)}${quote.source_side ? `; source: goals ${quote.source_side} ${quote.source_point}` : ""}${quote.market?.endsWith("_alternate") ? "; alternate market" : ""}; updated ${stamp(quote.updated_at)}`;
   return (
     <span
-      className={`prop-quote ${stale || old(quote) ? "prop-stale" : ""}`}
+      className="prop-quote"
       title={title}
       tabIndex={0}
       aria-label={title}
@@ -269,7 +249,6 @@ function Price({
       {prefix && <span>{prefix} </span>}
       <b>{american(quote.price)}</b>
       {showBook && <small>{shortBook[quote.bookmaker] || quote.book}</small>}
-      {(stale || old(quote)) && <small>stale</small>}
     </span>
   );
 }
@@ -285,12 +264,10 @@ function MarketRow({
   player,
   family,
   label,
-  stale,
 }: {
   player?: PropPlayer;
   family: string;
   label: string;
-  stale: boolean;
 }) {
   const lines = propLines(player, family);
   const [choice, setChoice] = useState("");
@@ -331,12 +308,10 @@ function MarketRow({
       <Price
         quote={bestQuote(line, binary ? "yes" : "over")}
         prefix={binary ? "Yes" : "O"}
-        stale={stale}
       />
       <Price
         quote={bestQuote(line, binary ? "no" : "under")}
         prefix={binary ? "No" : "U"}
-        stale={stale}
       />
       <select
         aria-label={`${label} sportsbook`}
@@ -389,7 +364,6 @@ export function PlayerPropPanel({
           player={player}
           family={family}
           label={label}
-          stale={game?.status === "stale" || !!state.error}
         />
       ))}
     </section>
@@ -401,16 +375,17 @@ export function CompactProps({
   gameId,
   playerId,
   family,
+  showLabel = true,
 }: {
   state: PropsState;
   gameId: number;
   playerId?: number | null;
   family?: string;
+  showLabel?: boolean;
 }) {
   const game = state.data?.games[String(gameId)];
   const player = playerId != null ? game?.players[String(playerId)] : undefined;
   const families = family ? [family] : ["points", "shots", "scorer"];
-  const stale = game?.status === "stale" || !!state.error;
   const rows = families.flatMap((f) => {
     const lines = propLines(player, f, f === "shots" && !family);
     const line =
@@ -431,24 +406,33 @@ export function CompactProps({
       aria-label="Quick player odds"
     >
       {rows.map(({ f, line, binary, over, under, label }) => {
+        const showPointOnly =
+          !showLabel &&
+          line?.point != null &&
+          !binary &&
+          (f === "shots" || (f === "points" && line.point !== 0.5));
         return (
           <div className="compact-prop-row" key={f}>
-            <span className="compact-prop-label">
-              {label}
-              {line?.point != null && !binary
-                ? ` ${line.point}`
-                : ""}
-            </span>
+            {showLabel && (
+              <span className="compact-prop-label">
+                {label}
+                {line?.point != null && !binary
+                  ? ` ${line.point}`
+                  : ""}
+              </span>
+            )}
+            {showPointOnly && (
+              <span className="compact-prop-label">{line.point}</span>
+            )}
             {over && (
               <Price
                 quote={over}
-                stale={stale}
                 showBook={false}
               />
             )}
             {over && under && <span className="prop-slash">/</span>}
             {under && (
-              <Price quote={under} stale={stale} showBook={false} />
+              <Price quote={under} showBook={false} />
             )}
           </div>
         );

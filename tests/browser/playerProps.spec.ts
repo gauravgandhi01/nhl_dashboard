@@ -180,11 +180,10 @@ test("shared player props render in expansion, lines, and only on-slate relevant
       path: `test-results/player-props-expanded-${width}.png`,
     });
   }
+  await expect(
+    page.getByRole("button", { name: "Load game props", exact: true }),
+  ).toHaveCount(0);
   expect(posts).toBe(0);
-  await page
-    .getByRole("button", { name: "Load game props", exact: true })
-    .click();
-  await expect.poll(() => posts).toBe(1);
 
   for (const side of ["away", "home"]) {
     matchup[side].lineup = {
@@ -230,6 +229,7 @@ test("shared player props render in expansion, lines, and only on-slate relevant
       fullPage: true,
     });
   }
+  entity.markets.points = [line("player_points_alternate", 1.5, 240)];
   const entry = {
     ...p,
     rank: 1,
@@ -269,20 +269,24 @@ test("shared player props render in expansion, lines, and only on-slate relevant
   );
   await page.goto(`/streaks?date=${date}&scope=tonight`);
   await expect(page.locator(".single-prop")).toHaveCount(3);
-  await expect(page.locator(".streak-board").nth(0)).toContainText("PTS 0.5");
-  await expect(page.locator(".streak-board").nth(1)).toContainText("ATG");
+  await expect(page.locator(".streak-board").nth(0)).toContainText("1.5");
+  await expect(page.locator(".streak-board").nth(0)).toContainText("+240");
+  await expect(page.locator(".streak-board").nth(0)).not.toContainText("PTS");
+  await expect(page.locator(".streak-board").nth(1)).not.toContainText("ATG");
   await expect(page.locator(".streak-board").nth(1)).not.toContainText("SOG");
-  await expect(page.locator(".streak-board").nth(2)).toContainText("SOG 2.5");
+  await expect(page.locator(".streak-board").nth(2)).toContainText("+120");
+  await expect(page.locator(".streak-board").nth(2)).toContainText("2.5");
+  await expect(page.locator(".streak-board").nth(2)).not.toContainText("SOG");
   await page.screenshot({
     path: "test-results/player-props-streaks-mobile.png",
     fullPage: true,
   });
   await page.getByRole("button", { name: "League-wide", exact: true }).click();
   await expect(page.locator(".compact-props")).toHaveCount(0);
-  expect(posts).toBe(1);
+  expect(posts).toBe(0);
 });
 
-test("missing configuration, provider errors, and stale props remain explicit", async ({
+test("missing configuration and provider errors remain explicit", async ({
   page,
   request,
 }) => {
@@ -317,7 +321,7 @@ test("missing configuration, provider errors, and stale props remain explicit", 
   await page.locator(".player-name").first().click();
   await expect(
     page.getByRole("button", { name: "Load game props", exact: true }),
-  ).toBeDisabled();
+  ).toHaveCount(0);
   await expect(page.locator(".player-prop-panel")).toContainText("Unavailable");
   mode = "stale";
   await page.reload();
@@ -326,6 +330,7 @@ test("missing configuration, provider errors, and stale props remain explicit", 
     "Quota exhausted",
   );
   await expect(
-    page.locator(".player-prop-panel .prop-stale").first(),
+    page.locator(".player-prop-panel .prop-quote").first(),
   ).toBeVisible();
+  await expect(page.locator(".player-prop-panel")).not.toContainText("stale");
 });

@@ -84,7 +84,6 @@ def test_explicit_fetch_cache_rosters_identity_and_provider_failures(tmp_path, m
         await store.client.aclose(); store.client = httpx.AsyncClient(transport=httpx.MockTransport(respond))
         service = PlayerProps(p)
         initial = await service.view('2026-09-29')
-        assert not calls
         a, b = await asyncio.gather(service.view('2026-09-29', refresh=True), service.view('2026-09-29', refresh=True))
         if mode == 'success':
             assert set(a['games']['2026020001']['players']) == {'13'}

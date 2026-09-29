@@ -77,7 +77,7 @@ test("first-period cards, windows, goalie inspection, rankings and desktop/mobil
   expect(errors).toEqual([]);
 });
 
-test("first-period empty date, schedule outage, postponed games and on-demand odds", async ({
+test("first-period empty date, schedule outage, postponed games and automatic odds", async ({
   page,
   request,
 }) => {
@@ -86,22 +86,10 @@ test("first-period empty date, schedule outage, postponed games and on-demand od
   data.matchups = [data.matchups[0]];
   data.matchups[0].game.schedule_state = "PPD";
   await page.route("**/api/first-period?*", (r) => r.fulfill({ json: data }));
-  let loads = 0;
-  await page.route("**/api/first-period/odds?*", (r) =>
+  let oddsCalls = 0;
+  await page.route("**/api/first-period/odds?*", (r) => {
+    oddsCalls++;
     r.fulfill({
-      json: {
-        prices: {},
-        configured: true,
-        status: "not_loaded",
-        retrieved_at: null,
-        source: "https://the-odds-api.com",
-        error: null,
-      },
-    }),
-  );
-  await page.route("**/api/first-period/odds/refresh?*", (r) => {
-    loads++;
-    return r.fulfill({
       json: {
         prices: {},
         configured: true,
@@ -115,12 +103,11 @@ test("first-period empty date, schedule outage, postponed games and on-demand od
   await page.goto("/first-period?date=2026-09-26");
   await expect(page.getByText("Postponed", { exact: true })).toBeVisible();
   await expect(page.locator(".fp-card .fp-price")).toHaveCount(0);
-  expect(loads).toBe(0);
-  await page.getByRole("button", { name: "Load odds", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Load odds", exact: true })).toHaveCount(0);
   await expect(
     page.getByText("Odds quota exhausted", { exact: true }),
   ).toBeVisible();
-  expect(loads).toBe(1);
+  expect(oddsCalls).toBe(1);
   data.matchups = [];
   await page
     .getByRole("button", { name: "Refresh first-period statistics" })

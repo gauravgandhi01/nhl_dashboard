@@ -1,4 +1,4 @@
-"""Shared event/player-ID prop cache. Paid requests only follow explicit refresh."""
+"""Shared event/player-ID prop cache. Paid requests refresh hourly as needed."""
 import asyncio
 import json
 import math
@@ -95,7 +95,7 @@ class PlayerProps:
         row = self.p.store.db.execute('SELECT body,fetched,attempted,error FROM player_prop_odds WHERE game_id=? AND version=?',
                                       (game['id'], VERSION)).fetchone()
         body = json.loads(row[0]) if row and row[0] else {'players': {}, 'unmatched_names': []}
-        stale = bool(row and row[0] and (row[3] or time.time() - row[1] >= 1800))
+        stale = bool(row and row[0] and (row[3] or time.time() - row[1] >= 3600))
         return {**body, 'game_id': game['id'], 'eligible': eligible(game),
                 **({'players': {}} if game.get('gameScheduleState') in ['PPD', 'CNCL'] else {}),
                 'status': ('stale' if stale else 'available') if row and row[0] else 'unavailable' if row and row[3] else 'not_loaded',
@@ -153,9 +153,10 @@ class PlayerProps:
             result['error'] = 'Schedule unavailable; props not requested'
             return result
         games = [g for g in schedule.data['games'] if game_id is None or g['id'] == game_id]
-        if refresh and schedule.stale:
+        should_refresh = refresh or configured
+        if should_refresh and schedule.stale:
             result['error'] = 'Schedule is stale; props not requested'
-        elif refresh and configured:
+        elif should_refresh and configured:
             async with self.lock:
                 pending = []
                 for game in games:

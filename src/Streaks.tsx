@@ -167,6 +167,7 @@ function Leaderboard({
       <p className="streak-period">{board.period}</p>
       <div className="streak-columns">
         <span>Player</span>
+        <span>Odds</span>
         <span>{streak ? "Streak" : "Total"}</span>
         <span>Recent 5</span>
       </div>
@@ -190,10 +191,6 @@ function Leaderboard({
                       </Link>
                     ))}
                   </div>
-                  {props && board.kind === "skater" && p.matchups.map(m => (
-                    <CompactProps key={m.game_id} state={props} gameId={m.game_id} playerId={p.id}
-                      family={board.id === "shots10" ? "shots" : ["goals10", "goal_streak"].includes(board.id) ? "scorer" : "points"} />
-                  ))}
                   {(p.seasons.length > 1 || p.stale) && (
                     <div className="streak-last-game">
                       {p.seasons.length > 1 && (
@@ -208,6 +205,13 @@ function Leaderboard({
                     </div>
                   )}
                 </div>
+              </div>
+              <div className="streak-odds">
+                {props && board.kind === "skater" && p.matchups.map(m => (
+                  <CompactProps key={m.game_id} state={props} gameId={m.game_id} playerId={p.id}
+                    family={board.id === "shots10" ? "shots" : ["goals10", "goal_streak"].includes(board.id) ? "scorer" : "points"}
+                    showLabel={false} />
+                ))}
               </div>
               <div
                 className="streak-value"
@@ -271,7 +275,7 @@ export function Streaks({
   const date = /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") || "")
     ? params.get("date")!
     : today();
-  const scope = params.get("scope") === "tonight" ? "tonight" : "league";
+  const scope = params.get("scope") === "league" ? "league" : "tonight";
   const kind = params.get("kind") === "goalie" ? "goalie" : "skater";
   const props = usePlayerProps(date, undefined, scope === "tonight" && kind === "skater");
   const update = (key: string, value: string) => {
@@ -377,9 +381,7 @@ export function Streaks({
               appearances / Goalies: starts or decisions
             </span>
             <span title={data.retrieved_at || "Not yet built"}>
-              {data.ready
-                ? `${data.coverage.eligible_players} eligible players`
-                : "Building history"}
+              {data.ready ? "History ready" : "Building history"}
             </span>
           </div>
           {data.build.status === "building" && (

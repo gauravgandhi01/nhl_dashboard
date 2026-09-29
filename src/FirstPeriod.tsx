@@ -6,7 +6,6 @@ import {
   ChevronLeft,
   ChevronRight,
   RefreshCw,
-  Download,
   ArrowDown,
   ArrowUp,
 } from "lucide-react";
@@ -98,6 +97,8 @@ const f = (value: number | null | undefined, digits = 2) =>
 const pct = (value: number | null | undefined) =>
   value == null ? "--" : `${value.toFixed(1)}%`;
 const money = (value: number) => `${value > 0 ? "+" : ""}${value}`;
+const oddsNotConfigured =
+  "Odds not configured: set THE_ODDS_API_KEY before starting the backend.";
 const timestamp = (s: string | null) =>
   s
     ? new Date(s).toLocaleString("en-US", {
@@ -239,13 +240,13 @@ function Status({ game }: { game: Game }) {
     </span>
   );
 }
-function PriceLine({ price, stale }: { price?: Price; stale: boolean }) {
+function PriceLine({ price }: { price?: Price }) {
   return (
     <div
-      className={`fp-price ${stale ? "warning" : ""}`}
+      className="fp-price"
       title={
         price
-          ? `FanDuel updated ${timestamp(price.updated_at)}${stale ? "; cached/stale prices" : ""}`
+          ? `FanDuel updated ${timestamp(price.updated_at)}`
           : "No matching FanDuel first-period market"
       }
     >
@@ -255,7 +256,6 @@ function PriceLine({ price, stale }: { price?: Price; stale: boolean }) {
           <strong>{price.total}</strong>
           <span>O {money(price.over)}</span>
           <span>U {money(price.under)}</span>
-          {stale && <span>Stale</span>}
         </>
       ) : (
         <span>Unavailable</span>
@@ -416,7 +416,6 @@ function PeriodCard({
         {!["PPD", "CNCL"].includes(m.game.schedule_state) && (
           <PriceLine
             price={odds?.prices[String(m.game.id)]}
-            stale={odds?.status === "stale"}
           />
         )}
       </div>
@@ -787,7 +786,7 @@ function PeriodContent({
   refresh: () => void;
   oddsDate: string;
 }) {
-  const { odds, busy: oddsBusy, error: oddsError, load } = useOdds(oddsDate);
+  const { odds, error: oddsError } = useOdds(oddsDate);
   const match = data?.matchups?.[0];
   return (
     <>
@@ -874,19 +873,6 @@ function PeriodContent({
         </div>
         <div className="toolbar-right">
           <button
-            className="text-button"
-            onClick={load}
-            disabled={oddsBusy || !odds?.configured}
-            title={
-              !odds?.configured
-                ? "THE_ODDS_API_KEY is not configured"
-                : "Fetch FanDuel first-period markets; respects the 30-minute cache"
-            }
-          >
-            <Download size={14} />
-            {oddsBusy ? "Loading odds" : "Load odds"}
-          </button>
-          <button
             className="icon-button"
             onClick={refresh}
             disabled={busy}
@@ -898,23 +884,20 @@ function PeriodContent({
         </div>
       </div>
       <div className="fp-odds-meta">
-        <a
-          href={odds?.source || "https://the-odds-api.com/"}
-          target="_blank"
-          rel="noreferrer"
-        >
-          FanDuel / The Odds API
-        </a>
         <span
           className={
-            odds?.status === "stale" || oddsError || odds?.error
+            oddsError || odds?.error
               ? "warning"
               : "muted"
           }
         >
           {oddsError ||
             odds?.error ||
-            odds?.status.replaceAll("_", " ") ||
+            (odds?.status === "stale"
+              ? "odds cached"
+              : odds?.status === "not_configured"
+                ? oddsNotConfigured
+                : odds?.status.replaceAll("_", " ")) ||
             "Loading cache"}
           {odds?.retrieved_at
             ? ` / Retrieved ${timestamp(odds.retrieved_at)}`
@@ -1003,7 +986,6 @@ function PeriodContent({
                 {!["PPD", "CNCL"].includes(match.game.schedule_state) && (
                   <PriceLine
                     price={odds?.prices[String(match.game.id)]}
-                    stale={odds?.status === "stale"}
                   />
                 )}
                 <section className="fp-h2h">
