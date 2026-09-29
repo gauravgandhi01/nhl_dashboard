@@ -5,7 +5,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from backend.cache import Feed
+from backend.cache import Feed, Store
 from backend.players import player_windows, players_dashboard
 from backend.providers import parse_mp_skaters
 
@@ -140,3 +140,26 @@ def test_season_outage_does_not_assume_previous_season():
     fake.league_missing = True
     result = asyncio.run(players_dashboard(fake, '2026-09-26'))
     assert not result['periods'][0]['previous_season']
+
+
+def test_dashboard_snapshot_cache_reuses_built_payload(tmp_path):
+    class CachedFake(Fake):
+        def __init__(self):
+            self.store = Store(tmp_path / 'players.sqlite3')
+            self.score_calls = 0
+
+        async def nhl(self, path, *args):
+            if path.startswith('score'):
+                self.score_calls += 1
+            return await super().nhl(path, *args)
+
+    async def scenario():
+        fake = CachedFake()
+        first = await players_dashboard(fake, '2026-09-26')
+        second = await players_dashboard(fake, '2026-09-26')
+        assert fake.score_calls == 1
+        assert first['players'] == second['players']
+        assert first['cache_status'] == 'fresh'
+        assert second['cache_status'] == 'cached'
+        await fake.store.close()
+    asyncio.run(scenario())

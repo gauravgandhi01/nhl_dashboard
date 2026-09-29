@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import time
 from collections import defaultdict
+from datetime import datetime, timezone
 
 from .cache import Feed
 from .service import display_name, game_info, latest_sources, today_et
 from .stats import number, season_label
+
+PLAYERS_TTL = 3600
 
 
 def seconds(value):
@@ -62,6 +67,21 @@ def player_windows(logs, advanced, cutoff):
 
 
 async def players_dashboard(p, date):
+    cache_enabled = True
+    now = time.time()
+    try:
+        p.store.db.execute('''CREATE TABLE IF NOT EXISTS player_dashboards (
+            date TEXT PRIMARY KEY, body TEXT, fetched REAL, error TEXT
+        )''')
+        p.store.db.commit()
+        row = p.store.db.execute('SELECT body,fetched,error FROM player_dashboards WHERE date=?', (date,)).fetchone()
+        if row and row[0] and now - row[1] < PLAYERS_TTL:
+            body = json.loads(row[0])
+            body['retrieved_at'] = datetime.fromtimestamp(row[1], timezone.utc).isoformat()
+            body['cache_status'] = 'cached'
+            return body
+    except (AttributeError, TypeError):
+        cache_enabled = False
     scores = await p.nhl(f'score/{date}', 600)
     sources = [scores]
     result = {'date': date, 'players': [], 'games': [], 'periods': [], 'sources': [], 'error': None}
@@ -122,4 +142,10 @@ async def players_dashboard(p, date):
                         })
     result['as_of'] = cutoff
     result['sources'] = latest_sources(sources)
+    result['retrieved_at'] = datetime.fromtimestamp(now, timezone.utc).isoformat()
+    result['cache_status'] = 'fresh'
+    if cache_enabled:
+        p.store.db.execute('INSERT OR REPLACE INTO player_dashboards VALUES(?,?,?,NULL)',
+                           (date, json.dumps(result), now))
+        p.store.db.commit()
     return result

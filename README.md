@@ -294,6 +294,10 @@ The daily slate is designed to render from small NHL/Daily Faceoff/odds feeds
 plus normalized MoneyPuck rows when available; large MoneyPuck CSV/ZIP files are
 not stored as raw SQLite response blobs.
 
+The Players page stores a built dashboard snapshot by date for one hour. Browser
+navigation also reuses the current date's last payload in memory, so returning to
+the tab should not rebuild every skater game log.
+
 ## Development and Checks
 
 ```sh

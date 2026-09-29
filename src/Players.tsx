@@ -33,12 +33,15 @@ type Skater = {
 type Data = {
   date: string;
   as_of: string;
+  retrieved_at?: string | null;
+  cache_status?: string;
   players: Skater[];
   games: { id: number }[];
   periods: { season_label: string; previous_season: boolean }[];
   sources: Source[];
   error: string | null;
 };
+const pageCache = new Map<string, Data>();
 const today = todayEt;
 const shift = (date: string, days: number) => {
   const d = new Date(date + "T12:00:00Z");
@@ -143,15 +146,21 @@ export function Players({
   };
   useEffect(() => {
     const controller = new AbortController();
-    setData(null);
+    const cached = pageCache.get(date);
+    setData(cached || null);
     setError(null);
-    setTeam("all");
-    setExpanded(null);
+    if (!cached) {
+      setTeam("all");
+      setExpanded(null);
+    }
     fetch(`/api/players?date=${date}`, { signal: controller.signal })
       .then(async (r) => {
         const body = await r.json();
         if (!r.ok) throw new Error(body.detail || "Players unavailable");
-        if (!controller.signal.aborted) setData(body);
+        if (!controller.signal.aborted) {
+          pageCache.set(date, body);
+          setData(body);
+        }
       })
       .catch((e) => {
         if (!controller.signal.aborted) setError(e.message);
