@@ -93,10 +93,10 @@ class Dashboard:
             if stats_season != season:
                 league = await self.p.stats('team/summary', stats_season, is_game=False)
                 sources.append(league)
-            goalie_stats, mp_goalies, mp_teams = await asyncio.gather(self.p.stats('goalie/summary', stats_season, is_game=False),
-                                                                      self.p.mp('goalies', stats_season),
-                                                                      self.p.mp('teams', stats_season))
-            sources.extend([goalie_stats, mp_goalies, mp_teams])
+            goalie_stats, mp_teams = await asyncio.gather(
+                self.p.stats('goalie/summary', stats_season, is_game=False),
+                self.p.mp('teams', stats_season))
+            sources.extend([goalie_stats, mp_teams])
             teams = {g[side]['id']: g[side] for g in games if int(g['season']) == season for side in ['awayTeam', 'homeTeam']}
             async def team_context(team):
                 roster, schedule, signal_schedule = await asyncio.gather(self.p.nhl(f"roster/{team['abbrev']}/current", 3600),
@@ -143,7 +143,7 @@ class Dashboard:
                                         'advanced': advanced_summary(advanced),
                                         'form': last_five((schedule.data or {}).get('games', []), tid),
                                         'goalie': card_goalie(starters[side], (roster.data or {}).get('goalies', []),
-                                                              goalie_stats.data or [], mp_goalies.data or []),
+                                                              goalie_stats.data or [], []),
                                         'signals': matchup_signals(game, tid, (signal_schedule.data or {}).get('games', []) if not signal_schedule.stale else [],
                                                                    starters[side], career_gp)}
                 comparisons[str(game['id'])] = comparison
