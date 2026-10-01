@@ -69,6 +69,7 @@ export type Side = {
     sections: Record<string, string[]>;
     updated_at: string | null;
   } | null;
+  // Keyed by NHL player ID, independent of provider display names.
   lineup_usage: Record<string, Stats>;
   lineup_player_ids?: Record<string, number | null>;
   lineup_source: Source;

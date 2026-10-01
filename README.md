@@ -368,3 +368,8 @@ Futures models and historical research are intentionally deferred. Existing
 sibling projects remain independently runnable and are not runtime dependencies.
 Daily cards and detailed pages refresh on navigation or manual refresh only.
 There are no live score displays, live filters, or automatic polling.
+
+Lineup TOI is joined by NHL player ID using the shared verified name aliases (including
+Gabe/Gabriel Perreault). Missing TOI labels distinguish unmatched lineup names, no
+prior regular-season appearances, NHL feed failures, and missing MoneyPuck 5v5
+coverage. Hover a missing-value label for details.

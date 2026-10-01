@@ -224,7 +224,7 @@ class Dashboard:
         for player in skater_players:
             feed = log_feeds[player['id']]
             log_rows = feed.data.get('gameLog') if isinstance(feed.data, dict) and isinstance(feed.data.get('gameLog'), list) else None
-            usage[normalized_name(player['name'])] = lineup_usage_windows(
+            usage[str(player['id'])] = lineup_usage_windows(
                 log_rows, mp_by_player.get(player['id']) if mp_skaters.data is not None else None, cutoff)
         goalie_players = [p for p in players if p['position'] == 'G']
         goalie_feed = Feed(None, 'NHL Stats', 'https://api.nhle.com/stats/rest/en/goalie/summary', error='Goalie roster unavailable')

@@ -1029,8 +1029,30 @@ function Lineups({ side, props, gameId }: { side: Side; props: PropsState; gameI
       usage.season_5v5 != null || usage.l10_5v5 != null || usage.l5_5v5 != null,
   );
   const usageValue = (name: string, window: "season" | "l10" | "l5") => {
-    const usage = side.lineup_usage?.[keyName(name)];
-    return clock(usage?.[strength === "5v5" ? `${window}_5v5` : window]);
+    const playerId = side.lineup_player_ids?.[name];
+    const usage = playerId == null ? undefined : side.lineup_usage?.[String(playerId)];
+    const value = usage?.[strength === "5v5" ? `${window}_5v5` : window];
+    if (value != null) return clock(value);
+    let label: string, reason: string;
+    if (playerId == null) {
+      label = "Unmatched";
+      reason = "Lineup name could not be matched to a unique NHL roster player.";
+    } else if (usage?.[`${window}_games`] == null) {
+      label = "NHL unavailable";
+      reason = "NHL appearance logs are unavailable for this player.";
+    } else if (usage[`${window}_games`] === 0) {
+      label = "No prior GP";
+      reason = "No eligible regular-season appearances before the selected game date in this statistical season.";
+    } else if (strength === "5v5") {
+      label = usage[`${window}_5v5_games`] == null ? "5v5 unavailable" : "No 5v5 data";
+      reason = usage[`${window}_5v5_games`] == null
+        ? "MoneyPuck five-on-five ice-time data is unavailable."
+        : "MoneyPuck has no matched five-on-five ice time for these NHL appearances.";
+    } else {
+      label = "TOI unavailable";
+      reason = "NHL appearances are present but usable ice time is unavailable.";
+    }
+    return <span className="toi-missing" title={reason}>{label}</span>;
   };
   return (
     <section>
@@ -1069,21 +1091,24 @@ function Lineups({ side, props, gameId }: { side: Side; props: PropsState; gameI
                 <div
                   className={`line-grid ${name === "Defensive Pairings" || name.startsWith("Defense pair") ? "pairs" : ""}`}
                 >
-                  {players.map((p, i) => (
-                    <div className="line-player" key={p + i}>
-                      <strong title={p}>{p.replace(/^(\S+)\s+/, (_, first: string) => first[0] + ". ")}</strong>
-                      <span>
-                        <b>S</b> {usageValue(p, "season")}
-                      </span>
-                      <span>
-                        <b>L10</b> {usageValue(p, "l10")}
-                      </span>
-                      <span>
-                        <b>L5</b> {usageValue(p, "l5")}
-                      </span>
-                      <CompactProps state={props} gameId={gameId} playerId={side.lineup_player_ids?.[p]} />
-                    </div>
-                  ))}
+                  {players.map((p, i) => {
+                    const values = [usageValue(p, "season"), usageValue(p, "l10"), usageValue(p, "l5")];
+                    const first = values[0];
+                    const sharedReason = typeof first !== "string" && values.every(
+                      value => typeof value !== "string" && value.props.title === first.props.title,
+                    );
+                    return (
+                      <div className="line-player" key={p + i}>
+                        <strong title={p}>{p.replace(/^(\S+)\s+/, (_, first: string) => first[0] + ". ")}</strong>
+                        {sharedReason ? <span className="line-usage-missing">{first}</span> : values.map((value, index) => (
+                          <span key={index} className={typeof value === "string" ? undefined : "line-usage-missing"}>
+                            <b>{["S", "L10", "L5"][index]}</b> {value}
+                          </span>
+                        ))}
+                        <CompactProps state={props} gameId={gameId} playerId={side.lineup_player_ids?.[p]} />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}
