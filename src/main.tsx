@@ -168,6 +168,49 @@ function IconButton({
   );
 }
 
+function TopbarDateControls() {
+  const [params, setParams] = useSearchParams();
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") || "")
+    ? params.get("date")!
+    : today();
+  const changeDate = (value: string) => {
+    if (!value) return;
+    const next = new URLSearchParams(params);
+    next.set("date", value);
+    setParams(next);
+  };
+  return (
+    <div className="date-controls compact-date-controls topbar-date-controls">
+      <IconButton
+        label="Previous day"
+        disabled={date <= today()}
+        onClick={() => changeDate(shift(date, -1))}
+      >
+        <ChevronLeft size={15} />
+      </IconButton>
+      <label className="date-input compact-date-input">
+        <CalendarDays size={13} />
+        <input
+          type="date"
+          aria-label="Game date"
+          min={today()}
+          value={date}
+          onChange={(e) => changeDate(e.target.value)}
+        />
+      </label>
+      <IconButton label="Next day" onClick={() => changeDate(shift(date, 1))}>
+        <ChevronRight size={15} />
+      </IconButton>
+      <button
+        className="text-button compact-text-button"
+        onClick={() => changeDate(today())}
+      >
+        Today
+      </button>
+    </div>
+  );
+}
+
 function GameStatus({ game }: { game: Game }) {
   if (game.schedule_state === "PPD")
     return <span className="status warning">Postponed</span>;
@@ -455,7 +498,7 @@ function CardStats({
 }
 
 function Slate() {
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
   const date = /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") || "")
     ? params.get("date")!
     : today();
@@ -466,6 +509,9 @@ function Slate() {
   const [filter, setFilter] = useState("upcoming");
   const odds = useMoneylines(date);
   const games = data?.games || [];
+  useEffect(() => {
+    setFilter("upcoming");
+  }, [date]);
   const filtered = games.filter(
     (g) =>
       (filter === "final"
@@ -474,50 +520,8 @@ function Slate() {
           ? isStarted(g)
           : isUpcoming(g)),
   );
-  const changeDate = (value: string) => {
-    if (value) {
-      setParams({ date: value });
-      setFilter("upcoming");
-    }
-  };
   return (
     <>
-      <header className="page-heading">
-        <div>
-          <div className="eyebrow">DAILY SLATE</div>
-          <div className="slate-datebar">
-            <h1>{dateTitle(date)}</h1>
-            <div className="date-controls compact-date-controls">
-              <IconButton
-                label="Previous day"
-                disabled={date <= today()}
-                onClick={() => changeDate(shift(date, -1))}
-              >
-                <ChevronLeft size={15} />
-              </IconButton>
-              <label className="date-input compact-date-input">
-                <CalendarDays size={13} />
-                <input
-                  type="date"
-                  aria-label="Game date"
-                  min={today()}
-                  value={date}
-                  onChange={(e) => changeDate(e.target.value)}
-                />
-              </label>
-              <IconButton
-                label="Next day"
-                onClick={() => changeDate(shift(date, 1))}
-              >
-                <ChevronRight size={15} />
-              </IconButton>
-              <button className="text-button compact-text-button" onClick={() => changeDate(today())}>
-                Today
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
       <div className="toolbar">
         <div className="segments" aria-label="Game status">
           {[
@@ -1315,12 +1319,6 @@ function DashboardNav() {
   return (
     <nav className="dashboard-nav" aria-label="Dashboard views">
       <Link
-        to={`/?date=${date}`}
-        aria-current={location.pathname === "/" ? "page" : undefined}
-      >
-        Matchups
-      </Link>
-      <Link
         to={`/players?date=${date}`}
         aria-current={location.pathname === "/players" ? "page" : undefined}
       >
@@ -1344,13 +1342,27 @@ function DashboardNav() {
   );
 }
 
+function TopbarBrand() {
+  const location = useLocation();
+  const [params] = useSearchParams();
+  const date = params.get("date") || today();
+  return (
+    <Link
+      to={`/?date=${date}`}
+      className="nav-title"
+      aria-current={location.pathname === "/" ? "page" : undefined}
+    >
+      NHL <span>Matchups</span>
+    </Link>
+  );
+}
+
 function App() {
   return (
     <BrowserRouter>
       <div className="topbar">
-        <Link to="/" className="nav-title">
-          NHL <span>Matchups</span>
-        </Link>
+        <TopbarBrand />
+        <TopbarDateControls />
         <DashboardNav />
       </div>
       <main>

@@ -126,7 +126,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 32px;
   padding: 0 max(24px, calc((100% - 1240px) / 2));
   background: #191a1c;
 }
@@ -173,15 +174,6 @@ main {
   color: var(--muted);
   font-size: 12px;
   margin-top: 10px;
-}
-.slate-datebar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px 14px;
-}
-.slate-datebar h1 {
-  font-size: clamp(22px, 3vw, 31px);
 }
 .date-controls,
 .toolbar-right {
@@ -259,6 +251,11 @@ main {
   min-height: 28px;
   padding: 5px 8px;
   font-size: 11px;
+}
+.topbar-date-controls {
+  align-self: center;
+  margin-left: -14px;
+  margin-right: 2px;
 }
 .toolbar {
   display: flex;
@@ -1342,6 +1339,20 @@ tr:hover td {
   }
   .topbar {
     padding: 0 18px;
+    height: auto;
+    min-height: 56px;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding-block: 8px;
+  }
+  .dashboard-nav {
+    height: auto;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+  }
+  .dashboard-nav a {
+    min-height: 28px;
   }
   .page-heading {
     align-items: flex-start;
@@ -1509,9 +1520,10 @@ tr:hover td {
 
 .dashboard-nav {
   display: flex;
-  gap: 22px;
+  gap: 18px;
   height: 100%;
   align-items: stretch;
+  margin-left: auto;
 }
 .dashboard-nav a {
   display: flex;
