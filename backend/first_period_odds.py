@@ -75,13 +75,13 @@ class FirstPeriodOdds:
                           else 'not_configured' if not configured else 'unavailable' if row and row[3] else 'not_loaded',
                 'error': row[3] if row else None}
 
-    async def refresh(self, date):
+    async def refresh(self, date, force=False):
         async with self.lock:
             cached = self.cached(date)
-            if not cached['configured'] or cached['status'] == 'available':
+            if not cached['configured'] or (cached['status'] == 'available' and not force):
                 return cached
             row = self.p.store.db.execute('SELECT attempted FROM first_period_odds WHERE date=?', (date,)).fetchone()
-            if row and time.time() - row[0] < 600:
+            if row and time.time() - row[0] < 600 and not force:
                 return cached
             now = time.time()
             try:

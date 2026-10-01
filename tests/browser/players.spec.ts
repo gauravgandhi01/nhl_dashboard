@@ -11,9 +11,6 @@ test("players windows, filters, sorting, expansion and navigation on desktop and
     await expect(page.locator(".player-name").first()).toBeVisible({
       timeout: 120000,
     });
-    await expect(page.locator(".data-context")).toContainText(
-      "Previous-season baseline",
-    );
     await expect(page.getByRole("button", { name: "Season", exact: true })).toHaveAttribute("aria-pressed", "true");
     expect(await page.locator("td.form-up").count()).toBeGreaterThan(0);
     expect(await page.locator("td.form-down").count()).toBeGreaterThan(0);
@@ -65,10 +62,7 @@ test("players windows, filters, sorting, expansion and navigation on desktop and
       path: `test-results/players-${width}.png`,
       fullPage: true,
     });
-    await page
-      .getByRole("navigation", { name: "Dashboard views" })
-      .getByRole("link", { name: "Matchups" })
-      .click();
+    await page.getByRole("link", { name: "NHL Matchups" }).click();
     await expect(page).toHaveURL("/?date=2026-09-26");
     await page
       .getByRole("navigation", { name: "Dashboard views" })

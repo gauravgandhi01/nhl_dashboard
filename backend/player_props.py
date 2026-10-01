@@ -169,7 +169,7 @@ class PlayerProps:
                 pending = []
                 for game in games:
                     row = self.p.store.db.execute('SELECT attempted FROM player_prop_odds WHERE game_id=? AND version=?', (game['id'], VERSION)).fetchone()
-                    if eligible(game) and self.cached(game)['status'] != 'available' and (not row or time.time() - row[0] >= 600):
+                    if eligible(game) and (refresh or self.cached(game)['status'] != 'available') and (refresh or not row or time.time() - row[0] >= 600):
                         pending.append(game)
                 if pending:
                     try:

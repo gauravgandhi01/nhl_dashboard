@@ -207,18 +207,17 @@ export function PropsControls({
   const unmatchedNames = games.flatMap((g) => g.unmatched_names || []);
   const status =
     state.error || state.data?.error || games.find((g) => g.error)?.error;
+  const message = state.busy
+    ? "Checking player odds"
+    : status ||
+      (state.data?.configured === false ? oddsNotConfigured : null);
   return (
     <div className="props-controls">
-      <span className={status ? "warning" : "muted"} role="status">
-        {state.busy
-          ? "Checking player odds"
-          : status ||
-          (state.data?.configured === false
-            ? oddsNotConfigured
-            : state.data
-              ? "Player odds checked"
-              : "Checking prop cache")}
-      </span>
+      {message && (
+        <span className={status ? "warning" : "muted"} role="status">
+          {message}
+        </span>
+      )}
       {state.data?.manual_refresh_enabled && (
         <button
           className="text-button"

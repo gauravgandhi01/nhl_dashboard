@@ -245,3 +245,26 @@ test("empty date, source outage, and keyboard navigation", async ({ page }) => {
     page.getByRole("heading", { name: "Games unavailable" }),
   ).toBeVisible();
 });
+
+test("moneyline refresh button posts for fresh odds", async ({ page, request }) => {
+  const slate = await (await request.get(`/api/slate?date=${slateDate}`)).json();
+  const payload = {
+    date: slateDate,
+    configured: true,
+    manual_refresh_enabled: true,
+    status: "available",
+    error: null,
+    retrieved_at: "2026-09-26T12:00:00+00:00",
+    usage: { remaining: "99" },
+    prices: {},
+  };
+  let posts = 0;
+  await page.route("**/api/slate?*", (route) => route.fulfill({ json: slate }));
+  await page.route("**/api/odds/moneyline**", (route) => {
+    if (route.request().method() === "POST") posts++;
+    return route.fulfill({ json: payload });
+  });
+  await page.goto(`/?date=${slateDate}`);
+  await page.getByRole("button", { name: "Refresh moneylines" }).click();
+  await expect.poll(() => posts).toBe(1);
+});

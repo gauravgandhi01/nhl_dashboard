@@ -3,7 +3,6 @@ import { Link, useSearchParams } from "react-router-dom";
 import {
   ArrowDown,
   ArrowUp,
-  ChevronLeft,
   ChevronRight,
   RefreshCw,
   Search,
@@ -43,11 +42,6 @@ type Data = {
 };
 const pageCache = new Map<string, Data>();
 const today = todayEt;
-const shift = (date: string, days: number) => {
-  const d = new Date(date + "T12:00:00Z");
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-};
 const numeric = (n: number | null | undefined, digits = 2) =>
   n == null ? "--" : n.toFixed(digits);
 const clock = (n: number | null | undefined) =>
@@ -201,61 +195,6 @@ export function Players() {
         (key === "point_games_pct" && n != null ? "%" : "");
   return (
     <>
-      <header className="page-heading">
-        <div>
-          <div className="eyebrow">SKATERS</div>
-          <h1>Players</h1>
-          <p className="subline">
-            {new Date(date + "T12:00:00").toLocaleDateString("en-US", {
-              weekday: "long",
-              month: "long",
-              day: "numeric",
-            })}{" "}
-            / {data?.games.length ?? "--"} games / Eastern Time
-          </p>
-        </div>
-        <div className="date-controls">
-          <button
-            className="icon-button"
-            aria-label="Previous day"
-            title="Previous day"
-            onClick={() => update("date", shift(date, -1))}
-          >
-            <ChevronLeft size={17} />
-          </button>
-          <label className="date-input">
-            <input
-              type="date"
-              aria-label="Player game date"
-              value={date}
-              onChange={(e) => update("date", e.target.value)}
-            />
-          </label>
-          <button
-            className="icon-button"
-            aria-label="Next day"
-            title="Next day"
-            onClick={() => update("date", shift(date, 1))}
-          >
-            <ChevronRight size={17} />
-          </button>
-          <button
-            className="text-button"
-            onClick={() => update("date", today())}
-          >
-            Today
-          </button>
-          <button
-            className="icon-button"
-            aria-label="Refresh players"
-            title="Refresh players"
-            disabled={!data && !error}
-            onClick={() => setRevision((r) => r + 1)}
-          >
-            <RefreshCw size={15} />
-          </button>
-        </div>
-      </header>
       <div className="toolbar player-toolbar">
         <div className="segments" aria-label="Player statistics window">
           {(
@@ -304,6 +243,15 @@ export function Players() {
             <option value="F">Forwards</option>
             <option value="D">Defense</option>
           </select>
+          <button
+            className="icon-button"
+            aria-label="Refresh players"
+            title="Refresh players"
+            disabled={!data && !error}
+            onClick={() => setRevision((r) => r + 1)}
+          >
+            <RefreshCw size={15} />
+          </button>
         </div>
       </div>
       <PropsControls state={props} />
@@ -320,21 +268,6 @@ export function Players() {
       ) : (
         data && (
           <>
-            <div className="data-context">
-              <span>
-                {data.periods
-                  .map(
-                    (p) =>
-                      `${p.season_label} regular season${p.previous_season ? " / Previous-season baseline" : ""}`,
-                  )
-                  .join("; ")}{" "}
-                / All strengths
-              </span>
-              <span>
-                Before {data.as_of} / {rows.length} skaters / Current rosters,
-                lineup unconfirmed
-              </span>
-            </div>
             {!data.games.length ? (
               <div className="state-message">
                 <h2>No scheduled games</h2>
@@ -420,17 +353,6 @@ export function Players() {
                 )}
               </div>
             )}
-            <p className="footnote">
-              NHL scoring &amp; ice time /{" "}
-              <a
-                href="https://moneypuck.com/data.htm"
-                target="_blank"
-                rel="noreferrer"
-              >
-                MoneyPuck skater attempts and rates
-              </a>{" "}
-              / -- unavailable
-            </p>
           </>
         )
       )}
@@ -527,7 +449,6 @@ function PlayerRows({
           <td colSpan={16}>
             <div>
               <strong>{p.name}</strong>
-              <span className="muted"> {p.season_label} / All strengths</span>
               <table aria-label={`${p.name} form comparison`}>
                 <thead>
                   <tr>

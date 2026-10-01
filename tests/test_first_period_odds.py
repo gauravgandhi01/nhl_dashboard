@@ -82,6 +82,9 @@ def test_odds_opt_in_caching_quota_and_secret_redaction(tmp_path,monkeypatch,mod
             assert results[0]['prices']['2026020001']['total']==1.5
             assert results[0]['odds_scope']['mode']=='bookmakers'
             assert len(calls)==2
+            forced=await odds.refresh('2026-09-28', force=True)
+            assert forced['prices']['2026020001']['total']==1.5
+            assert len(calls)==4
             store.db.execute('UPDATE first_period_odds SET fetched=0,attempted=0');store.db.commit()
             async def fail(request):return httpx.Response(403)
             await store.client.aclose();store.client=httpx.AsyncClient(transport=httpx.MockTransport(fail))

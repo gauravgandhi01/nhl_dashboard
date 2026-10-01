@@ -124,7 +124,7 @@ test("streaks cross-season, partial, empty slate and failed provider states", as
   await expect(
     page.getByText("Across seasons", { exact: true }).first(),
   ).toBeVisible();
-  await expect(page.getByText(/Partial leaderboard coverage/)).toBeVisible();
+  await expect(page.getByText(/leaderboard history is incomplete/)).toBeVisible();
   data.boards.forEach((b: { entries: unknown[] }) => (b.entries = []));
   await page.getByRole("button", { name: "League-wide", exact: true }).click();
   await page.getByRole("button", { name: "On slate", exact: true }).click();

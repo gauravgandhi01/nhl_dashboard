@@ -146,7 +146,7 @@ test("shared player props render in expansion, lines, and only on-slate relevant
   for (const width of [1440, 375]) {
     await page.setViewportSize({ width, height: 1000 });
     await page.goto(`/players?date=${date}`);
-    await expect(page.locator(".props-controls")).toContainText(
+    await expect(page.locator(".props-controls")).not.toContainText(
       "Player odds checked",
     );
     await expect(page.locator(".props-controls")).not.toContainText(

@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
-  ChevronLeft,
-  ChevronRight,
   RefreshCw,
   Flame,
   Trophy,
@@ -62,11 +60,6 @@ type Data = {
   sources: Source[];
 };
 const today = todayEt;
-const shift = (date: string, days: number) => {
-  const d = new Date(date + "T12:00:00Z");
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-};
 const shortDate = (date: string) =>
   new Date(date + "T12:00:00").toLocaleDateString("en-US", {
     month: "short",
@@ -285,52 +278,6 @@ export function Streaks() {
     response?.date === date && response.scope === scope ? response : null;
   return (
     <>
-      <header className="page-heading">
-        <div>
-          <div className="eyebrow">PLAYER FORM</div>
-          <h1>Streaks &amp; leaders</h1>
-          <p className="subline">
-            {new Date(date + "T12:00:00").toLocaleDateString("en-US", {
-              weekday: "long",
-              month: "long",
-              day: "numeric",
-            })}{" "}
-            / Regular season / Across seasons
-          </p>
-        </div>
-        <div className="date-controls">
-          <button
-            className="icon-button"
-            title="Previous day"
-            aria-label="Previous day"
-            onClick={() => update("date", shift(date, -1))}
-          >
-            <ChevronLeft size={17} />
-          </button>
-          <label className="date-input">
-            <input
-              type="date"
-              aria-label="Streaks date"
-              value={date}
-              onChange={(e) => update("date", e.target.value)}
-            />
-          </label>
-          <button
-            className="icon-button"
-            title="Next day"
-            aria-label="Next day"
-            onClick={() => update("date", shift(date, 1))}
-          >
-            <ChevronRight size={17} />
-          </button>
-          <button
-            className="text-button"
-            onClick={() => update("date", today())}
-          >
-            Today
-          </button>
-        </div>
-      </header>
       <div className="toolbar">
         <div className="segments" aria-label="Leaderboard scope">
           <button
@@ -366,15 +313,6 @@ export function Streaks() {
         </div>
       ) : data ? (
         <>
-          <div className="data-context">
-            <span>
-              Before {data.as_of} / Current-roster players / Skaters:
-              appearances / Goalies: starts or decisions
-            </span>
-            <span title={data.retrieved_at || "Not yet built"}>
-              {data.ready ? "History ready" : "Building history"}
-            </span>
-          </div>
           {data.build.status === "building" && (
             <div className="loading-label" role="status">
               <RefreshCw size={14} className="spin" />
@@ -384,10 +322,7 @@ export function Streaks() {
           )}
           {(data.coverage.partial || data.stale || data.error) && (
             <p className="streak-warning warning">
-              {data.error ||
-                `${data.coverage.roster_coverage}/${data.coverage.roster_total} rosters / ${data.coverage.skipped_players} players with unavailable history / ${data.coverage.ambiguous_players} unresolved identities`}
-              {data.stale ? " / Stale snapshot" : ""}
-              {data.coverage.partial ? " / Partial leaderboard coverage" : ""}
+              {data.error || "Some leaderboard history is incomplete."}
             </p>
           )}
           {(!data.schedule_available || data.schedule_stale) && (

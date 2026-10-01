@@ -92,6 +92,9 @@ def test_cache_and_failure_isolation(tmp_path, monkeypatch, mode):
             assert results[0]['prices']['2026020001'][0]['name'] == 'Best available'
             assert results[0]['odds_scope']['mode'] == 'bookmakers'
             assert len(calls) == 1
+            forced = await service.refresh('2026-11-01', force=True)
+            assert forced['prices']['2026020001'][0]['away'] == 120
+            assert len(calls) == 2
             store.db.execute('UPDATE moneyline_odds SET fetched=0,attempted=0'); store.db.commit()
             async def fail(request): raise httpx.ConnectError('Secret-bearing URL must not escape', request=request)
             await store.client.aclose()

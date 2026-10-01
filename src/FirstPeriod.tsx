@@ -3,8 +3,6 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
-  ChevronLeft,
-  ChevronRight,
   RefreshCw,
   ArrowDown,
   ArrowUp,
@@ -112,11 +110,6 @@ const timestamp = (s: string | null) =>
         minute: "2-digit",
       }) + " ET"
     : "Unavailable";
-const shift = (date: string, days: number) => {
-  const d = new Date(date + "T12:00:00Z");
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-};
 const selected = (s: Side) => s.goalies.find((g) => g.id === s.selected_goalie);
 
 function usePeriod(url: string) {
@@ -800,56 +793,7 @@ function PeriodContent({
               ? `${match.game.away.abbrev} at ${match.game.home.abbrev}`
               : "First Period"}
           </h1>
-          <p className="subline">
-            {new Date(oddsDate + "T12:00:00").toLocaleDateString("en-US", {
-              weekday: "long",
-              month: "long",
-              day: "numeric",
-            })}
-            {id && match ? (
-              <>
-                {" "}
-                / <Status game={match.game} />
-              </>
-            ) : (
-              <> / {data?.matchups?.length ?? "--"} games / Eastern Time</>
-            )}
-          </p>
         </div>
-        {!id && (
-          <div className="date-controls">
-            <button
-              className="icon-button"
-              title="Previous day"
-              aria-label="Previous day"
-              onClick={() => update("date", shift(date, -1))}
-            >
-              <ChevronLeft size={17} />
-            </button>
-            <label className="date-input">
-              <input
-                type="date"
-                aria-label="First-period date"
-                value={date}
-                onChange={(e) => update("date", e.target.value)}
-              />
-            </label>
-            <button
-              className="icon-button"
-              title="Next day"
-              aria-label="Next day"
-              onClick={() => update("date", shift(date, 1))}
-            >
-              <ChevronRight size={17} />
-            </button>
-            <button
-              className="text-button"
-              onClick={() => update("date", today())}
-            >
-              Today
-            </button>
-          </div>
-        )}
       </header>
       <div className="toolbar">
         <div className="segments" aria-label="First-period window">

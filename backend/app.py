@@ -78,7 +78,7 @@ async def moneyline(date: Date | None = None):
 @app.post('/api/odds/moneyline/refresh')
 async def moneyline_refresh(date: Date | None = None):
     require_manual_odds_refresh()
-    return odds_refresh_payload(await app.state.moneylines.refresh(date.isoformat() if date else today_et()))
+    return odds_refresh_payload(await app.state.moneylines.refresh(date.isoformat() if date else today_et(), force=True))
 
 
 @app.get('/api/streaks')
@@ -117,7 +117,7 @@ async def first_period_odds(date: Date | None = None):
 @app.post('/api/first-period/odds/refresh')
 async def first_period_odds_refresh(date: Date | None = None):
     require_manual_odds_refresh()
-    return odds_refresh_payload(await app.state.first_period_odds.refresh(date.isoformat() if date else today_et()))
+    return odds_refresh_payload(await app.state.first_period_odds.refresh(date.isoformat() if date else today_et(), force=True))
 
 
 @app.get('/api/matchups/{game_id}')

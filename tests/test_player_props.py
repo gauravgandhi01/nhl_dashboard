@@ -89,7 +89,7 @@ def test_explicit_fetch_cache_rosters_identity_and_provider_failures(tmp_path, m
         a, b = await asyncio.gather(service.view('2026-09-29', refresh=True), service.view('2026-09-29', refresh=True))
         if mode == 'success':
             assert set(a['games']['2026020001']['players']) == {'13'}
-            assert len(calls) == 2
+            assert len(calls) == 4
             store.db.execute('UPDATE player_prop_odds SET fetched=0,attempted=0'); store.db.commit()
             def fail(request): return httpx.Response(403)
             await store.client.aclose(); store.client = httpx.AsyncClient(transport=httpx.MockTransport(fail))
@@ -101,7 +101,8 @@ def test_explicit_fetch_cache_rosters_identity_and_provider_failures(tmp_path, m
         elif mode != 'schedule_failure':
             assert not a['games']['2026020001']['players']
         if mode in ['no_key', 'started', 'postponed', 'schedule_failure']: assert not calls
-        if mode in ['quota', 'roster_failure', 'ambiguous']: assert len(calls) == 1
+        if mode == 'quota': assert len(calls) == 1
+        if mode in ['roster_failure', 'ambiguous']: assert len(calls) == 2
         assert 'SECRET' not in json.dumps([initial, a, b])
         assert 'SECRET' not in '\n'.join(store.db.iterdump())
         await store.close()
