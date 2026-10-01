@@ -462,7 +462,7 @@ function CardStats({
       <div className="card-goalie-names">
         {[a, h].map((side, i) => (
           <div key={i}>
-            <strong>{side?.goalie.name || "Not announced"}</strong>
+            <strong>{side?.goalie.name || "--"}</strong>
             <span
               className={
                 side?.goalie.basis === "Confirmed" ? "positive" : "muted"
@@ -777,7 +777,7 @@ function GoaliePanel({ side }: { side: Side }) {
       </div>
       <div className="reported-starter">
         <span className="muted">Reported starter</span>
-        <strong>{side.starter.name || "Not announced"}</strong>
+        <strong>{side.starter.name || "--"}</strong>
       </div>
       {side.starter.updated_at && (
         <p className="footnote">Updated {stamp(side.starter.updated_at)}</p>

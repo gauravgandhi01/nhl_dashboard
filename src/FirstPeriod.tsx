@@ -535,7 +535,7 @@ function GoalieDetail({ side, league }: { side: Side; league: Windows }) {
   return (
     <section>
       <div className="fp-starter">
-        <strong>{side.starter.name || "Not announced"}</strong>
+        <strong>{side.starter.name || "--"}</strong>
         {"\n"}
         <span
           className={side.starter.status === "Confirmed" ? "positive" : "muted"}
