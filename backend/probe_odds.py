@@ -1,7 +1,7 @@
 """Explicit bounded market discovery across configured US regions; never runs on navigation.
 
 Run from the project folder: .venv/bin/python -m backend.probe_odds
-Requires THE_ODDS_API_KEY in the environment. Writes a credential-free local report.
+Requires api_keys in ../keys.json. Writes a credential-free local report.
 """
 import asyncio
 import json

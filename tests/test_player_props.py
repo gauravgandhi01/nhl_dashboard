@@ -6,6 +6,7 @@ import httpx
 import pytest
 
 from backend.cache import Feed, Store
+import backend.odds_client as odds_client_module
 from backend.player_identity import resolve_player
 from backend.player_props import BOOKS, MARKETS, PlayerProps, normalize_props
 
@@ -53,8 +54,9 @@ def test_normalization_filters_books_invalid_prices_and_preserves_market_sides()
 
 @pytest.mark.parametrize('mode', ['success', 'no_key', 'started', 'postponed', 'schedule_failure', 'roster_failure', 'mismatch', 'ambiguous', 'quota', 'empty'])
 def test_explicit_fetch_cache_rosters_identity_and_provider_failures(tmp_path, monkeypatch, mode):
-    monkeypatch.setenv('THE_ODDS_API_KEY', 'SECRET')
-    if mode == 'no_key': monkeypatch.delenv('THE_ODDS_API_KEY')
+    keys_path = tmp_path / 'keys.json'
+    keys_path.write_text(json.dumps({'api_keys': [] if mode == 'no_key' else ['SECRET']}))
+    monkeypatch.setattr(odds_client_module, 'KEYS_PATH', keys_path)
     async def run():
         store = Store(tmp_path / 'test.sqlite3')
         e = event()

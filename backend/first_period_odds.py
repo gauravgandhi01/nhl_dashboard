@@ -1,7 +1,6 @@
 """Opt-in first-period prices. Credential-bearing requests never enter the HTTP cache."""
 import asyncio
 import json
-import os
 import time
 from datetime import datetime, timezone
 
@@ -9,7 +8,7 @@ import httpx
 
 from .providers import TEAM_NAMES
 from .stats import normalized_name, number
-from .odds_client import odds_client
+from .odds_client import odds_client, odds_configured
 from .odds_config import configured_bookmakers, market_params, odds_scope
 
 BASE = 'https://api.the-odds-api.com/v4/sports/icehockey_nhl'
@@ -67,7 +66,7 @@ class FirstPeriodOdds:
 
     def cached(self, date):
         row = self.p.store.db.execute('SELECT body,fetched,attempted,error FROM first_period_odds WHERE date=?', (date,)).fetchone()
-        configured = bool(os.environ.get('THE_ODDS_API_KEY', '').strip())
+        configured = odds_configured()
         data = json.loads(row[0]) if row and row[0] else {'prices': {}}
         fresh = bool(row and row[0] and time.time() - row[1] < 3600)
         return {**data, 'date': date, 'configured': configured, 'source': SOURCE,

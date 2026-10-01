@@ -77,6 +77,7 @@ type Odds = {
   prices: Record<string, Price>;
   status: string;
   configured: boolean;
+  manual_refresh_enabled?: boolean;
   retrieved_at: string | null;
   error: string | null;
   source: string;
@@ -93,7 +94,7 @@ const pct = (value: number | null | undefined) =>
   value == null ? "--" : `${value.toFixed(1)}%`;
 const money = (value: number) => `${value > 0 ? "+" : ""}${value}`;
 const oddsNotConfigured =
-  "Odds not configured: set THE_ODDS_API_KEY before starting the backend.";
+  "Odds not configured: add api_keys to the workspace keys.json file.";
 const timestamp = (s: string | null) =>
   s
     ? new Date(s).toLocaleString("en-US", {
@@ -539,18 +540,15 @@ function GoalieDetail({ side, league }: { side: Side; league: Windows }) {
   );
   return (
     <section>
-      <div className="section-heading">
-        <h2>{side.team.abbrev} goaltending</h2>
+      <div className="fp-starter">
+        <strong>{side.starter.name || "Not announced"}</strong>
+        {"\n"}
         <span
           className={side.starter.status === "Confirmed" ? "positive" : "muted"}
         >
           {side.starter.status}
         </span>
       </div>
-      <p className="fp-starter">
-        Reported starter:{" "}
-        <strong>{side.starter.name || "Not announced"}</strong>
-      </p>
       <p className="footnote">
         Source updated {timestamp(side.starter.updated_at)}
       </p>
@@ -774,7 +772,12 @@ function PeriodContent({
   refresh: () => void;
   oddsDate: string;
 }) {
-  const { odds, error: oddsError } = useOdds(oddsDate);
+  const {
+    odds,
+    busy: oddsBusy,
+    error: oddsError,
+    load: loadOdds,
+  } = useOdds(oddsDate);
   const match = data?.matchups?.[0];
   return (
     <>
@@ -891,6 +894,17 @@ function PeriodContent({
             ? ` / Retrieved ${timestamp(odds.retrieved_at)}`
             : ""}
         </span>
+        {odds?.manual_refresh_enabled && (
+          <button
+            className="text-button"
+            onClick={loadOdds}
+            disabled={oddsBusy}
+            title="Refresh first-period odds"
+          >
+            <RefreshCw size={13} className={oddsBusy ? "spin" : ""} />
+            Refresh odds
+          </button>
+        )}
       </div>
       {!data && !error ? (
         <div className="loading-label" role="status">

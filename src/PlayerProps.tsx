@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { RefreshCw } from "lucide-react";
 
 export type Quote = {
   side: string;
@@ -35,6 +36,7 @@ type PropGame = {
 type PropData = {
   date: string;
   configured: boolean;
+  manual_refresh_enabled?: boolean;
   games: Record<string, PropGame>;
   error: string | null;
   max_credits_per_game: number;
@@ -68,7 +70,7 @@ const old = (q: Quote) =>
   !Number.isFinite(Date.parse(q.updated_at)) ||
   Date.now() - Date.parse(q.updated_at) >= 3600000;
 const oddsNotConfigured =
-  "Odds not configured: set THE_ODDS_API_KEY before starting the backend.";
+  "Odds not configured: add api_keys to the workspace keys.json file.";
 
 export function bestQuote(line: PropLine | undefined, side: string) {
   const all = line?.quotes.filter((q) => q.side === side) || [];
@@ -217,6 +219,21 @@ export function PropsControls({
               ? "Player odds checked"
               : "Checking prop cache")}
       </span>
+      {state.data?.manual_refresh_enabled && (
+        <button
+          className="text-button"
+          onClick={() => state.load(gameId)}
+          disabled={state.busy}
+          title={
+            gameId == null
+              ? "Refresh slate player odds"
+              : "Refresh game player odds"
+          }
+        >
+          <RefreshCw size={13} className={state.busy ? "spin" : ""} />
+          Refresh odds
+        </button>
+      )}
       {unmatched > 0 && (
         <span
           className="warning"

@@ -139,8 +139,9 @@ builds can take a few minutes; no legacy folder/cache is required.
 
 ### Optional First-Period Prices
 
-Set `THE_ODDS_API_KEY` in the server environment before launching. The application
-does not read `firstperiodstats/key.json` or any other legacy credential file.
+Add The Odds API credentials to the workspace-level `../keys.json` file before
+launching. The application reads the `api_keys` array from that file and does not
+read `firstperiodstats/key.json` or any other legacy credential file.
 The tab reads cached prices without making provider requests. **Load odds** is
 the only action that requests current `totals_p1` event markets. By default odds
 requests use the configured US regions (`us,us2,us_ex`). Edit
@@ -205,10 +206,21 @@ SQLite cache only; there is no automatic polling or quota spend. Missing, stale,
 and pregame-snapshot prices are labeled. Market favorites use a separate highlight
 from statistical advantages.
 
-Set `THE_ODDS_API_KEY` in the same terminal used to launch `python3 run.py`.
-An export in another terminal does not update an already-running backend;
-restart it after changing the key. No key is included in frontend assets, source,
-cached URLs, or application logs. First Period uses the same environment setting.
+Add keys to the workspace-level `../keys.json` file before launching
+`python3 run.py`:
+
+```json
+{
+  "api_keys": ["..."]
+}
+```
+
+Restart the backend after changing the file. The backend chooses from the
+configured key pool and can try another key when one is rejected, rate-limited,
+or out of credits. No key is included in frontend assets, source, cached URLs,
+or application logs. First Period uses the same key file. Manual odds refresh
+buttons are enabled by default; set `NHL_MANUAL_ODDS_REFRESH_ENABLED=false` to
+disable the POST refresh routes while keeping cached odds reads available.
 Set optional `config/odds.json` `"bookmakers"` to a supported-key subset to
 request those books directly instead of all configured US regions. Supported keys
 include `fanduel`, `draftkings`, `betmgm`, `espnbet`, `fanatics`, `ballybet`,
@@ -303,7 +315,10 @@ Optional build/runtime settings:
   caches in seconds. The default is two minutes so confirmed starters and line
   changes appear quickly. `NHL_DFO_GOALIES_TTL` is still accepted for backwards
   compatibility.
-- `THE_ODDS_API_KEY=...` enables moneylines, player props, and first-period odds.
+- `../keys.json` with an `api_keys` array enables moneylines, player props, and
+  first-period odds.
+- `NHL_MANUAL_ODDS_REFRESH_ENABLED=false` disables manual odds refresh requests.
+  The default is enabled.
 
 Daily Faceoff access can differ between your machine and the hosted server.
 If `robots.txt` cannot be retrieved, no lineup-page request is made. The app

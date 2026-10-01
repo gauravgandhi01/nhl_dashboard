@@ -3,12 +3,11 @@ import asyncio
 import json
 import logging
 import math
-import os
 import time
 from datetime import datetime, timezone
 
 from .first_period_odds import event_game, SOURCE
-from .odds_client import OddsError, odds_client
+from .odds_client import OddsError, odds_client, odds_configured
 from .player_identity import resolve_player
 from .service import display_name
 from .stats import number
@@ -155,14 +154,14 @@ class PlayerProps:
 
     async def view(self, date, game_id=None, refresh=False):
         schedule = await self.p.nhl(f'score/{date}', 600)
-        configured = bool(os.environ.get('THE_ODDS_API_KEY', '').strip())
+        configured = odds_configured()
         result = {'date': date, 'configured': configured, 'games': {}, 'books': list(BOOKS),
                   'source': SOURCE, 'max_credits_per_game': len(MARKETS), 'error': None}
         if schedule.data is None or not isinstance(schedule.data.get('games'), list):
             result['error'] = 'Schedule unavailable; props not requested'
             return result
         games = [g for g in schedule.data['games'] if game_id is None or g['id'] == game_id]
-        should_refresh = refresh or configured
+        should_refresh = refresh
         if should_refresh and schedule.stale:
             result['error'] = 'Schedule is stale; props not requested'
         elif should_refresh and configured:

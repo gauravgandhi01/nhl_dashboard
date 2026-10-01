@@ -448,6 +448,35 @@ main {
   color: #cba2a0;
   background: #cc8c8910;
 }
+.card-metric-bars > strong {
+  position: relative;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.metric-track {
+  position: absolute;
+  bottom: 0;
+  left: 8px;
+  right: 8px;
+  height: 3px;
+  background: #ffffff09;
+  overflow: hidden;
+}
+.metric-track > span {
+  display: block;
+  height: 100%;
+  background: #737980;
+}
+.card-metric-bars > strong:first-child .metric-track > span {
+  margin-left: auto;
+}
+.better .metric-track > span {
+  background: #70b796;
+}
+.worse .metric-track > span {
+  background: #a77d79;
+}
 .card-form-row {
   margin: 6px 0 10px;
   grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr);
@@ -1836,7 +1865,13 @@ tr:hover td {
   color: #d6aaa6;
 }
 .fp-starter {
+  display: grid;
+  gap: 3px;
   font-size: 12px;
+}
+.fp-starter strong {
+  color: var(--text);
+  font-size: 14px;
 }
 .fp-h2h,
 .fp-rankings {

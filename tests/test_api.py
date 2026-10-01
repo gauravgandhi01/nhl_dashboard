@@ -3,7 +3,7 @@ import asyncio
 import httpx
 from fastapi.testclient import TestClient
 
-from backend.app import app
+from backend.app import app, manual_odds_refresh_enabled
 from backend.cache import Feed, Store
 from backend.service import Dashboard
 from backend.providers import Providers
@@ -137,6 +137,22 @@ def test_api_validation_and_spa_routes(tmp_path, monkeypatch):
         assert client.get('/api/matchups/123').status_code == 404
         assert client.get('/api/matchups/2026010001?window=invalid').status_code == 422
         assert client.get('/api/missing').status_code == 404
+
+
+def test_manual_odds_refresh_gate_defaults_on_and_can_disable_posts(tmp_path, monkeypatch):
+    monkeypatch.setenv('NHL_DASHBOARD_DB', str(tmp_path / 'api.sqlite3'))
+    monkeypatch.delenv('NHL_MANUAL_ODDS_REFRESH_ENABLED', raising=False)
+    assert manual_odds_refresh_enabled()
+    with TestClient(app) as client:
+        assert client.get('/api/odds/moneyline?date=2026-09-28').json()['manual_refresh_enabled'] is True
+    monkeypatch.setenv('NHL_MANUAL_ODDS_REFRESH_ENABLED', 'false')
+    assert not manual_odds_refresh_enabled()
+    with TestClient(app) as client:
+        assert client.post('/api/odds/moneyline/refresh?date=2026-09-28').status_code == 403
+        assert client.post('/api/first-period/odds/refresh?date=2026-09-28').status_code == 403
+        assert client.post('/api/player-props/refresh?date=2026-09-28').status_code == 403
+        assert client.get('/api/odds/moneyline?date=2026-09-28').json()['manual_refresh_enabled'] is False
+        assert client.get('/api/first-period/odds?date=2026-09-28').json()['manual_refresh_enabled'] is False
 
 
 def test_pagination_advances_by_actual_page_size(tmp_path):

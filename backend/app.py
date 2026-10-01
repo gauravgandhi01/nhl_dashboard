@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from datetime import date as Date
+import os
 from pathlib import Path
 from typing import Literal
 
@@ -19,6 +20,20 @@ from .player_props import PlayerProps
 from .runtime_db import database_path
 
 ROOT = Path(__file__).resolve().parents[1]
+FALSE_VALUES = {'0', 'false', 'no', 'off', 'disabled'}
+
+
+def manual_odds_refresh_enabled():
+    return os.environ.get('NHL_MANUAL_ODDS_REFRESH_ENABLED', 'true').strip().lower() not in FALSE_VALUES
+
+
+def require_manual_odds_refresh():
+    if not manual_odds_refresh_enabled():
+        raise HTTPException(403, 'Manual odds refresh is disabled')
+
+
+def odds_refresh_payload(payload):
+    return {**payload, 'manual_refresh_enabled': manual_odds_refresh_enabled()}
 
 
 @asynccontextmanager
@@ -57,12 +72,13 @@ async def players(date: Date | None = None):
 
 @app.get('/api/odds/moneyline')
 async def moneyline(date: Date | None = None):
-    return await app.state.moneylines.refresh(date.isoformat() if date else today_et())
+    return odds_refresh_payload(app.state.moneylines.cached(date.isoformat() if date else today_et()))
 
 
 @app.post('/api/odds/moneyline/refresh')
 async def moneyline_refresh(date: Date | None = None):
-    return await app.state.moneylines.refresh(date.isoformat() if date else today_et())
+    require_manual_odds_refresh()
+    return odds_refresh_payload(await app.state.moneylines.refresh(date.isoformat() if date else today_et()))
 
 
 @app.get('/api/streaks')
@@ -72,12 +88,13 @@ async def streaks(date: Date | None = None, scope: Literal['league', 'tonight'] 
 
 @app.get('/api/player-props')
 async def player_props(date: Date | None = None, game_id: int | None = None):
-    return await app.state.player_props.view(date.isoformat() if date else today_et(), game_id)
+    return odds_refresh_payload(await app.state.player_props.view(date.isoformat() if date else today_et(), game_id))
 
 
 @app.post('/api/player-props/refresh')
 async def player_props_refresh(date: Date | None = None, game_id: int | None = None):
-    return await app.state.player_props.view(date.isoformat() if date else today_et(), game_id, refresh=True)
+    require_manual_odds_refresh()
+    return odds_refresh_payload(await app.state.player_props.view(date.isoformat() if date else today_et(), game_id, refresh=True))
 
 
 @app.get('/api/first-period')
@@ -94,12 +111,13 @@ async def first_period_matchup(game_id: int, window: Literal['season', 'last5', 
 
 @app.get('/api/first-period/odds')
 async def first_period_odds(date: Date | None = None):
-    return await app.state.first_period_odds.refresh(date.isoformat() if date else today_et())
+    return odds_refresh_payload(app.state.first_period_odds.cached(date.isoformat() if date else today_et()))
 
 
 @app.post('/api/first-period/odds/refresh')
 async def first_period_odds_refresh(date: Date | None = None):
-    return await app.state.first_period_odds.refresh(date.isoformat() if date else today_et())
+    require_manual_odds_refresh()
+    return odds_refresh_payload(await app.state.first_period_odds.refresh(date.isoformat() if date else today_et()))
 
 
 @app.get('/api/matchups/{game_id}')

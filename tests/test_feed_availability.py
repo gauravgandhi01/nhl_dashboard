@@ -6,6 +6,7 @@ import pytest
 
 from backend.cache import Store
 from backend.providers import Providers, DFO
+import backend.odds_client as odds_client_module
 from backend.odds_client import OddsClient, OddsError
 
 
@@ -48,7 +49,9 @@ def test_robots_failure_preserves_cache_without_fetching_page(tmp_path, cached, 
     (404, None, 'no longer available'),
 ])
 def test_odds_diagnostics_are_specific_and_credential_safe(tmp_path, monkeypatch, status, code, expected):
-    monkeypatch.setenv('THE_ODDS_API_KEY', 'SECRET_TEST_KEY')
+    keys_path = tmp_path / 'keys.json'
+    keys_path.write_text(json.dumps({'api_keys': ['SECRET_TEST_KEY']}))
+    monkeypatch.setattr(odds_client_module, 'KEYS_PATH', keys_path)
     async def run():
         store = Store(tmp_path / 'cache.sqlite3')
         calls = []

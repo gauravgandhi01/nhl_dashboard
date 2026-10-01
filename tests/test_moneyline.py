@@ -8,6 +8,7 @@ import pytest
 
 from backend.cache import Store, Feed
 import backend.moneyline as moneyline_module
+import backend.odds_client as odds_client_module
 from backend.moneyline import Moneylines, moneyline_prices
 from backend.odds_config import configured_bookmakers
 from backend.odds_client import odds_client
@@ -47,14 +48,14 @@ def test_paired_moneylines_and_reject_ambiguous_markets():
 
 @pytest.mark.parametrize('mode', ['success', 'bookmaker_filter', 'missing', 'duplicate', 'started', 'postponed', 'empty', 'schedule_failure', 'no_key', 'quota', 'failure'])
 def test_cache_and_failure_isolation(tmp_path, monkeypatch, mode):
-    monkeypatch.setenv('THE_ODDS_API_KEY', 'TEST_SECRET')
+    keys_path = tmp_path / 'keys.json'
+    keys_path.write_text(json.dumps({'api_keys': [] if mode == 'no_key' else ['TEST_SECRET']}))
+    monkeypatch.setattr(odds_client_module, 'KEYS_PATH', keys_path)
     if mode == 'bookmaker_filter':
         monkeypatch.setattr(moneyline_module, 'market_params',
                             lambda extra=None: {**(extra or {}), 'bookmakers': 'fanduel,espnbet'})
         monkeypatch.setattr(moneyline_module, 'odds_scope',
                             lambda: {'regions': 'us,us2,us_ex', 'bookmakers': ['fanduel', 'espnbet'], 'mode': 'bookmakers'})
-    if mode == 'no_key':
-        monkeypatch.delenv('THE_ODDS_API_KEY')
     async def run():
         store = Store(tmp_path / 'test.sqlite3')
         game, event = fixture()

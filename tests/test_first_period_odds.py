@@ -7,6 +7,7 @@ import pytest
 
 from backend.cache import Store, Feed
 import backend.first_period_odds as first_period_module
+import backend.odds_client as odds_client_module
 from backend.first_period_odds import FirstPeriodOdds, event_game, market_price
 from backend.odds_config import configured_bookmakers
 
@@ -41,7 +42,9 @@ def test_market_matching_and_actual_total():
 
 @pytest.mark.parametrize('mode',['success','bookmaker_filter','no_key','quota','missing','mismatch','failure','started'])
 def test_odds_opt_in_caching_quota_and_secret_redaction(tmp_path,monkeypatch,mode):
-    monkeypatch.setenv('THE_ODDS_API_KEY','SECRET_TEST_KEY')
+    keys_path = tmp_path / 'keys.json'
+    keys_path.write_text(json.dumps({'api_keys': [] if mode == 'no_key' else ['SECRET_TEST_KEY']}))
+    monkeypatch.setattr(odds_client_module, 'KEYS_PATH', keys_path)
     if mode=='bookmaker_filter':
         monkeypatch.setattr(first_period_module, 'market_params',
                             lambda extra=None: {**(extra or {}), 'bookmakers': 'fanduel,espnbet'})
@@ -49,7 +52,6 @@ def test_odds_opt_in_caching_quota_and_secret_redaction(tmp_path,monkeypatch,mod
                             lambda: ['fanduel', 'espnbet'])
         monkeypatch.setattr(first_period_module, 'odds_scope',
                             lambda: {'regions': 'us,us2,us_ex', 'bookmakers': ['fanduel', 'espnbet'], 'mode': 'bookmakers'})
-    if mode=='no_key': monkeypatch.delenv('THE_ODDS_API_KEY')
     async def scenario():
         store=Store(tmp_path/'odds.sqlite3');calls=[]
         g=game()

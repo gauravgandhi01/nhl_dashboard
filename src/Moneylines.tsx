@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { RefreshCw } from "lucide-react";
 import type { Game } from "./types";
 
 type Price = {
@@ -20,6 +21,7 @@ type Odds = {
   status: string;
   error: string | null;
   retrieved_at: string | null;
+  manual_refresh_enabled?: boolean;
   prices: Record<string, Price[]>;
   usage?: { remaining: string | null } | null;
 };
@@ -36,7 +38,7 @@ const stamp = (s: string | null) =>
     : "Unknown";
 const american = (n: number) => (n > 0 ? `+${n}` : String(n));
 const oddsNotConfigured =
-  "Odds not configured: set THE_ODDS_API_KEY before starting the backend.";
+  "Odds not configured: add api_keys to the workspace keys.json file.";
 
 export function useMoneylines(date: string) {
   const [data, setData] = useState<Odds | null>(null);
@@ -50,9 +52,10 @@ export function useMoneylines(date: string) {
     setBusy(true);
     setError(null);
     try {
-      const r = await fetch(`/api/odds/moneyline?date=${date}`, {
-        signal: current.signal,
-      });
+      const r = await fetch(
+        `/api/odds/moneyline${post ? "/refresh" : ""}?date=${date}`,
+        { method: post ? "POST" : "GET", signal: current.signal },
+      );
       if (!r.ok) throw new Error();
       const result = await r.json();
       if (!current.signal.aborted) setData(result);
@@ -71,7 +74,7 @@ export function useMoneylines(date: string) {
     data: data?.date === date ? data : null,
     busy,
     error,
-    load: () => void request(false),
+    load: () => void request(true),
   };
 }
 
@@ -102,6 +105,17 @@ export function MoneylineControls({
         {data?.usage?.remaining != null &&
           ` / ${data.usage.remaining} credits at retrieval`}
       </span>
+      {data?.manual_refresh_enabled && (
+        <button
+          className="text-button"
+          onClick={odds.load}
+          disabled={busy}
+          title="Refresh moneyline odds"
+        >
+          <RefreshCw size={13} className={busy ? "spin" : ""} />
+          Refresh odds
+        </button>
+      )}
     </div>
   );
 }

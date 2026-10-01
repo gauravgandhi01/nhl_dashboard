@@ -1,6 +1,7 @@
 """Explicit player-prop discovery across configured US odds coverage.
 
-Run with THE_ODDS_API_KEY set: .venv/bin/python -m backend.probe_player_props
+Run from the project folder: .venv/bin/python -m backend.probe_player_props
+Requires api_keys in ../keys.json.
 Optional bookmaker selection lives in config/odds.json.
 Does not modify dashboard caches. Maximum conservative budget: 20 credits.
 """
