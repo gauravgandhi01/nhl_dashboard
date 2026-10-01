@@ -95,6 +95,13 @@ const pct = (value: number | null | undefined) =>
 const money = (value: number) => `${value > 0 ? "+" : ""}${value}`;
 const oddsNotConfigured =
   "Odds not configured: add api_keys to the workspace keys.json file.";
+const oddsMessage = (odds: Odds | null, error: string | null) => {
+  if (error || odds?.error) return error || odds?.error;
+  if (!odds) return null;
+  if (odds.status === "not_configured") return oddsNotConfigured;
+  if (odds.status === "stale") return "Odds cached";
+  return null;
+};
 const timestamp = (s: string | null) =>
   s
     ? new Date(s).toLocaleString("en-US", {
@@ -368,22 +375,16 @@ function PeriodCard({
           h={h.hit_pct}
           percent
         />
-        <div className="card-goalie-heading">
-          <span>FIRST-PERIOD GOALTENDING</span>
-        </div>
         <div className="card-goalie-names">
           {[m.away, m.home].map((s) => (
             <div key={s.team.id}>
-              <strong>{selected(s)?.name || "Unavailable"}</strong>
-              <span>{s.goalie_basis}</span>
+              <strong>{s.starter.name || selected(s)?.name || "Unavailable"}</strong>
               <span
                 className={
                   s.starter.status === "Confirmed" ? "positive" : "muted"
                 }
               >
-                {s.starter.name
-                  ? `${s.starter.name} / ${s.starter.status}`
-                  : "Starter not announced"}
+                {s.starter.name ? s.starter.status : s.goalie_basis}
               </span>
             </div>
           ))}
@@ -779,6 +780,7 @@ function PeriodContent({
     load: loadOdds,
   } = useOdds(oddsDate);
   const match = data?.matchups?.[0];
+  const oddsMeta = oddsMessage(odds, oddsError);
   return (
     <>
       {id && (
@@ -874,26 +876,13 @@ function PeriodContent({
           </button>
         </div>
       </div>
+      {(oddsMeta || odds?.manual_refresh_enabled) && (
       <div className="fp-odds-meta">
-        <span
-          className={
-            oddsError || odds?.error
-              ? "warning"
-              : "muted"
-          }
-        >
-          {oddsError ||
-            odds?.error ||
-            (odds?.status === "stale"
-              ? "odds cached"
-              : odds?.status === "not_configured"
-                ? oddsNotConfigured
-                : odds?.status.replaceAll("_", " ")) ||
-            "Loading cache"}
-          {odds?.retrieved_at
-            ? ` / Retrieved ${timestamp(odds.retrieved_at)}`
-            : ""}
-        </span>
+        {oddsMeta && (
+          <span className={oddsError || odds?.error ? "warning" : "muted"}>
+            {oddsMeta}
+          </span>
+        )}
         {odds?.manual_refresh_enabled && (
           <button
             className="text-button"
@@ -906,6 +895,7 @@ function PeriodContent({
           </button>
         )}
       </div>
+      )}
       {!data && !error ? (
         <div className="loading-label" role="status">
           <RefreshCw size={14} className="spin" />
@@ -922,28 +912,12 @@ function PeriodContent({
             <div className="data-context">
               <span>
                 {data.season_label} regular season
-                {data.previous_season ? " / Previous-season baseline" : ""} /
-                Before {data.as_of}
-              </span>
-              <span>
-                {windows.find(([w]) => w === window)?.[1]} / All strengths
+                {data.previous_season ? " / Previous-season baseline" : ""}
               </span>
             </div>
-            <div className="fp-coverage">
-              <span
-                className={
-                  data.coverage.goalie_games < data.coverage.games ||
-                  data.coverage.stale_games ||
-                  data.coverage.incomplete_games
-                    ? "warning"
-                    : "muted"
-                }
-              >
-                Goalie history: {data.coverage.goalie_games}/
-                {data.coverage.games} games / {data.coverage.incomplete_games}{" "}
-                with attribution caveats / {data.coverage.stale_games} stale
-              </span>
-              {data.build.status === "building" ? (
+            {(data.build.status === "building" || data.build.error) && (
+              <div className="fp-coverage">
+                {data.build.status === "building" ? (
                 <span role="status">
                   <RefreshCw className="spin" size={12} /> Building{" "}
                   {data.build.done}/{data.build.total}
@@ -952,6 +926,7 @@ function PeriodContent({
                 <span className="warning">{data.build.error}</span>
               ) : null}
             </div>
+            )}
             {data.stats_error && (
               <p className="warning footnote">{data.stats_error}</p>
             )}

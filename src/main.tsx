@@ -19,8 +19,6 @@ import {
   CircleHelp,
   ExternalLink,
   RefreshCw,
-  Search,
-  X,
   Clock3,
 } from "lucide-react";
 import type {
@@ -467,7 +465,6 @@ function Slate() {
   );
   const [filter, setFilter] = useState("upcoming");
   const odds = useMoneylines(date);
-  const [search, setSearch] = useState("");
   const games = data?.games || [];
   const filtered = games.filter(
     (g) =>
@@ -475,10 +472,7 @@ function Slate() {
         ? isFinal(g)
         : filter === "started"
           ? isStarted(g)
-          : isUpcoming(g)) &&
-      `${g.away.name} ${g.home.name} ${g.away.abbrev} ${g.home.abbrev}`
-        .toLowerCase()
-        .includes(search.toLowerCase()),
+          : isUpcoming(g)),
   );
   const changeDate = (value: string) => {
     if (value) {
@@ -491,44 +485,37 @@ function Slate() {
       <header className="page-heading">
         <div>
           <div className="eyebrow">DAILY SLATE</div>
-          <h1>{dateTitle(date)}</h1>
-          <p className="subline">
-            {games.length} games <span className="divider">/</span>{" "}
-            {games.some((g) => g.game_type === 1)
-              ? "Preseason"
-              : games.some((g) => g.game_type === 3)
-                ? "Playoffs"
-                : "Regular season"}{" "}
-            <span className="divider">/</span> Eastern Time
-          </p>
-        </div>
-        <div className="date-controls">
-          <IconButton
-            label="Previous day"
-            disabled={date <= today()}
-            onClick={() => changeDate(shift(date, -1))}
-          >
-            <ChevronLeft size={17} />
-          </IconButton>
-          <label className="date-input">
-            <CalendarDays size={15} />
-            <input
-              type="date"
-              aria-label="Game date"
-              min={today()}
-              value={date}
-              onChange={(e) => changeDate(e.target.value)}
-            />
-          </label>
-          <IconButton
-            label="Next day"
-            onClick={() => changeDate(shift(date, 1))}
-          >
-            <ChevronRight size={17} />
-          </IconButton>
-          <button className="text-button" onClick={() => changeDate(today())}>
-            Today
-          </button>
+          <div className="slate-datebar">
+            <h1>{dateTitle(date)}</h1>
+            <div className="date-controls compact-date-controls">
+              <IconButton
+                label="Previous day"
+                disabled={date <= today()}
+                onClick={() => changeDate(shift(date, -1))}
+              >
+                <ChevronLeft size={15} />
+              </IconButton>
+              <label className="date-input compact-date-input">
+                <CalendarDays size={13} />
+                <input
+                  type="date"
+                  aria-label="Game date"
+                  min={today()}
+                  value={date}
+                  onChange={(e) => changeDate(e.target.value)}
+                />
+              </label>
+              <IconButton
+                label="Next day"
+                onClick={() => changeDate(shift(date, 1))}
+              >
+                <ChevronRight size={15} />
+              </IconButton>
+              <button className="text-button compact-text-button" onClick={() => changeDate(today())}>
+                Today
+              </button>
+            </div>
+          </div>
         </div>
       </header>
       <div className="toolbar">
@@ -556,24 +543,7 @@ function Slate() {
           ))}
         </div>
         <div className="toolbar-right">
-          <label className="search">
-            <Search size={14} />
-            <input
-              aria-label="Filter teams"
-              placeholder="Filter teams"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            {search && (
-              <button
-                title="Clear filter"
-                aria-label="Clear filter"
-                onClick={() => setSearch("")}
-              >
-                <X size={13} />
-              </button>
-            )}
-          </label>
+          <MoneylineControls odds={odds} />
           <IconButton
             label="Refresh games"
             onClick={refresh}
@@ -583,7 +553,6 @@ function Slate() {
           </IconButton>
         </div>
       </div>
-      <MoneylineControls odds={odds} />
       {loading ? (
         <Loading />
       ) : error || data?.error ? (

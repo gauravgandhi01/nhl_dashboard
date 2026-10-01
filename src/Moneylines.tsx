@@ -84,38 +84,27 @@ export function MoneylineControls({
   odds: ReturnType<typeof useMoneylines>;
 }) {
   const { data, busy, error } = odds;
+  const details = [
+    error || data?.error,
+    data?.retrieved_at ? `Retrieved ${stamp(data.retrieved_at)}` : null,
+    data?.usage?.remaining != null
+      ? `${data.usage.remaining} credits at retrieval`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" / ");
+  if (!data?.manual_refresh_enabled) return null;
   return (
     <div className="moneyline-controls">
-      <span
-        className={error || data?.error ? "warning-text" : "muted"}
-        role="status"
+      <button
+        className="icon-button compact-icon"
+        onClick={odds.load}
+        disabled={busy}
+        title={details ? `Refresh moneylines / ${details}` : "Refresh moneylines"}
+        aria-label="Refresh moneylines"
       >
-        {busy
-          ? "Checking moneylines"
-          : error ||
-          data?.error ||
-          (data?.status === "available"
-            ? Object.keys(data.prices).length
-              ? "Moneylines loaded"
-              : "No pregame prices available"
-            : data?.status === "not_configured"
-              ? oddsNotConfigured
-              : data?.status.replaceAll("_", " ") || "Checking cache")}
-        {data?.retrieved_at && ` / Retrieved ${stamp(data.retrieved_at)}`}
-        {data?.usage?.remaining != null &&
-          ` / ${data.usage.remaining} credits at retrieval`}
-      </span>
-      {data?.manual_refresh_enabled && (
-        <button
-          className="text-button"
-          onClick={odds.load}
-          disabled={busy}
-          title="Refresh moneyline odds"
-        >
-          <RefreshCw size={13} className={busy ? "spin" : ""} />
-          Refresh odds
-        </button>
-      )}
+        <RefreshCw size={13} className={busy ? "spin" : ""} />
+      </button>
     </div>
   );
 }
