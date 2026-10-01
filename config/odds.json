@@ -14,5 +14,9 @@
     "prophetx",
     "williamhill_us"
   ],
+  "bookmaker_fees": {
+    "prophetx": { "type": "profit_pct", "value": 0.02 },
+    "kalshi": { "type": "kalshi_taker", "coefficient": 0.07 }
+  },
   "player_prop_market_limit": 8
 }

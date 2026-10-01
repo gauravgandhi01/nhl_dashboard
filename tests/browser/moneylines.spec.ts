@@ -81,6 +81,7 @@ test("moneylines show configuration and retained prices on provider errors", asy
 }) => {
   const slate = await (await request.get("/api/slate?date=2026-09-26")).json();
   slate.games = slate.games.slice(0, 1);
+  slate.games[0].state = "FUT";
   await page.route("**/api/slate?*", (route) => route.fulfill({ json: slate }));
   await page.route("**/api/odds/moneyline**", (route) =>
     route.fulfill({
@@ -103,6 +104,7 @@ test("moneylines show configuration and retained prices on provider errors", asy
       json: {
         date: "2026-09-26",
         configured: true,
+        manual_refresh_enabled: true,
         status: "stale",
         error: "Odds quota exhausted",
         prices: {
@@ -124,8 +126,11 @@ test("moneylines show configuration and retained prices on provider errors", asy
     }),
   );
   await page.reload();
-  await expect(page.locator(".moneyline-controls")).toContainText(
-    "Odds quota exhausted",
+  await expect(
+    page.getByRole("button", { name: "Refresh moneylines" }),
+  ).toHaveAttribute(
+    "title",
+    /Odds quota exhausted/,
   );
   await expect(page.locator(".team-moneyline").first()).toContainText("+100");
   await expect(page.locator(".team-moneyline").first()).toContainText(

@@ -31,6 +31,13 @@ test("signal flags identify the team and reveal their reasons on desktop and mob
         "Winning record with three consecutive losses, including overtime.",
     },
   ];
+  const unflagged = { ...game, id: game.id + 1 };
+  slate.games.push(unflagged);
+  slate.comparisons[String(unflagged.id)] = {
+    ...comparison,
+    away: { ...comparison.away, signals: [] },
+    home: { ...comparison.home, signals: [] },
+  };
   await page.route("**/api/slate?*", (route) => route.fulfill({ json: slate }));
   for (const width of [1440, 375]) {
     await page.setViewportSize({ width, height: 900 });
@@ -42,10 +49,20 @@ test("signal flags identify the team and reveal their reasons on desktop and mob
     await expect(page.locator(".signal-losing_streak")).toContainText(
       game.home.abbrev,
     );
-    await page.locator(".signal-inexperienced_goalie").focus();
-    await expect(
-      page.locator('.signal-inexperienced_goalie [role="tooltip"]'),
-    ).toBeVisible();
+    const flags = page.locator(".card-signals");
+    await expect(flags).toContainText("3 flags");
+    const offsets = await page.locator(".game-card").evaluateAll(cards =>
+      cards.map(card => card.querySelector(".card-metric")!.getBoundingClientRect().top - card.getBoundingClientRect().top),
+    );
+    expect(Math.abs(offsets[0] - offsets[1])).toBeLessThanOrEqual(1);
+    await flags.focus();
+    await expect(flags.getByRole("tooltip")).toBeVisible();
+    await expect(flags.getByRole("tooltip")).toContainText("Confirmed starter has 4 career NHL appearances.");
+    await page.keyboard.press("Escape");
+    await expect(flags.getByRole("tooltip")).toBeHidden();
+    await flags.click();
+    await expect(page).toHaveURL(`/?date=${slateDate}`);
+    await expect(flags.getByRole("tooltip")).toBeVisible();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,

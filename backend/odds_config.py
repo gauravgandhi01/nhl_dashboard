@@ -119,3 +119,42 @@ def player_prop_market_limit(config=None):
     if limit < 1 or limit > 20:
         raise ValueError('Odds config player_prop_market_limit must be between 1 and 20')
     return limit
+
+
+DEFAULT_BOOKMAKER_FEES = {
+    'prophetx': {'type': 'profit_pct', 'value': 0.02},
+    'kalshi': {'type': 'kalshi_taker', 'coefficient': 0.07},
+}
+
+
+def bookmaker_fees(config=None):
+    data = load_config() if config is None else config
+    raw = data.get('bookmaker_fees', {})
+    if raw is None:
+        raw = {}
+    if not isinstance(raw, dict):
+        raise ValueError('Odds config bookmaker_fees must be an object')
+    result = {**DEFAULT_BOOKMAKER_FEES}
+    for key, value in raw.items():
+        bookmaker = str(key).strip().lower()
+        if bookmaker not in OBSERVED_BOOKMAKERS:
+            raise ValueError(f"Unknown bookmaker fee key: {bookmaker}")
+        if value is None:
+            result.pop(bookmaker, None)
+            continue
+        if not isinstance(value, dict):
+            raise ValueError('Odds config bookmaker fee entries must be objects')
+        fee_type = value.get('type')
+        if fee_type == 'profit_pct':
+            pct = float(value.get('value'))
+            if pct < 0 or pct >= 1:
+                raise ValueError('profit_pct bookmaker fees must be between 0 and 1')
+            result[bookmaker] = {'type': fee_type, 'value': pct}
+        elif fee_type == 'kalshi_taker':
+            coefficient = float(value.get('coefficient'))
+            if coefficient < 0 or coefficient >= 1:
+                raise ValueError('kalshi_taker coefficient must be between 0 and 1')
+            result[bookmaker] = {'type': fee_type, 'coefficient': coefficient}
+        else:
+            raise ValueError(f"Unsupported bookmaker fee type: {fee_type}")
+    return result

@@ -1,6 +1,7 @@
 """Credential-safe transport and shared quota guard for optional odds feeds."""
 import asyncio
 import json
+import os
 import time
 from pathlib import Path
 
@@ -8,6 +9,7 @@ import httpx
 
 BASE = 'https://api.the-odds-api.com/v4/sports/icehockey_nhl'
 KEYS_PATH = Path(__file__).resolve().parents[2] / 'keys.json'
+RENDER_KEYS_PATH = Path('/etc/secrets/keys.json')
 
 
 class OddsError(ValueError):
@@ -18,11 +20,30 @@ def _clean_key(value):
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
+def key_paths(path=None):
+    if path is not None:
+        return [Path(path)]
+    paths = []
+    env_path = os.environ.get('NHL_ODDS_KEYS_PATH')
+    if env_path:
+        paths.append(Path(env_path))
+    paths.extend([KEYS_PATH, RENDER_KEYS_PATH])
+    unique = []
+    for item in paths:
+        if item not in unique:
+            unique.append(item)
+    return unique
+
+
 def odds_api_keys(path=None):
-    path = KEYS_PATH if path is None else path
-    try:
-        payload = json.loads(Path(path).read_text(encoding='utf-8'))
-    except (OSError, ValueError, TypeError):
+    payload = None
+    for candidate in key_paths(path):
+        try:
+            payload = json.loads(candidate.read_text(encoding='utf-8'))
+            break
+        except (OSError, ValueError, TypeError):
+            continue
+    if payload is None:
         return []
     if not isinstance(payload, dict):
         return []
@@ -58,7 +79,7 @@ class OddsClient:
             try:
                 keys = odds_api_keys()
                 if not keys:
-                    raise OddsError('Odds key not configured in keys.json')
+                    raise OddsError('Odds key not configured in keys.json or /etc/secrets/keys.json')
                 if time.time() < self.exhausted_until:
                     raise OddsError('Odds quota exhausted or rate limited; retry after cooldown')
                 now = time.time()
@@ -86,7 +107,7 @@ class OddsClient:
                             reason = 'Odds quota insufficient for this request; check remaining credits'
                         elif code in ['INVALID_KEY', 'MISSING_KEY'] or response.status_code == 401:
                             self.invalid_keys.add(key)
-                            reason = 'Odds API key rejected; check keys.json'
+                            reason = 'Odds API key rejected; check configured keys file'
                         elif code in ['INVALID_MARKET', 'INVALID_MARKETS', 'INVALID_BOOKMAKERS', 'INVALID_REGIONS']:
                             reason = 'Odds provider rejected the requested markets or bookmakers'
                         elif response.status_code == 429:
@@ -102,7 +123,7 @@ class OddsClient:
                     self.key_index = keys.index(key)
                     return response.json()
                 if all(key in self.invalid_keys for key in keys):
-                    raise OddsError('Odds API key rejected; check keys.json')
+                    raise OddsError('Odds API key rejected; check configured keys file')
                 if all(key in self.invalid_keys or self.key_cooldowns.get(key, 0) > time.time() for key in keys):
                     self.exhausted_until = min(
                         [until for until in self.key_cooldowns.values() if until > time.time()] or [time.time() + 1800])

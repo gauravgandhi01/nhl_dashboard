@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 
 from .first_period_odds import event_game, SOURCE
 from .odds_client import OddsError, odds_client, odds_configured
+from .odds_fees import effective_american
 from .player_identity import resolve_player
 from .service import display_name
 from .stats import number
@@ -82,7 +83,8 @@ def normalize_props(event, roster, aliases=None):
                 if line is None:
                     line = {'id': line_id, 'market': key, 'point': point, 'alternate': alternate, 'quotes': []}
                     lines.append(line)
-                line['quotes'].append({'side': side, 'price': int(price), 'bookmaker': book['key'], 'market': key,
+                line['quotes'].append({'side': side, 'price': int(price), 'effective_price': effective_american(book['key'], price),
+                    'bookmaker': book['key'], 'market': key,
                     'book': book.get('title') or book['key'], 'updated_at': market.get('last_update') or book.get('last_update')})
     return {'players': players, 'unmatched_names': sorted(unresolved), 'matched_players': len(players)}
 

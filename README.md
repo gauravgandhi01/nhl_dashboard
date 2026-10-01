@@ -140,8 +140,10 @@ builds can take a few minutes; no legacy folder/cache is required.
 ### Optional First-Period Prices
 
 Add The Odds API credentials to the workspace-level `../keys.json` file before
-launching. The application reads the `api_keys` array from that file and does not
-read `firstperiodstats/key.json` or any other legacy credential file.
+launching locally, or mount the same JSON as Render secret file
+`/etc/secrets/keys.json`. The application reads the `api_keys` array from those
+files, or from `NHL_ODDS_KEYS_PATH` if set, and does not read
+`firstperiodstats/key.json` or any other legacy credential file.
 The tab reads cached prices without making provider requests. **Load odds** is
 the only action that requests current `totals_p1` event markets. By default odds
 requests use the configured US regions (`us,us2,us_ex`). Edit
@@ -207,7 +209,8 @@ and pregame-snapshot prices are labeled. Market favorites use a separate highlig
 from statistical advantages.
 
 Add keys to the workspace-level `../keys.json` file before launching
-`python3 run.py`:
+`python3 run.py`. On Render, create a secret file named `keys.json`; it is read
+from `/etc/secrets/keys.json` at runtime:
 
 ```json
 {
@@ -315,8 +318,8 @@ Optional build/runtime settings:
   caches in seconds. The default is two minutes so confirmed starters and line
   changes appear quickly. `NHL_DFO_GOALIES_TTL` is still accepted for backwards
   compatibility.
-- `../keys.json` with an `api_keys` array enables moneylines, player props, and
-  first-period odds.
+- `../keys.json`, `/etc/secrets/keys.json`, or `NHL_ODDS_KEYS_PATH` with an
+  `api_keys` array enables moneylines, player props, and first-period odds.
 - `NHL_MANUAL_ODDS_REFRESH_ENABLED=false` disables manual odds refresh requests.
   The default is enabled.
 

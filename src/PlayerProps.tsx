@@ -4,6 +4,7 @@ import { RefreshCw } from "lucide-react";
 export type Quote = {
   side: string;
   price: number;
+  effective_price?: number | null;
   bookmaker: string;
   book: string;
   market?: string;
@@ -76,7 +77,9 @@ export function bestQuote(line: PropLine | undefined, side: string) {
   const all = line?.quotes.filter((q) => q.side === side) || [];
   const fresh = all.filter((q) => !old(q));
   return [...(fresh.length ? fresh : all)].sort(
-    (a, b) => b.price - a.price || a.bookmaker.localeCompare(b.bookmaker),
+    (a, b) =>
+      (b.effective_price ?? b.price) - (a.effective_price ?? a.price) ||
+      a.bookmaker.localeCompare(b.bookmaker),
   )[0];
 }
 

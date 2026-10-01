@@ -7,7 +7,7 @@ import pytest
 from backend.cache import Store
 from backend.providers import Providers, DFO
 import backend.odds_client as odds_client_module
-from backend.odds_client import OddsClient, OddsError
+from backend.odds_client import OddsClient, OddsError, odds_api_keys
 
 
 @pytest.mark.parametrize('cached,disallow', [(False, False), (True, False), (True, True)])
@@ -72,3 +72,20 @@ def test_odds_diagnostics_are_specific_and_credential_safe(tmp_path, monkeypatch
         assert not store.db.execute('SELECT * FROM responses').fetchall()
         await store.close()
     asyncio.run(run())
+
+
+def test_odds_keys_support_env_workspace_and_render_secret_paths(tmp_path, monkeypatch):
+    workspace = tmp_path / 'workspace_keys.json'
+    render = tmp_path / 'render_keys.json'
+    env = tmp_path / 'env_keys.json'
+    workspace.write_text(json.dumps({'api_keys': ['WORKSPACE']}))
+    render.write_text(json.dumps({'api_keys': ['RENDER']}))
+    env.write_text(json.dumps({'api_keys': ['ENV', 'ENV']}))
+    monkeypatch.setattr(odds_client_module, 'KEYS_PATH', workspace)
+    monkeypatch.setattr(odds_client_module, 'RENDER_KEYS_PATH', render)
+    monkeypatch.delenv('NHL_ODDS_KEYS_PATH', raising=False)
+    assert odds_api_keys() == ['WORKSPACE']
+    workspace.unlink()
+    assert odds_api_keys() == ['RENDER']
+    monkeypatch.setenv('NHL_ODDS_KEYS_PATH', str(env))
+    assert odds_api_keys() == ['ENV']

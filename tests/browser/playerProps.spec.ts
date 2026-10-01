@@ -80,6 +80,16 @@ test("prop selection groups identical thresholds, retains alternates, and prefer
   points[0].quotes.find((q) => q.price === 130)!.updated_at =
     "2020-01-01T00:00:00Z";
   expect(bestQuote(points[0], "over")?.price).toBe(120);
+  points[0].quotes.push({
+    side: "over",
+    price: 135,
+    effective_price: 118,
+    bookmaker: "prophetx",
+    book: "ProphetX",
+    market: "player_points",
+    updated_at: now,
+  });
+  expect(bestQuote(points[0], "over")?.price).toBe(120);
   expect(bestQuote(undefined, "over")).toBeUndefined();
 });
 

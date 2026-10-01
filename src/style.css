@@ -322,16 +322,16 @@ main {
 }
 .slate {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 314px), 1fr));
-  gap: 11px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 292px), 1fr));
+  gap: 8px;
   align-items: stretch;
 }
 .game-card {
   display: grid;
   grid-template-rows: auto 1fr;
   min-width: 0;
-  gap: 9px;
-  padding: 12px;
+  gap: 6px;
+  padding: 8px;
   background: #191a1c;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -353,18 +353,23 @@ main {
   gap: 4px;
 }
 .card-matchup > div {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 24px auto;
+  justify-content: center;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
+  min-width: 0;
+}
+.card-matchup .team-moneyline {
+  grid-column: 1 / -1;
   min-width: 0;
 }
 .card-matchup .logo {
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
 }
 .card-matchup strong {
-  font-size: 15px;
+  font-size: 12px;
   font-weight: 550;
 }
 .team-moneyline {
@@ -396,28 +401,47 @@ main {
   text-align: center;
   font-size: 9px;
   color: var(--muted);
-  margin: 8px 0 7px;
+  margin: 4px 0;
 }
 .card-signals {
-  position: relative;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin: 0 0 8px;
-}
-.signal-flag {
   display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 5px;
-  max-width: 100%;
-  padding: 4px 6px;
+  gap: 4px;
+  min-width: 0;
+  max-width: 50%;
+  height: 18px;
+  margin-left: auto;
+  padding: 1px 4px;
   border-radius: 3px;
-  font-size: 10px;
+  font-size: 9px;
+  color: #d9bd83;
+  background: #d9bd8314;
+  cursor: help;
+}
+.card-signals > svg {
+  flex-shrink: 0;
+}
+.signal-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.signal-flag {
+  display: grid;
+  gap: 3px;
+  padding: 6px;
+  border-radius: 3px;
+  font-size: 11px;
   line-height: 1.4;
   color: #d9bd83;
   background: #d9bd8314;
   border: 1px solid #d9bd8338;
+}
+.signal-flag + .signal-flag {
+  margin-top: 5px;
+}
+.signal-flag > span {
+  color: #e4e5e7;
 }
 .signal-inexperienced_goalie {
   color: #9ac5d9;
@@ -448,16 +472,16 @@ main {
   font-size: 11px;
   line-height: 1.5;
 }
-.signal-flag:hover .signal-tooltip,
-.signal-flag:focus .signal-tooltip {
+.card-signals:hover .signal-tooltip,
+.card-signals:focus .signal-tooltip {
   display: block;
 }
-.signal-flag:focus-visible {
+.card-signals:focus-visible {
   outline: 2px solid #8dbbdb;
   outline-offset: 2px;
 }
 .card-metric {
-  min-height: 25px;
+  min-height: 21px;
   border-top: 1px solid #ffffff05;
   font-size: 10px;
   color: #adb1b8;
@@ -466,7 +490,7 @@ main {
   font-family: var(--mono);
   font-size: 11px;
   font-weight: 400;
-  padding: 3px 0;
+  padding: 2px 0;
   border-radius: 3px;
   color: #d9dce1;
 }
@@ -509,14 +533,20 @@ main {
   background: #a77d79;
 }
 .card-form-row {
-  margin: 6px 0 10px;
-  grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr);
+  margin: 4px 0 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 8px;
+}
+.card-form-row > span {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  font-size: 9px;
 }
 .card-form {
-  display: flex;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 2px;
-  min-height: 28px;
+  min-height: 24px;
   min-width: 0;
 }
 .card-form > span {
@@ -524,9 +554,8 @@ main {
   grid-template-rows: 1fr 1fr;
   align-items: center;
   justify-content: center;
-  min-width: 28px;
-  max-width: 36px;
-  padding: 2px 3px;
+  min-width: 0;
+  padding: 2px 0;
   font-size: 8px;
   line-height: 1;
   border-radius: 2px;
@@ -540,10 +569,11 @@ main {
   font-weight: 600;
 }
 .card-form > span small {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  column-gap: 2px;
   color: #c3c7cd;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .card-form > span small b {
   color: var(--muted);
@@ -563,7 +593,7 @@ main {
 }
 .card-goalie-heading {
   border-top: 1px solid var(--border);
-  padding-top: 10px;
+  padding-top: 6px;
   display: flex;
   justify-content: space-between;
   font-size: 9px;
@@ -573,7 +603,7 @@ main {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px;
-  margin: 8px 0;
+  margin: 5px 0;
   text-align: center;
 }
 .card-goalie-names > div {
@@ -583,7 +613,7 @@ main {
   min-width: 0;
 }
 .card-goalie-names strong {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
   overflow-wrap: anywhere;
 }
@@ -597,11 +627,14 @@ main {
   margin-top: 8px;
 }
 .game-time {
+  position: relative;
+  min-height: 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 9px;
-  padding-bottom: 9px;
+  padding-bottom: 5px;
+  font-size: 11px;
   border-bottom: 1px solid var(--border);
 }
 .status {
@@ -735,9 +768,11 @@ main {
   color: var(--amber);
 }
 .card-arrow {
+  flex-shrink: 0;
   color: #686d74;
 }
 .game-card:hover .card-arrow {
+  flex-shrink: 0;
   color: #d8dadf;
 }
 .state-message {
@@ -1848,13 +1883,25 @@ tr:hover td {
   grid-template-rows: auto 1fr;
 }
 .fp-card .card-matchup {
-  margin-bottom: 14px;
+  margin-bottom: 6px;
 }
 .fp-card .card-metric {
-  grid-template-columns: minmax(0, 1fr) 150px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 116px minmax(0, 1fr);
 }
 .fp-card .card-goalie-heading {
-  margin-top: 16px;
+  margin-top: 8px;
+}
+.fp-card .fp-price {
+  gap: 4px 8px;
+  font-size: 10px;
+  padding-top: 6px;
+  margin-top: 6px;
+}
+.game-card .status {
+  font-size: 11px;
+}
+.game-card .eyebrow {
+  font-size: 9px;
 }
 .fp-price {
   display: flex;

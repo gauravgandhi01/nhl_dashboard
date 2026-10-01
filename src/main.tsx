@@ -341,6 +341,46 @@ function CardForm({ side }: { side?: CardSide }) {
   );
 }
 
+function CardSignals({ game, comparison }: { game: Game; comparison?: CardComparison }) {
+  const signals = [comparison?.away, comparison?.home].flatMap((side, index) =>
+    (side?.signals || []).map(signal => ({
+      ...signal,
+      team: index === 0 ? game.away.abbrev : game.home.abbrev,
+    })),
+  );
+  if (!signals.length) return null;
+  return (
+    <span
+      className="card-signals"
+      tabIndex={0}
+      aria-label={signals.map(signal => `${signal.team}: ${signal.detail}`).join("; ")}
+      onClick={event => {
+        event.preventDefault();
+        event.currentTarget.focus();
+      }}
+      onKeyDown={event => {
+        if (event.key === "Enter" || event.key === " ") event.preventDefault();
+        if (event.key === "Escape") event.currentTarget.blur();
+      }}
+    >
+      <Flag size={10} />
+      <span className="signal-summary">
+        {signals.length === 1
+          ? `${signals[0].team} ${signals[0].label}`
+          : `${signals.length} flags`}
+      </span>
+      <span className="signal-tooltip" role="tooltip">
+        {signals.map(signal => (
+          <span className={`signal-flag signal-${signal.id}`} key={`${signal.team}-${signal.id}`}>
+            <strong>{signal.team} · {signal.label}</strong>
+            <span>{signal.detail}</span>
+          </span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
 function CardStats({
   game,
   comparison,
@@ -372,29 +412,6 @@ function CardStats({
           ? `${comparison.season_label} regular season${comparison.previous_season ? " / Prior season" : ""}`
           : "Statistics unavailable"}
       </div>
-      {[a, h].some((side) => side?.signals?.length) && (
-        <div className="card-signals" aria-label="Matchup signals">
-          {[a, h].flatMap((side, index) =>
-            (side?.signals || []).map((signal) => (
-              <span
-                key={`${index}-${signal.id}`}
-                className={`signal-flag signal-${signal.id}`}
-                tabIndex={0}
-                aria-label={`${index === 0 ? game.away.abbrev : game.home.abbrev}: ${signal.detail}`}
-              >
-                <Flag size={11} />
-                <strong>
-                  {index === 0 ? game.away.abbrev : game.home.abbrev}
-                </strong>{" "}
-                {signal.label}
-                <span className="signal-tooltip" role="tooltip">
-                  {signal.detail}
-                </span>
-              </span>
-            )),
-          )}
-        </div>
-      )}
       <CardMetric
         label="5v5 xG%"
         bars
@@ -582,6 +599,7 @@ function Slate() {
             >
               <div className="game-time">
                 <GameStatus game={g} />
+                <CardSignals game={g} comparison={data?.comparisons?.[g.id]} />
                 <ArrowRight size={16} className="card-arrow" />
               </div>
               <CardStats

@@ -33,6 +33,11 @@ def test_paired_moneylines_and_reject_ambiguous_markets():
     best = moneyline_prices(event, game)[0]
     assert best['away'] == 120 and best['away_name'] == 'FanDuel'
     assert best['home'] == -130 and best['home_name'] == 'Pinnacle'
+    event['bookmakers'].append({'key': 'prophetx', 'title': 'ProphetX', 'last_update': event['commence_time'], 'markets': [{'key': 'h2h',
+        'outcomes': [{'name': 'Florida Panthers', 'price': -128}, {'name': 'Chicago Blackhawks', 'price': 122}]}]})
+    best = moneyline_prices(event, game)[0]
+    assert best['away'] == 120 and best['away_name'] == 'FanDuel'
+    assert best['home'] == -130 and best['home_name'] == 'Pinnacle'
     event['bookmakers'] = event['bookmakers'][:1]
     market = event['bookmakers'][0]['markets'][0]
     market['outcomes'].append({'name': 'Draw', 'price': 250})

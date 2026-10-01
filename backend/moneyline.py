@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from .first_period_odds import event_game, NAMES, SOURCE
+from .odds_fees import effective_american, net_decimal
 from .odds_client import odds_client, odds_configured
 from .odds_config import market_params, odds_scope
 from .stats import normalized_name, number
@@ -35,13 +36,16 @@ def moneyline_prices(event, game):
         if set(sides) == {'away', 'home'}:
             updated = market.get('last_update') or book.get('last_update')
             for side, price in sides.items():
+                net = net_decimal(key, price)
                 current = best.get(side)
-                if current is None or price > current['price']:
-                    best[side] = {'price': price, 'bookmaker': key, 'name': title, 'updated_at': updated}
+                if net is not None and (current is None or net > current['net_decimal']):
+                    best[side] = {'price': price, 'effective_price': effective_american(key, price),
+                                  'net_decimal': net, 'bookmaker': key, 'name': title, 'updated_at': updated}
     if set(best) != {'away', 'home'}:
         return []
     return [{'bookmaker': 'best', 'name': 'Best available',
              'away': best['away']['price'], 'home': best['home']['price'],
+             'away_effective': best['away']['effective_price'], 'home_effective': best['home']['effective_price'],
              'away_bookmaker': best['away']['bookmaker'], 'away_name': best['away']['name'],
              'away_updated_at': best['away']['updated_at'],
              'home_bookmaker': best['home']['bookmaker'], 'home_name': best['home']['name'],
