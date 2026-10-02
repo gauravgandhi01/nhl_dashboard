@@ -268,7 +268,6 @@ function CardMetric({
   suffix = "",
   lower = false,
   neutral = false,
-  bars = false,
 }: {
   label: string;
   away: number | null | undefined;
@@ -277,7 +276,6 @@ function CardMetric({
   suffix?: string;
   lower?: boolean;
   neutral?: boolean;
-  bars?: boolean;
 }) {
   const comparable =
     !neutral &&
@@ -285,29 +283,17 @@ function CardMetric({
     home != null &&
     away.toFixed(digits) !== home.toFixed(digits);
   const awayBetter = comparable && (lower ? away < home : away > home);
-  const showBars = bars && away != null && home != null &&
-    Number.isFinite(away) && Number.isFinite(home) && away >= 0 && home >= 0;
-  const maximum = showBars ? Math.max(away, home) : 0;
-  const help = `${lower ? "Lower" : "Higher"} is better${showBars
-    ? `. Gap: ${Math.abs(away - home).toFixed(digits)}${suffix === "%" ? " percentage points" : suffix}. Bars share a zero-based scale within this matchup.`
-    : ""}`;
-  const bar = (value: number | null | undefined) => showBars && (
-    <span className="metric-track" aria-hidden="true">
-      <span style={{ width: `${maximum > 0 ? value! / maximum * 100 : 0}%` }} />
-    </span>
-  );
+  const help = `${lower ? "Lower" : "Higher"} is better`;
   return (
-    <div className={`card-metric${bars ? " card-metric-bars" : ""}`}>
+    <div className="card-metric">
       <strong className={comparable ? (awayBetter ? "better" : "worse") : ""}>
         {fmt(away, digits, suffix)}
-        {bar(away)}
       </strong>
       <span title={neutral ? label : help}>
         {label}
       </span>
       <strong className={comparable ? (awayBetter ? "worse" : "better") : ""}>
         {fmt(home, digits, suffix)}
-        {bar(home)}
       </strong>
     </div>
   );
@@ -396,26 +382,20 @@ function CardStats({
   return (
     <div className="card-stats">
       <div className="card-matchup">
-        <div title={game.away.name}>
+        <div className="card-team" role="group" aria-label={game.away.name} title={game.away.name}>
           <Logo team={game.away} />
-          <strong>{game.away.abbrev}</strong>
+          <span className="card-record" title="Team record (W–L–OT)">{game.away.record || "--"}</span>
           <TeamMoneyline game={game} odds={odds} side="away" />
         </div>
         <span className="eyebrow">AT</span>
-        <div title={game.home.name}>
+        <div className="card-team" role="group" aria-label={game.home.name} title={game.home.name}>
           <Logo team={game.home} />
-          <strong>{game.home.abbrev}</strong>
+          <span className="card-record" title="Team record (W–L–OT)">{game.home.record || "--"}</span>
           <TeamMoneyline game={game} odds={odds} side="home" />
         </div>
       </div>
-      <div className="card-season">
-        {comparison
-          ? `${comparison.season_label} regular season`
-          : "Statistics unavailable"}
-      </div>
       <CardMetric
         label="5v5 xG%"
-        bars
         away={a?.advanced.xgf_pct}
         home={h?.advanced.xgf_pct}
         digits={1}
@@ -423,27 +403,23 @@ function CardStats({
       />
       <CardMetric
         label="Goals for / G"
-        bars
         away={a?.summary.gf}
         home={h?.summary.gf}
       />
       <CardMetric
         label="Goals against / G"
-        bars
         away={a?.summary.ga}
         home={h?.summary.ga}
         lower
       />
       <CardMetric
         label="Shots / G"
-        bars
         away={a?.summary.sf}
         home={h?.summary.sf}
         digits={1}
       />
       <CardMetric
         label="Power play"
-        bars
         away={a?.summary.pp}
         home={h?.summary.pp}
         digits={1}

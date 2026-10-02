@@ -174,6 +174,19 @@ export function MoneylineRows({
   );
 }
 
+const bookCodes: Record<string, string> = {
+  ballybet: "BB", betmgm: "MG", betonlineag: "BO", betrivers: "BR",
+  draftkings: "DK", fanatics: "FN", fanduel: "FD", kalshi: "KL",
+  mybookieag: "MB", novig: "NV", prophetx: "PX", williamhill_us: "CZ",
+  betonline: "BO", mybookie: "MB", caesars: "CZ", williamhill: "CZ",
+};
+export function sportsbookCode(key: string | undefined, name: string) {
+  const known = bookCodes[key || ""] || bookCodes[name.toLowerCase().replace(/[^a-z0-9]/g, "")];
+  if (known) return known;
+  const words = name.replace(/([a-z])([A-Z])/g, "$1 $2").match(/[A-Za-z0-9]+/g) || [];
+  return (words.length > 1 ? words.map(word => word[0]).join("").slice(0, 2) : words[0]?.slice(0, 2) || "--").toUpperCase();
+}
+
 export function TeamMoneyline({
   game,
   odds,
@@ -191,13 +204,14 @@ export function TeamMoneyline({
     price.away < price.home ? "away" : price.home < price.away ? "home" : null;
   const book = side === "away" ? price.away_name : price.home_name;
   const value = side === "away" ? price.away : price.home;
+  const bookKey = (side === "away" ? price.away_bookmaker : price.home_bookmaker) || price.bookmaker;
   return (
     <span
       className={`team-moneyline ${favorite === side ? "ml-favorite" : ""}`}
       title={`${game[side].abbrev} best moneyline at ${book || price.name}`}
     >
       <span>{american(value)}</span>
-      <small>{book || price.name}</small>
+      <small title={book || price.name} aria-label={book || price.name}>{sportsbookCode(bookKey, book || price.name)}</small>
     </span>
   );
 }

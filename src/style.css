@@ -397,12 +397,6 @@ main {
 .team-moneyline.warning-text {
   color: #d7b874;
 }
-.card-season {
-  text-align: center;
-  font-size: 9px;
-  color: var(--muted);
-  margin: 4px 0;
-}
 .card-signals {
   display: inline-flex;
   align-items: center;
@@ -502,35 +496,6 @@ main {
 .card-metric .worse {
   color: #cba2a0;
   background: #cc8c8910;
-}
-.card-metric-bars > strong {
-  position: relative;
-  border-radius: 0;
-  background: none;
-  box-shadow: none;
-}
-.metric-track {
-  position: absolute;
-  bottom: 0;
-  left: 8px;
-  right: 8px;
-  height: 3px;
-  background: #ffffff09;
-  overflow: hidden;
-}
-.metric-track > span {
-  display: block;
-  height: 100%;
-  background: #737980;
-}
-.card-metric-bars > strong:first-child .metric-track > span {
-  margin-left: auto;
-}
-.better .metric-track > span {
-  background: #70b796;
-}
-.worse .metric-track > span {
-  background: #a77d79;
 }
 .card-form-row {
   margin: 4px 0 6px;
@@ -2158,3 +2123,9 @@ tr:hover td {
 .refresh-button:hover:not(:disabled) { background: #292b2e; }
 .refresh-button:focus-visible { outline: 2px solid #9ebdce; outline-offset: 2px; }
 .props-controls:empty { display: none; }
+
+.card-matchup > .card-team { grid-template-columns: 40px auto; gap: 2px 4px; }
+.card-team .logo { width: 40px; height: 40px; }
+.card-record { font: 9px var(--mono); color: var(--muted); white-space: nowrap; }
+.card-team .team-moneyline { display: flex; align-items: baseline; justify-content: center; gap: 4px; margin: 0 0 5px; }
+.card-team .team-moneyline small { font-size: 7px; }

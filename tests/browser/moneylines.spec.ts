@@ -6,6 +6,8 @@ test("moneylines auto-load paired prices and fit mobile", async ({
 }) => {
   const slate = await (await request.get("/api/slate?date=2026-09-26")).json();
   const game = slate.games[0];
+  game.away.record = "3-1-0";
+  game.home.record = "2-1-1";
   slate.games = [{ ...game, state: "FUT", start: "2099-09-26T23:00:00Z" }];
   await page.route("**/api/slate?*", (route) => route.fulfill({ json: slate }));
   let calls = 0;
@@ -47,14 +49,19 @@ test("moneylines auto-load paired prices and fit mobile", async ({
     await expect(page.getByRole("button", { name: "Load moneylines" })).toHaveCount(0);
     const firstCard = page.locator(".game-card").first();
     await expect(firstCard.locator(".team-moneyline")).toHaveCount(2);
+    await expect(firstCard.locator(".card-record")).toHaveText(["3-1-0", "2-1-1"]);
+    await expect(firstCard.locator(".card-season")).toHaveCount(0);
+    await expect(firstCard.locator(".card-matchup")).not.toContainText(game.away.abbrev);
+    await expect(firstCard.locator(".card-team .logo").first()).toHaveCSS("width", "40px");
+    await expect(firstCard.locator(".team-moneyline small").first()).toHaveAttribute("title", "FanDuel");
     await expect(firstCard.locator(".team-moneyline").first()).toContainText(
       "+125",
     );
     await expect(firstCard.locator(".team-moneyline").first()).toContainText(
-      "FanDuel",
+      "FD",
     );
     await expect(firstCard.locator(".team-moneyline").last()).toContainText(
-      "DraftKings",
+      "DK",
     );
     await expect(
       firstCard.locator(".team-moneyline.ml-favorite").first(),
@@ -134,7 +141,7 @@ test("moneylines show configuration and retained prices on provider errors", asy
   );
   await expect(page.locator(".team-moneyline").first()).toContainText("+100");
   await expect(page.locator(".team-moneyline").first()).toContainText(
-    "FanDuel",
+    "FD",
   );
   await expect(page.locator("body")).not.toContainText("Stale");
 });
