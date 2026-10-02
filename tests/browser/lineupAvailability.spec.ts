@@ -48,10 +48,13 @@ test("lineup TOI follows NHL IDs across name variants and explains missing value
     lineup: { sections: {
       "Forward Line 1": ["Gabriel Perreault", "Unknown Skater", "New Rookie"],
       "Forward Line 2": ["Unavailable Log", "Uncovered Skater", "Provider Outage"],
+      "Defense pair 1": ["Low Defender", "High Defender"],
+      "1st Powerplay Unit": ["Gabriel Perreault", "Low Defender"],
     }, updated_at: source.retrieved_at },
-    lineup_player_ids: { "Gabriel Perreault": 8484210, "Unknown Skater": null, "New Rookie": 2, "Unavailable Log": 3, "Uncovered Skater": 4, "Provider Outage": 5 },
+    lineup_player_ids: { "Gabriel Perreault": 8484210, "Unknown Skater": null, "New Rookie": 2, "Unavailable Log": 3, "Uncovered Skater": 4, "Provider Outage": 5, "Low Defender": 6, "High Defender": 7 },
     lineup_usage: {
-      "8484210": usage(980, 5, 800, 5), "2": usage(null, 0, null, 0),
+      "8484210": { ...usage(980, 5, 800, 5), l5: 850 },
+      "6": usage(980, 5, 900, 5), "7": usage(1200, 5, 700, 5), "2": usage(null, 0, null, 0),
       "3": usage(null, null, null, null), "4": usage(900, 5, null, 0), "5": usage(900, 5, null, null),
       // A conflicting legacy name key must never override the verified NHL ID.
       gabrielperreault: usage(60, 5, 60, 5),
@@ -68,13 +71,25 @@ test("lineup TOI follows NHL IDs across name variants and explains missing value
     await page.setViewportSize({ width, height: 1000 });
     await page.goto("/matchups/2026020002?date=2026-09-29&tab=lineups");
     const player = (name: string) => page.locator(".line-player").filter({ has: page.locator(`strong[title="${name}"]`) });
-    await expect(player("Gabriel Perreault")).toContainText("16:20");
-    await expect(player("Gabriel Perreault")).not.toContainText("1:00");
+    const forward = player("Gabriel Perreault").first();
+    const defense = player("Low Defender").first();
+    await expect(forward).toContainText("16:20");
+    await expect(forward.locator(".line-toi").nth(0)).toHaveCSS("background-color", "rgba(89, 190, 151, 0.26)");
+    await expect(forward.locator(".line-toi").nth(2)).toHaveCSS("background-color", "rgba(222, 132, 145, 0.26)");
+    await expect(defense.locator(".line-toi").nth(0)).toHaveCSS("background-color", "rgba(222, 132, 145, 0.26)");
+    await expect(forward.locator(".line-toi").nth(0)).toHaveAttribute("title", /displayed NYR forwards: 15:00–16:20/);
+    await expect(defense.locator(".line-toi").nth(0)).toHaveAttribute("title", /displayed NYR defense: 16:20–20:00/);
+    await expect(player("Gabriel Perreault").nth(1).locator(".line-toi").nth(0)).toHaveCSS("background-color", "rgba(89, 190, 151, 0.26)");
+    await expect(player("New Rookie").locator(".line-toi")).toHaveCount(0);
+    await expect(forward).not.toContainText("1:00");
     await expect(player("Unknown Skater")).toContainText("Unmatched");
     await expect(player("New Rookie")).toContainText("No prior GP");
     await expect(player("Unavailable Log")).toContainText("NHL unavailable");
     await page.getByRole("button", { name: "5v5 TOI", exact: true }).click();
-    await expect(player("Gabriel Perreault")).toContainText("13:20");
+    await expect(forward).toContainText("13:20");
+    // A single available forward is neutral; defense uses its own 5v5 range.
+    await expect(forward.locator(".line-toi").nth(0)).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    await expect(defense.locator(".line-toi").nth(0)).toHaveCSS("background-color", "rgba(89, 190, 151, 0.26)");
     await expect(player("Uncovered Skater")).toContainText("No 5v5 data");
     await expect(player("Provider Outage")).toContainText("5v5 unavailable");
     await expect(player("New Rookie")).toContainText("No prior GP");

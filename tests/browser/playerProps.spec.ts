@@ -222,13 +222,14 @@ test("shared player props render in expansion, lines, and only on-slate relevant
     await page.setViewportSize({ width, height: 1000 });
     await page.goto(`/matchups/${p.game_id}?date=${date}&tab=lineups`);
     const matched = page.locator(".line-player").first();
-    await expect(matched).toContainText("PTS 0.5");
-    await expect(matched).toContainText("SOG 2.5");
-    await expect(matched).not.toContainText("O0.5");
+    await expect(matched.locator(".compact-prop-label").first()).toHaveText("PTS");
+    await expect(matched).toContainText("SOG O2.5");
     await expect(matched).not.toContainText("DK");
     await expect(matched).not.toContainText("FanDuel");
     await expect(matched).toContainText("+260");
-    await expect(matched.locator(".prop-slash").first()).toBeVisible();
+    await expect(matched.locator(".prop-slash")).toHaveCount(0);
+    await expect(matched.locator(".prop-quote")).toHaveCount(3);
+    await expect(matched.locator('.prop-quote[aria-label*="under"], .prop-quote[aria-label*="no "]')).toHaveCount(0);
     await expect(matched.locator(".prop-quote").first()).toHaveAttribute(
       "title",
       /FanDuel|DraftKings/,

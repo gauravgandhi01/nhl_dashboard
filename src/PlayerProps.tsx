@@ -396,12 +396,14 @@ export function CompactProps({
   playerId,
   family,
   showLabel = true,
+  overOnly = false,
 }: {
   state: PropsState;
   gameId: number;
   playerId?: number | null;
   family?: string;
   showLabel?: boolean;
+  overOnly?: boolean;
 }) {
   const game = state.data?.games[String(gameId)];
   const player = playerId != null ? game?.players[String(playerId)] : undefined;
@@ -414,7 +416,7 @@ export function CompactProps({
         : lines[0];
     const binary = f === "scorer";
     const over = bestQuote(line, line?.point == null ? "yes" : "over");
-    const under = bestQuote(line, line?.point == null ? "no" : "under");
+    const under = overOnly ? undefined : bestQuote(line, line?.point == null ? "no" : "under");
     if (!over && !under) return [];
     const label = f === "points" ? "PTS" : f === "shots" ? "SOG" : "ATG";
     return [{ f, line, binary, over, under, label }];
@@ -436,8 +438,8 @@ export function CompactProps({
             {showLabel && (
               <span className="compact-prop-label">
                 {label}
-                {line?.point != null && !binary
-                  ? ` ${line.point}`
+                {line?.point != null && !binary && !(f === "points" && line.point === 0.5)
+                  ? ` ${overOnly ? "O" : ""}${line.point}`
                   : ""}
               </span>
             )}

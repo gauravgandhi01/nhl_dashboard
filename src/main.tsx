@@ -1028,6 +1028,47 @@ function Lineups({ side, props, gameId }: { side: Side; props: PropsState; gameI
     (usage) =>
       usage.season_5v5 != null || usage.l10_5v5 != null || usage.l5_5v5 != null,
   );
+  const usageWindows = ["season", "l10", "l5"] as const;
+  type PositionGroup = "forwards" | "defense";
+  // Deduplicate players who also appear on special-teams units.
+  const positionGroups = new Map<number, PositionGroup>();
+  for (const [section, names] of sections) {
+    for (const name of names) {
+      const id = side.lineup_player_ids?.[name];
+      if (id == null) continue;
+      const position = side.roster.find(player => player.id === id)?.position;
+      const group = position === "D" ? "defense"
+        : ["C", "L", "R", "LW", "RW", "F"].includes(position || "") ? "forwards"
+        : /defen/i.test(section) ? "defense"
+        : /forward/i.test(section) ? "forwards" : undefined;
+      if (group) positionGroups.set(id, group);
+    }
+  }
+  const usageNumber = (id: number, window: typeof usageWindows[number]) =>
+    side.lineup_usage?.[String(id)]?.[strength === "5v5" ? `${window}_5v5` : window];
+  const usageRanges = new Map<string, [number, number]>();
+  for (const group of ["forwards", "defense"] as const) {
+    for (const window of usageWindows) {
+      const values = [...positionGroups].filter(([, value]) => value === group)
+        .map(([id]) => usageNumber(id, window))
+        .filter((value): value is number => value != null && Number.isFinite(value));
+      if (values.length) usageRanges.set(`${group}-${window}`, [Math.min(...values), Math.max(...values)]);
+    }
+  }
+  const usageFormatting = (name: string, window: typeof usageWindows[number]) => {
+    const id = side.lineup_player_ids?.[name];
+    const group = id == null ? undefined : positionGroups.get(id);
+    const value = id == null ? undefined : usageNumber(id, window);
+    const range = group && usageRanges.get(`${group}-${window}`);
+    if (value == null || !Number.isFinite(value) || !range || range[0] === range[1]) return {};
+    const relative = (value - range[0]) / (range[1] - range[0]);
+    const distance = Math.abs(relative - 0.5) * 2;
+    const rgb = relative >= 0.5 ? "89, 190, 151" : "222, 132, 145";
+    return {
+      style: { backgroundColor: `rgba(${rgb}, ${0.04 + distance * 0.22})` },
+      title: `${window === "season" ? "Season" : window.toUpperCase()} ${strength === "5v5" ? "5v5 " : ""}TOI among displayed ${side.team.abbrev} ${group}: ${clock(range[0])}–${clock(range[1])}. Green = higher; rose = lower.`,
+    };
+  };
   const usageValue = (name: string, window: "season" | "l10" | "l5") => {
     const playerId = side.lineup_player_ids?.[name];
     const usage = playerId == null ? undefined : side.lineup_usage?.[String(playerId)];
@@ -1092,7 +1133,7 @@ function Lineups({ side, props, gameId }: { side: Side; props: PropsState; gameI
                   className={`line-grid ${name === "Defensive Pairings" || name.startsWith("Defense pair") ? "pairs" : ""}`}
                 >
                   {players.map((p, i) => {
-                    const values = [usageValue(p, "season"), usageValue(p, "l10"), usageValue(p, "l5")];
+                    const values = usageWindows.map(window => usageValue(p, window));
                     const first = values[0];
                     const sharedReason = typeof first !== "string" && values.every(
                       value => typeof value !== "string" && value.props.title === first.props.title,
@@ -1101,11 +1142,12 @@ function Lineups({ side, props, gameId }: { side: Side; props: PropsState; gameI
                       <div className="line-player" key={p + i}>
                         <strong title={p}>{p.replace(/^(\S+)\s+/, (_, first: string) => first[0] + ". ")}</strong>
                         {sharedReason ? <span className="line-usage-missing">{first}</span> : values.map((value, index) => (
-                          <span key={index} className={typeof value === "string" ? undefined : "line-usage-missing"}>
+                          <span key={index} className={typeof value === "string" ? "line-toi" : "line-usage-missing"}
+                            {...(typeof value === "string" ? usageFormatting(p, usageWindows[index]) : {})}>
                             <b>{["S", "L10", "L5"][index]}</b> {value}
                           </span>
                         ))}
-                        <CompactProps state={props} gameId={gameId} playerId={side.lineup_player_ids?.[p]} />
+                        <CompactProps state={props} gameId={gameId} playerId={side.lineup_player_ids?.[p]} overOnly />
                       </div>
                     );
                   })}
@@ -1113,6 +1155,8 @@ function Lineups({ side, props, gameId }: { side: Side; props: PropsState; gameI
               </div>
             ))}
           <p className="footnote">
+            TOI shading: rose = lower, green = higher within this team’s displayed forwards or defense, per column.
+            <br />
             Published {stamp(side.lineup?.updated_at || null)}{" "}
             <span className="divider">/</span> Retrieved{" "}
             {stamp(side.lineup_source.retrieved_at)}
@@ -1136,7 +1180,7 @@ function Lineups({ side, props, gameId }: { side: Side; props: PropsState; gameI
               <div className="line-player" key={p.id}>
                 <strong title={p.name}>{p.name.replace(/^(\S+)\s+/, (_, first: string) => first[0] + ". ")}</strong>
                 <span>{p.position}</span>
-                <CompactProps state={props} gameId={gameId} playerId={p.id} />
+                <CompactProps state={props} gameId={gameId} playerId={p.id} overOnly />
               </div>
             ))}
           </div>
