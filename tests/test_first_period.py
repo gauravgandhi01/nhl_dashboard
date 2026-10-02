@@ -107,7 +107,9 @@ def test_invalid_sources_rejected(change):
 
 
 class Fake:
-    def __init__(self, store): self.store, self.calls, self.failure = store, [], False
+    def __init__(self, store):
+        self.store, self.calls, self.failure = store, [], False
+        self.season = 20262027
     async def stats(self, report, season, *args, **kwargs):
         self.calls.append((report,season))
         rows = [] if season == 20262027 else goalie_rows() if report == 'goalie/summary' else pair()
@@ -116,7 +118,7 @@ class Fake:
     async def nhl(self,path,*args):
         self.calls.append(path)
         if path.startswith('score'):
-            data={'games':[{'id':2026010001,'season':20262027,'gameDate':'2026-09-27','startTimeUTC':'2026-09-27T23:00:00Z',
+            data={'games':[{'id':2026010001,'season':self.season,'gameDate':'2026-09-27','startTimeUTC':'2026-09-27T23:00:00Z',
                 'awayTeam':{'id':16,'abbrev':'CHI'},'homeTeam':{'id':13,'abbrev':'FLA'}}]}
         elif path.startswith('roster'):
             data={'goalies':[{'id':1 if 'CHI' in path else 2,'firstName':{'default':'Test'},'lastName':{'default':'Goalie'}}]}
@@ -124,12 +126,13 @@ class Fake:
         return Feed(data,'NHL',path)
 
 
-def test_build_dedup_fallback_persistence_and_failure(tmp_path):
+def test_build_dedup_current_season_persistence_and_failure(tmp_path):
     async def scenario():
         store = Store(tmp_path/'first.sqlite3'); fake=Fake(store); service=FirstPeriod(fake)
         try:
+            fake.season = 20252026
             first = await service.view('2026-09-27')
-            assert first['previous_season'] and first['season_label']=='2025-26'
+            assert not first['previous_season'] and first['season_label']=='2025-26'
             assert first['rankings'][0]['windows']['season']['hits']==1
             task = service.tasks[20252026]
             service.ensure_build(20252026,[game()])
@@ -145,4 +148,20 @@ def test_build_dedup_fallback_persistence_and_failure(tmp_path):
             assert service.saved(20252026)[2025020001]['body'] is not None
             assert service.saved(20252026)[2025020001]['error']
         finally: await service.close();await store.close()
+    asyncio.run(scenario())
+
+
+def test_empty_current_season_never_loads_previous_season(tmp_path):
+    async def scenario():
+        store = Store(tmp_path / 'empty.sqlite3'); fake = Fake(store); service = FirstPeriod(fake)
+        try:
+            result = await service.view('2026-09-27')
+            assert result['season'] == 20262027 and not result['previous_season']
+            assert result['coverage']['games'] == 0
+            assert not service.tasks
+            assert all(call[1] == 20262027 for call in fake.calls if isinstance(call, tuple))
+            assert not any(isinstance(call, str) and 'play-by-play' in call for call in fake.calls)
+            assert result['matchups'][0]['away']['windows']['season']['games'] == 0
+        finally:
+            await service.close(); await store.close()
     asyncio.run(scenario())

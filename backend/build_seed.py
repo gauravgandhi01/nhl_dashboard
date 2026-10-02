@@ -7,12 +7,11 @@ from pathlib import Path
 
 from .cache import Store
 from .providers import Providers
+from .stats import season_for_date
 
 
 def default_seasons() -> list[int]:
-    today = date.today()
-    start = today.year if today.month >= 9 else today.year - 1
-    return [(start - 1) * 10000 + start, start * 10000 + start + 1]
+    return [season_for_date(date.today().isoformat())]
 
 
 def seasons() -> list[int]:

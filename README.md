@@ -44,8 +44,8 @@ skater game ZIP, **all strengths**, with totals divided by total covered ice tim
 MP GP shows the actual matched-game coverage; hover for covered minutes. Missing
 data is never zero-filled, and stale/partial providers are marked beside players.
 Windows end before the selected night (or today for future nights), never cross
-statistical seasons, and show smaller samples explicitly. A previous-season
-baseline is used only when NHL confirms no regular-season games before the cutoff.
+statistical seasons, and show smaller samples explicitly. Only the selected slate’s
+season is used (2026–27 for current slates); empty samples never fall back to an older season.
 Current rosters are not historical roster snapshots. The first Players load can
 take longer while the season ZIP and individual game logs populate SQLite.
 
@@ -60,8 +60,8 @@ take longer while the season ZIP and individual game logs populate SQLite.
   within the current team's roster. Provider IDs are never assumed equivalent.
 
 Comparison statistics use completed regular-season games in the displayed season.
-Before regular-season data exists, the prior season is explicitly shown. Last 10
-never crosses seasons. Goalies use their last 10 appearances across teams.
+Before regular-season data exists, statistics remain empty. Last 10
+uses up to ten games from that season only. Goalies use their last 10 appearances across teams.
 Daily cards use reported starters when available. Otherwise they show the most-used
 goalie on the current roster in the displayed season, labeled "Roster leader";
 this is a comparison profile, not a predicted starter. Card colors compare like
@@ -72,14 +72,10 @@ and runs oldest to newest, with up to five results from the displayed season.
 Matchup flags are team-specific and show their reason on hover/focus:
 - **B2B:** a game on the preceding calendar night, using the selected matchup's
   season schedule, including scheduled games. Postponed/canceled games are excluded.
-- **Goalie <5 NHL GP:** only a confirmed, uniquely matched starting goalie with
-  fewer than five career NHL appearances (regular season plus playoffs, excluding
-  preseason). The roster-leader fallback never triggers this flag. Missing or stale
-  confirmation/career data is not treated as zero appearances.
 - **Winning team / L3+:** current-season regular-season wins exceed all losses
   (regulation plus OT/SO), and the team has lost at least three consecutive completed
-  games. Overtime/shootout losses count; the streak is not limited to L5. Prior-season
-  baselines never trigger this signal. Results are taken before the matchup date.
+  games. Overtime/shootout losses count; the streak is not limited to L5.
+  Results are taken before the matchup date.
 
 Unavailable or stale schedules suppress schedule/record flags; no flag is not a
 claim that every signal could be evaluated.
@@ -105,8 +101,8 @@ The **First Period** tab (`/first-period?date=YYYY-MM-DD`) provides comparison
 cards, dedicated matchup URLs, goalie inspection, head-to-head scores and sortable
 league team rankings. Only Season (default), Last 5 and Last 10 are supported.
 The statistical baseline is completed regular-season games before the selected
-date, capped before today for future slates. An explicitly labeled previous-season
-baseline is used before the regular season starts. The separate league-trends
+date, capped before today for future slates, within that slate’s season only.
+Teams and goalies with no appearances retain empty samples. The separate league-trends
 report, projection model, custom matchups and live tracking are not migrated.
 
 NHL `team/goalsbyperiod` supplies team counts; inconsistent/missing paired rows are
@@ -171,28 +167,26 @@ recomputes the top ten among players whose current teams play on the selected
 date. Scheduled-team badges are not player/goalie participation confirmations.
 
 Only NHL regular-season appearances count, before the selected date (capped before
-today for future dates). Last ten and active streaks cross season boundaries and
-trades; postseason and preseason are excluded rather than mixed in. Missed games
+today for future dates). Last ten and active streaks stay within the selected
+season and follow players across trades; postseason and preseason are excluded. Missed games
 do not break appearance-based streaks. Goalie wins are consecutive decisions:
 no-decisions are skipped, regulation and overtime/shootout losses end the streak.
 The low-GA and shutout boards use starts, excluding short relief appearances.
-Exact sample sizes, latest appearance dates, and crossover labels are displayed.
+Short last-ten samples show their actual appearance count; dates are available on hover.
 
 Eligibility uses current NHL rosters and regular-season activity in the selected
-statistical season or preceding season. These are not historical roster snapshots.
-Older game logs are loaded using each player's available-season manifest until
-the last-ten sample and active streak endings can be established, including missed
-seasons. If the manifest is absent and the streak remains open, a `+` denotes a
-lower bound. Missing history excludes the affected player and marks coverage
-partial rather than joining a streak across an unknown gap. Current-roster ID
-collisions are unresolved, not fuzzy-matched.
+season only. These are not historical roster snapshots. Each eligible player needs
+only that season’s game log; older-season manifests are not followed. Active streaks
+stop at the season boundary. Missing logs exclude the affected player and mark
+coverage partial. Current-roster ID collisions remain unresolved.
 
 Ranks share ties by value, but lists are capped at ten rows. Ties are ordered by
 larger sample, latest appearance date, name, then ID. Boards with no positive
-results remain empty. Short career samples are not inflated to ten appearances.
+results remain empty. Short season samples are not inflated to ten appearances.
 
 `GET /api/streaks?date=YYYY-MM-DD&scope=league|tonight` serves a project-local SQLite
-snapshot. A single background build per cutoff reuses the NHL game-log cache,
+snapshot. Player and streak snapshots carry a version so older cross-season payloads
+are rebuilt rather than displayed. A single background build per cutoff reuses the NHL game-log cache,
 persists normalized records, and refreshes every six hours. Failures/partial data
 retry after ten minutes and retain last-good snapshots. The page polls only while
 building, pauses in hidden tabs, and never polls live scores. Date/scope changes
@@ -309,8 +303,8 @@ NHL_DASHBOARD_DB=/tmp/dashboard.sqlite3
 
 Optional build/runtime settings:
 
-- `NHL_SEED_SEASONS=20252026,20262027` seeds explicit seasons during Docker
-  build. If omitted, the previous and current seasons are attempted.
+- `NHL_SEED_SEASONS=20262027` seeds the selected season during Docker
+  build. If omitted, only the current season is attempted.
 - `NHL_MONEYPUCK_REFRESH_HOURS=24` controls how long normalized MoneyPuck rows
   are trusted before a runtime refresh attempt. Use `0` to trust seeded rows
   indefinitely on small free instances; the Docker image defaults to `0`.

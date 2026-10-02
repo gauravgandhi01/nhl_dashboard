@@ -4,7 +4,7 @@ from copy import deepcopy
 import pytest
 
 from backend.cache import Feed, Store
-from backend.streaks import Streaks, metric, normalize, needs_history, entries_for, top_ten
+from backend.streaks import Streaks, metric, normalize, entries_for, top_ten
 
 
 def row(i, year=2025, points=1, goals=1, **kwargs):
@@ -16,12 +16,12 @@ def player(kind='skater'):
     return {'id': 1, 'kind': kind, 'name': 'Test Player', 'team': 'CAR', 'position': 'C'}
 
 
-def test_last10_cross_season_dedup_and_cutoff():
+def test_last10_current_season_dedup_and_cutoff():
     rows = normalize([row(i) for i in range(1,9)] + [row(1,2026), row(2,2026), row(2,2026), row(3,2026)], '2026-11-03')
-    assert len(rows) == 10
+    assert len(rows) == 2
     result = entries_for(player(), rows, True)['points10']
-    assert result['value'] == 10 and result['sample_size'] == 10
-    assert result['seasons'] == ['2025-26','2026-27']
+    assert result['value'] == 2 and result['sample_size'] == 2
+    assert result['seasons'] == ['2026-27']
     assert result['end_date'] == '2026-11-02'
 
 
@@ -56,7 +56,6 @@ def test_low_ga_starts_only_and_less_than_two_not_less_or_equal():
     result=metric(rows,'low_ga10',True)
     assert result['value']==2 and len(result['sample'])==3
     assert metric(rows,'shutouts10',True)['value']==1
-    assert needs_history(rows,'goalie')
 
 
 def test_incomplete_stats_not_zero_and_small_samples_explicit():
@@ -77,7 +76,7 @@ def test_top_ten_caps_ties_and_uses_latest_date_and_name():
     assert top_ten(entries)[1]['rank']==2
 
 
-def test_history_manifest_carries_active_streak_across_years_and_missing_feed_excludes(tmp_path):
+def test_history_stops_at_season_boundary_and_missing_feed_excludes(tmp_path):
     async def scenario():
         store=Store(tmp_path/'history.sqlite3')
         class Fake:
@@ -86,13 +85,13 @@ def test_history_manifest_carries_active_streak_across_years_and_missing_feed_ex
                 s=int(path.split('/')[-2])
                 data={'seasonId':s,'gameTypeId':2,'playerStatsSeasons':[{'season':20252026,'gameTypes':[2]},{'season':20242025,'gameTypes':[2]}],
                       'gameLog':[row(i,2025 if s==20252026 else 2024) for i in range(1,7)]}
-                if self.missing and s==20242025:data=None
+                if self.missing:data=None
                 return Feed(data,'NHL',path)
         fake=Fake();fake.store=store;service=Streaks(fake)
         try:
             result,feeds=await service.history(player(),20252026,'2026-01-01')
-            assert result['point_streak']['value']==12 and not result['point_streak']['lower_bound']
-            assert len(feeds)==2 and result['points10']['sample_size']==10
+            assert result['point_streak']['value']==6 and not result['point_streak']['lower_bound']
+            assert len(feeds)==1 and result['points10']['sample_size']==6
             fake.missing=True
             assert (await service.history(player(),20252026,'2026-01-01'))[0] is None
         finally:await service.close();await store.close()
@@ -106,6 +105,7 @@ def test_snapshot_build_dedup_slate_scope_failures_and_no_games(tmp_path,monkeyp
         class Fake:
             failed=False
             async def stats(self,report,season,*args,**kwargs):
+                assert season == 20262027
                 return Feed(None if self.failed else [{'playerId':1,'gamesPlayed':10}], 'NHL',report)
             async def nhl(self,path,*args):
                 if path.startswith('score'):
@@ -114,11 +114,17 @@ def test_snapshot_build_dedup_slate_scope_failures_and_no_games(tmp_path,monkeyp
                     data={'forwards':[{'id':1,'firstName':{'default':'A'},'lastName':{'default':'Player'},'positionCode':'C'}]} if 'CAR' in path else {'forwards':[]}
                 else:
                     season=int(path.split('/')[-2])
-                    data={'seasonId':season,'gameTypeId':2,'playerStatsSeasons':[{'season':season,'gameTypes':[2]}],'gameLog':[row(i) for i in range(1,12)]}
+                    data={'seasonId':season,'gameTypeId':2,'playerStatsSeasons':[{'season':season,'gameTypes':[2]}],'gameLog':[{**row(i, 2026), 'gameDate': f'2026-09-{i:02}'} for i in range(1,12)]}
                 return Feed(data,'NHL',path)
         fake=Fake();fake.store=store;service=Streaks(fake)
         try:
+            import json, time
+            store.db.execute('INSERT INTO streak_snapshots VALUES(?,?,?,?,NULL)',
+                             ('2026-09-28', json.dumps({'entries': {'points10': [{'name': 'Old season'}]}}), time.time(), time.time()))
+            store.db.commit()
+            assert service.cached('2026-09-28') is None
             first=await service.view('2026-09-28')
+            assert not first['ready']
             key=first['as_of'];task=service.tasks[key]
             service.ensure_build(key);assert service.tasks[key] is task
             await task

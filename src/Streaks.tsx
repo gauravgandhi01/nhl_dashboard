@@ -38,6 +38,7 @@ type Board = {
   entries: Entry[];
 };
 type Data = {
+  season_label?: string;
   scope: "league" | "tonight";
   boards: Board[];
   date: string;
@@ -179,18 +180,8 @@ function Leaderboard({
                       </Link>
                     ))}
                   </div>
-                  {(p.seasons.length > 1 || p.stale) && (
-                    <div className="streak-last-game">
-                      {p.seasons.length > 1 && (
-                        <span
-                          className="streak-crossover"
-                          title={p.seasons.join(", ")}
-                        >
-                          Across seasons
-                        </span>
-                      )}
-                      {p.stale && <span className="warning">Stale</span>}
-                    </div>
+                  {p.stale && (
+                    <div className="streak-last-game"><span className="warning">Stale</span></div>
                   )}
                 </div>
               </div>
@@ -209,7 +200,7 @@ function Leaderboard({
                   {p.value}
                   {p.lower_bound ? "+" : ""}
                 </strong>
-                {!lastTen && (
+                {(!lastTen || p.sample_size < 10) && (
                   <span>
                     {streak
                       ? board.id === "win_streak"
@@ -313,10 +304,11 @@ export function Streaks() {
         </div>
       ) : data ? (
         <>
+          <p className="footnote">{data.season_label || "Selected season"} regular season only. Last 10 uses up to 10 appearances.</p>
           {data.build.status === "building" && (
             <div className="loading-label" role="status">
               <RefreshCw size={14} className="spin" />
-              Building cross-season history {data.build.done}/
+              Building season history {data.build.done}/
               {data.build.total || "--"}
             </div>
           )}

@@ -1,13 +1,14 @@
-"""Cross-season regular-season form and streak leaderboards."""
+"""Single-season regular-season form and streak leaderboards."""
 import asyncio
 import json
 import time
 
-from .cache import Feed
 from .providers import TEAM_NAMES
 from .service import display_name, latest_sources, today_et
-from .stats import number, season_label
+from .stats import number, season_label, season_for_date, in_season
 from .players import seconds
+
+SNAPSHOT_VERSION = 2
 
 BOARDS = [
     ('points10', 'Points', 'Last 10 appearances', 'skater', 'points'),
@@ -21,11 +22,12 @@ BOARDS = [
 ]
 
 
-def normalize(rows, cutoff):
+def normalize(rows, cutoff, season=None):
+    season = season or season_for_date(cutoff)
     grouped = {}
     for r in rows:
         gid = r.get('gameId')
-        if str(gid)[4:6] != '02' or r.get('gameDate', '9999') >= cutoff or not seconds(r.get('toi')):
+        if not in_season(gid, season) or str(gid)[4:6] != '02' or r.get('gameDate', '9999') >= cutoff or not seconds(r.get('toi')):
             continue
         if gid in grouped and grouped[gid] != r:
             raise ValueError('Conflicting player-game records')
@@ -55,12 +57,6 @@ def metric(rows, key, complete):
         return None
     return {'value': sum(v < 2 for v in values) if key == 'low_ga10' else sum(values),
             'sample': sample, 'open': False}
-
-
-def needs_history(rows, kind):
-    relevant = [b[0] for b in BOARDS if b[3] == kind]
-    count = len([r for r in rows if r.get('gamesStarted') == 1]) if kind == 'goalie' else len(rows)
-    return count < 10 or any((metric(rows, key, False) or {}).get('open') for key in relevant)
 
 
 def entries_for(player, rows, complete):
@@ -102,7 +98,11 @@ class Streaks:
         await asyncio.gather(*self.tasks.values(), return_exceptions=True)
 
     def cached(self, cutoff):
-        return self.p.store.db.execute('SELECT body,fetched,attempted,error FROM streak_snapshots WHERE cutoff=?', (cutoff,)).fetchone()
+        row = self.p.store.db.execute('SELECT body,fetched,attempted,error FROM streak_snapshots WHERE cutoff=?', (cutoff,)).fetchone()
+        # Old snapshots may contain earlier seasons, including after a failed rebuild.
+        if row and row[0] and json.loads(row[0]).get('version') != SNAPSHOT_VERSION:
+            return (None, 0, row[2], row[3]) if row[3] else None
+        return row
 
     def ensure_build(self, cutoff):
         if cutoff in self.tasks and not self.tasks[cutoff].done():
@@ -115,58 +115,38 @@ class Streaks:
         self.tasks[cutoff] = asyncio.create_task(self.build(cutoff))
 
     async def history(self, player, season, cutoff):
-        feeds, rows, pending, visited = [], [], [season], set()
-        complete = False
-        while pending:
-            current = pending.pop(0)
-            if current in visited:
-                continue
-            visited.add(current)
-            feed = await self.p.nhl(f"player/{player['id']}/game-log/{current}/2", 21600)
-            feeds.append(feed)
-            data = feed.data
-            if data is None or data.get('seasonId') != current or data.get('gameTypeId') != 2:
-                return None, feeds
-            logs = data.get('gameLog')
-            manifest = data.get('playerStatsSeasons')
-            if logs is None and manifest == []:
-                logs = []
-            if not isinstance(logs, list):
-                return None, feeds
-            rows = normalize([*rows, *logs], cutoff)
-            if isinstance(manifest, list):
-                older = sorted({r['season'] for r in manifest if r.get('season', current) < current
-                                and 2 in r.get('gameTypes', [])}, reverse=True)
-                pending = [s for s in older if s not in visited]
-                complete = not pending
-            else:
-                # Do not assert an exact streak when the provider omits career coverage.
-                pending = []
-            if not needs_history(rows, player['kind']):
-                break
+        feed = await self.p.nhl(f"player/{player['id']}/game-log/{season}/2", 21600)
+        data = feed.data
+        if data is None or data.get('seasonId') != season or data.get('gameTypeId') != 2:
+            return None, [feed]
+        logs = data.get('gameLog')
+        if logs is None and data.get('playerStatsSeasons') == []:
+            logs = []
+        if not isinstance(logs, list):
+            return None, [feed]
+        rows = normalize(logs, cutoff, season)
         self.p.store.save_games('nhl_streak_' + player['kind'], season,
                                 [{**r, 'playerId': player['id']} for r in rows], 'playerId')
-        return entries_for(player, rows, complete), feeds
+        # The season boundary ends the sample, even when the streak remains active.
+        return entries_for(player, rows, True), [feed]
 
     async def build(self, cutoff):
         progress = self.progress[cutoff]
         now = time.time()
         try:
-            year = int(cutoff[:4]) - (int(cutoff[5:7]) < 7)
-            season = year * 10000 + year + 1
+            season = season_for_date(cutoff)
             sources = []
             inventory = {}
-            # Inventory limits leaders to current-roster players with recent NHL activity.
+            # Only roster players with activity in this season need game-log requests.
             for kind in ['skater', 'goalie']:
-                feeds = await asyncio.gather(*(self.p.stats(f'{kind}/summary', s,
-                            f" and gameDate<'{cutoff}'", is_game=False) for s in [season, season - 10001]))
-                sources.extend(feeds)
-                if any(f.data is None for f in feeds):
+                feed = await self.p.stats(f'{kind}/summary', season,
+                                         f" and gameDate<'{cutoff}'", is_game=False)
+                sources.append(feed)
+                if feed.data is None:
                     raise ValueError('Player inventory unavailable')
-                for s, feed in zip([season, season - 10001], feeds):
-                    for r in feed.data:
-                        if (number(r.get('gamesPlayed')) or 0) > 0:
-                            inventory.setdefault((kind, r['playerId']), s)
+                for r in feed.data:
+                    if (number(r.get('gamesPlayed')) or 0) > 0:
+                        inventory[(kind, r['playerId'])] = season
             teams = sorted(TEAM_NAMES)
             roster_feeds = await asyncio.gather(*(self.p.nhl(f'roster/{a}/current', 3600) for a in teams))
             sources.extend(roster_feeds)
@@ -202,7 +182,7 @@ class Streaks:
                     progress['done'] += 1
             await asyncio.gather(*(collect(p) for p in players))
             partial = skipped > 0 or any(f.data is None or f.stale for f in sources) or any(len(v) != 1 for v in identities.values())
-            body = {'entries': results, 'sources': latest_sources(sources), 'partial': partial,
+            body = {'version': SNAPSHOT_VERSION, 'season': season, 'entries': results, 'sources': latest_sources(sources), 'partial': partial,
                     'eligible_players': len(players), 'skipped_players': skipped,
                     'ambiguous_players': sum(len(v) != 1 for v in identities.values()),
                     'roster_coverage': sum(f.data is not None for f in roster_feeds), 'roster_total': len(teams)}
@@ -238,7 +218,7 @@ class Streaks:
             boards.append({'id': key, 'title': title, 'period': period, 'kind': kind,
                            'entries': [{**e, 'matchups': opponents.get(e['team'], [])} for e in top_ten(eligible)]})
         from datetime import datetime, timezone
-        return {'date': date, 'as_of': cutoff, 'scope': scope, 'boards': boards,
+        return {'date': date, 'season_label': season_label(season_for_date(cutoff)), 'as_of': cutoff, 'scope': scope, 'boards': boards,
                 'build': self.progress.get(cutoff, {'status': 'ready', 'done': 0, 'total': 0}),
                 'retrieved_at': datetime.fromtimestamp(row[1], timezone.utc).isoformat() if row and row[1] else None,
                 'stale': bool(row and row[0] and (row[3] or time.time() - row[1] >= 21600)),

@@ -8,7 +8,7 @@ from datetime import date as Date, timedelta
 
 from .first_period_stats import VERSION, team_games, extract_goalies, windows, summarize, WINDOWS
 from .service import today_et, game_info, display_name, latest_sources
-from .stats import season_label, match_player
+from .stats import season_label, match_player, in_season
 
 
 class FirstPeriod:
@@ -31,7 +31,8 @@ class FirstPeriod:
             if memo and time.monotonic() - memo[0] < 600:
                 return memo[1]
             feed = await self.p.stats('team/goalsbyperiod', season)
-            games, rejected = team_games(feed.data or [], today_et())
+            rows = [r for r in feed.data or [] if in_season(r.get('gameId'), season)]
+            games, rejected = team_games(rows, today_et())
             self.p.store.save_games(f'nhl_first_period_v{VERSION}', season,
                                     [{'gameId': g['gameId'], 'date': g['date'], **g[side]}
                                      for g in games for side in ['away', 'home']], 'id')
@@ -120,15 +121,7 @@ class FirstPeriod:
         cutoff = min(date, today_et())
         feed, season_games, rejected = await self.dataset(season)
         sources.append(feed)
-        # A missing period feed is not evidence that a season has not started.
         stats_season = season
-        if feed.data is not None and not any(g['date'] < cutoff for g in season_games):
-            league = await self.p.stats('team/summary', season, f" and gameDate<'{cutoff}'", is_game=False)
-            sources.append(league)
-            if league.data == []:
-                stats_season -= 10001
-                feed, season_games, rejected = await self.dataset(stats_season)
-                sources.append(feed)
         self.ensure_build(stats_season, season_games)
         games = [g for g in season_games if g['date'] < cutoff]
         saved = self.saved(stats_season)
@@ -196,7 +189,7 @@ class FirstPeriod:
                      'windows': team_windows[t['id']], 'playing': t['abbrev'] in abbreviations} for t in ranked]
         progress = self.progress.get(stats_season, {'status': 'ready', 'done': 0, 'total': 0, 'error': None})
         return {'date': date, 'window': window, 'season': stats_season, 'season_label': season_label(stats_season),
-                'previous_season': stats_season != season, 'as_of': cutoff, 'matchups': comparisons,
+                'previous_season': False, 'as_of': cutoff, 'matchups': comparisons,
                 'rankings': rankings, 'league_goalies': league_goalies, 'build': dict(progress),
                 'coverage': {'games': len(games), 'goalie_games': covered, 'incomplete_games': incomplete,
                              'stale_games': stale, 'rejected_team_games': rejected},

@@ -2,7 +2,9 @@ import { test, expect } from "@playwright/test";
 
 test("first-period cards, windows, goalie inspection, rankings and desktop/mobile navigation", async ({
   page,
+  request,
 }) => {
+  const data = await (await request.get("/api/first-period?date=2026-09-26")).json();
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   const posts: string[] = [];
@@ -26,7 +28,7 @@ test("first-period cards, windows, goalie inspection, rankings and desktop/mobil
     await expect(page.locator(".fp-card").first()).toContainText(
       "Roster leader",
     );
-    await expect(page.locator(".fp-rankings tbody tr")).toHaveCount(32);
+    await expect(page.locator(".fp-rankings tbody tr")).toHaveCount(data.rankings.length);
     await page.getByRole("button", { name: "L5 2+ %", exact: true }).click();
     await expect(page.locator('th[aria-sort="descending"]')).toContainText(
       "L5",

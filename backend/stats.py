@@ -118,8 +118,13 @@ def card_goalie(starter, roster, rows, advanced):
             'advanced_games': len(samples)}
 
 
-def choose_season(requested, completed_rows):
-    return requested if completed_rows else requested - 10001
+def season_for_date(value):
+    year = int(value[:4]) - (int(value[5:7]) < 7)
+    return year * 10000 + year + 1
+
+
+def in_season(game_id, season):
+    return str(game_id)[:4] == str(season)[:4]
 
 
 def rest_context(games, selected):

@@ -1,7 +1,7 @@
 import pytest
 
 from backend.providers import parse_goalies, parse_lineups, parse_mp_teams, starter_for
-from backend.stats import advanced_summary, choose_season, goalie_summary, match_player, recent, rest_context, team_summary
+from backend.stats import advanced_summary, season_for_date, goalie_summary, match_player, recent, rest_context, team_summary
 from backend.stats import card_goalie, card_team_stats, last_five
 
 
@@ -54,8 +54,9 @@ def test_last_ten_and_incomplete_samples():
 
 
 def test_season_rollover_and_preseason():
-    assert choose_season(20262027, []) == 20252026
-    assert choose_season(20262027, [{'gamesPlayed': 1}]) == 20262027
+    assert season_for_date("2026-10-02") == 20262027
+    assert season_for_date("2027-01-01") == 20262027
+    assert season_for_date("2026-07-01") == 20262027
 
 
 def test_identity_never_guesses_duplicate_names():

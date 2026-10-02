@@ -104,23 +104,24 @@ class Fake:
         elif path.startswith('roster'):
             data = {'forwards': [{'id': 1, 'firstName': {'default': 'Test'}, 'lastName': {'default': 'Skater'}, 'positionCode': 'C'}], 'goalies': [{'id': 2}]}
         else:
-            assert '/20252026/2' in path or self.league_missing
+            assert '/20262027/2' in path
             data = {'gameLog': logs()}
         return Feed(data, 'NHL', path, '2026-09-26T00:00:00Z')
 
     async def stats(self, *args, **kwargs):
-        return Feed(None if self.league_missing else [], 'NHL', 'stats')
+        raise AssertionError('No league-wide request needed to select a season')
 
-    async def mp(self, *args):
+    async def mp(self, kind, season):
+        assert season == 20262027
         return Feed(None, 'MoneyPuck', 'mp')
 
 
-def test_service_fallback_ids_and_isolated_provider_failure():
+def test_service_current_season_ids_and_isolated_provider_failure():
     result = asyncio.run(players_dashboard(Fake(), '2026-09-26'))
-    assert result['periods'] == [{'season_label': '2025-26', 'previous_season': True}]
+    assert result['periods'] == [{'season_label': '2026-27', 'previous_season': False}]
     assert len(result['players']) == 2
     assert result['players'][0]['id'] == 1
-    assert result['players'][0]['windows']['season']['games'] == 12
+    assert result['players'][0]['windows']['season']['games'] == 0
     assert result['players'][0]['windows']['season']['attempts60'] is None
     assert result['players'][0]['opponent_logo'] is None
     assert result['players'][0]['advanced_source']['status'] == 'unavailable'
@@ -161,5 +162,12 @@ def test_dashboard_snapshot_cache_reuses_built_payload(tmp_path):
         assert first['players'] == second['players']
         assert first['cache_status'] == 'fresh'
         assert second['cache_status'] == 'cached'
+        import json
+        legacy = {**first, 'version': 1, 'periods': [{'season_label': '2025-26', 'previous_season': True}]}
+        fake.store.db.execute('UPDATE player_dashboards SET body=?', (json.dumps(legacy),))
+        fake.store.db.commit()
+        rebuilt = await players_dashboard(fake, '2026-09-26')
+        assert fake.score_calls == 2
+        assert rebuilt['periods'][0]['season_label'] == '2026-27'
         await fake.store.close()
     asyncio.run(scenario())

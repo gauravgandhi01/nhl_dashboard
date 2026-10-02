@@ -8,9 +8,10 @@ from datetime import datetime, timezone
 
 from .cache import Feed
 from .service import display_name, game_info, latest_sources, today_et
-from .stats import number, season_label
+from .stats import number, season_label, season_for_date, in_season
 
 PLAYERS_TTL = 3600
+SNAPSHOT_VERSION = 2
 
 
 def seconds(value):
@@ -30,10 +31,11 @@ def divide(value, denominator, scale=1):
     return value * scale / denominator if value is not None and denominator else None
 
 
-def player_windows(logs, advanced, cutoff):
+def player_windows(logs, advanced, cutoff, season=None):
+    season = season or season_for_date(cutoff)
     # Match by NHL player/game IDs; window membership always comes from NHL appearances.
     games = sorted({r['gameId']: r for r in logs or []
-                    if r.get('gameDate', '9999') < cutoff and seconds(r.get('toi'))
+                    if in_season(r.get('gameId'), season) and r.get('gameDate', '9999') < cutoff and seconds(r.get('toi'))
                     and str(r.get('gameId', ''))[4:6] == '02'}.values(),
                    key=lambda r: (r['gameDate'], r['gameId']), reverse=True)
     mp = defaultdict(list)
@@ -75,7 +77,7 @@ async def players_dashboard(p, date):
         )''')
         p.store.db.commit()
         row = p.store.db.execute('SELECT body,fetched,error FROM player_dashboards WHERE date=?', (date,)).fetchone()
-        if row and row[0] and now - row[1] < PLAYERS_TTL:
+        if row and row[0] and now - row[1] < PLAYERS_TTL and json.loads(row[0]).get('version') == SNAPSHOT_VERSION:
             body = json.loads(row[0])
             body['retrieved_at'] = datetime.fromtimestamp(row[1], timezone.utc).isoformat()
             body['cache_status'] = 'cached'
@@ -84,7 +86,7 @@ async def players_dashboard(p, date):
         cache_enabled = False
     scores = await p.nhl(f'score/{date}', 600)
     sources = [scores]
-    result = {'date': date, 'players': [], 'games': [], 'periods': [], 'sources': [], 'error': None}
+    result = {'version': SNAPSHOT_VERSION, 'date': date, 'players': [], 'games': [], 'periods': [], 'sources': [], 'error': None}
     if scores.data is None or not isinstance(scores.data.get('games'), list):
         result['error'] = 'The NHL schedule is unavailable.'
         result['sources'] = latest_sources(sources)
@@ -94,11 +96,8 @@ async def players_dashboard(p, date):
     result['games'] = [game_info(g, []) for g in games]
     cutoff = min(date, today_et())
     for season in sorted({int(g['season']) for g in games}):
-        league = await p.stats('team/summary', season, f" and gameDate<'{cutoff}'", is_game=False)
-        sources.append(league)
-        no_games = league.data is not None and not any((number(r.get('gamesPlayed')) or 0) > 0 for r in league.data)
-        stats_season = season - 10001 if no_games else season
-        result['periods'].append({'season_label': season_label(stats_season), 'previous_season': season != stats_season})
+        stats_season = season
+        result['periods'].append({'season_label': season_label(season), 'previous_season': False})
         advanced = await p.mp('skaters', stats_season)
         sources.append(advanced)
         by_id = defaultdict(list)
@@ -120,7 +119,7 @@ async def players_dashboard(p, date):
         summaries = {}
         for pid, feed in logs.items():
             rows = feed.data['gameLog'] if feed.data is not None else None
-            summaries[pid] = player_windows(rows, by_id[pid] if advanced.data is not None else None, cutoff)
+            summaries[pid] = player_windows(rows, by_id[pid] if advanced.data is not None else None, cutoff, season)
             p.store.save_games('nhl_skater', stats_season, [{**r, 'playerId': pid} for r in rows or []], 'playerId')
         for game in games:
             if int(game['season']) != season:

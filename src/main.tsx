@@ -409,7 +409,7 @@ function CardStats({
       </div>
       <div className="card-season">
         {comparison
-          ? `${comparison.season_label} regular season${comparison.previous_season ? " / Prior season" : ""}`
+          ? `${comparison.season_label} regular season`
           : "Statistics unavailable"}
       </div>
       <CardMetric
@@ -1341,7 +1341,6 @@ function Matchup() {
           <div className="data-context">
             <span>
               {data.season_label} regular season
-              {data.previous_season ? " / Previous-season baseline" : ""}
             </span>
             <span>
               {window === "last10"

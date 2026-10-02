@@ -104,12 +104,20 @@ test("top-ten streak boards, slate filter, mobile layout and preserved dates", a
   expect(errors).toEqual([]);
 });
 
-test("streaks cross-season, partial, empty slate and failed provider states", async ({
+test("streaks current-season, partial, empty slate and failed provider states", async ({
   page,
   request,
 }) => {
   const data = await (await request.get("/api/streaks?date=2026-09-28")).json();
-  data.boards[0].entries[0].seasons = ["2025-26", "2026-27"];
+  data.season_label = "2026-27";
+  data.ready = true;
+  data.build.status = "ready";
+  data.boards[0].entries = [{
+    id: 1, name: "Test Skater", team: "CAR", position: "C", logo: "",
+    rank: 1, value: 3, sample_size: 2, lower_bound: false,
+    latest_game: "2026-10-01", start_date: "2026-09-30", end_date: "2026-10-01",
+    seasons: ["2026-27"], stale: false, recent: [], matchups: [],
+  }];
   data.coverage.partial = true;
   data.coverage.skipped_players = 1;
   await page.route("**/api/streaks?*", (r) =>
@@ -122,8 +130,10 @@ test("streaks cross-season, partial, empty slate and failed provider states", as
   );
   await page.goto("/streaks?date=2026-09-28");
   await expect(
-    page.getByText("Across seasons", { exact: true }).first(),
-  ).toBeVisible();
+    page.getByText("Across seasons", { exact: true }),
+  ).toHaveCount(0);
+  await expect(page.getByText(/2026-27 regular season only/)).toBeVisible();
+  await expect(page.locator(".streak-row").first()).toContainText("2 GP");
   await expect(page.getByText(/leaderboard history is incomplete/)).toBeVisible();
   data.boards.forEach((b: { entries: unknown[] }) => (b.entries = []));
   await page.getByRole("button", { name: "League-wide", exact: true }).click();

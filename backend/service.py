@@ -6,9 +6,9 @@ from zoneinfo import ZoneInfo
 
 from .cache import Feed
 from .player_identity import resolve_player
-from .signals import career_nhl_games, matchup_signals
+from .signals import matchup_signals
 from .providers import ALIASES, TEAM_NAMES, Providers, starter_for
-from .stats import (advanced_summary, choose_season, goalie_summary, match_player, normalized_name,
+from .stats import (advanced_summary, in_season, season_for_date, goalie_summary, match_player, normalized_name,
                     number, recent, rest_context, season_label, team_summary, card_team_stats, last_five, card_goalie)
 
 
@@ -49,9 +49,10 @@ def average(values):
     return sum(values) / len(values) if values else None
 
 
-def lineup_usage_windows(logs, advanced, cutoff):
+def lineup_usage_windows(logs, advanced, cutoff, season=None):
+    season = season or season_for_date(cutoff)
     games = sorted({r['gameId']: r for r in logs or []
-                    if r.get('gameDate', '9999') < cutoff and clock_seconds(r.get('toi'))
+                    if in_season(r.get('gameId'), season) and r.get('gameDate', '9999') < cutoff and clock_seconds(r.get('toi'))
                     and str(r.get('gameId', ''))[4:6] == '02'}.values(),
                    key=lambda r: (r['gameDate'], r['gameId']), reverse=True)
     mp_5v5 = {}
@@ -88,11 +89,7 @@ class Dashboard:
         for season in sorted({int(g['season']) for g in games}):
             league = await self.p.stats('team/summary', season, is_game=False)
             sources.append(league)
-            completed = [r for r in league.data or [] if (number(r.get('gamesPlayed')) or 0) > 0]
-            stats_season = choose_season(season, completed) if league.data is not None else season
-            if stats_season != season:
-                league = await self.p.stats('team/summary', stats_season, is_game=False)
-                sources.append(league)
+            stats_season = season
             goalie_stats, mp_teams, mp_goalies = await asyncio.gather(
                 self.p.stats('goalie/summary', stats_season, is_game=False),
                 self.p.mp('teams', stats_season),
@@ -100,53 +97,27 @@ class Dashboard:
             sources.extend([goalie_stats, mp_teams, mp_goalies])
             teams = {g[side]['id']: g[side] for g in games if int(g['season']) == season for side in ['awayTeam', 'homeTeam']}
             async def team_context(team):
-                roster, schedule, signal_schedule = await asyncio.gather(self.p.nhl(f"roster/{team['abbrev']}/current", 3600),
-                                                        self.p.nhl(f"club-schedule-season/{team['abbrev']}/{stats_season}", 21600),
-                                                        self.p.nhl(f"club-schedule-season/{team['abbrev']}/{season}", 600))
-                return roster, schedule, signal_schedule
+                return await asyncio.gather(self.p.nhl(f"roster/{team['abbrev']}/current", 3600),
+                                            self.p.nhl(f"club-schedule-season/{team['abbrev']}/{season}", 600))
             contexts = dict(zip(teams, await asyncio.gather(*(team_context(t) for t in teams.values()))))
-            for roster, schedule, signal_schedule in contexts.values():
-                sources.extend([roster, schedule, signal_schedule])
-            confirmed_ids = {}
-            if not goalies.stale:
-                for game in games:
-                    if int(game['season']) != season:
-                        continue
-                    for side, starter in starter_for(game, goalies.data).items():
-                        if starter.get('status') != 'Confirmed':
-                            continue
-                        roster = contexts[game[side + 'Team']['id']][0]
-                        if roster.stale:
-                            continue
-                        candidates = [{'id': p['id'], 'name': f"{display_name(p.get('firstName'))} {display_name(p.get('lastName'))}"}
-                                      for p in (roster.data or {}).get('goalies', [])]
-                        player_id = match_player(starter.get('name'), candidates)
-                        if player_id is not None:
-                            confirmed_ids[(game['id'], side)] = player_id
-            player_ids = sorted(set(confirmed_ids.values()))
-            career_feeds = dict(zip(player_ids, await asyncio.gather(*(
-                self.p.nhl(f'player/{pid}/landing', 3600) for pid in player_ids))))
-            sources.extend(career_feeds.values())
+            for roster, schedule in contexts.values():
+                sources.extend([roster, schedule])
             by_team = {r['teamId']: r for r in league.data or []}
             for game in games:
                 if int(game['season']) != season:
                     continue
                 starters = starter_for(game, goalies.data)
-                comparison = {'season_label': season_label(stats_season), 'previous_season': stats_season != season}
+                comparison = {'season_label': season_label(stats_season), 'previous_season': False}
                 for side in ['away', 'home']:
                     tid = game[side + 'Team']['id']
-                    roster, schedule, signal_schedule = contexts[tid]
-                    player_id = confirmed_ids.get((game['id'], side))
-                    career = career_feeds.get(player_id)
-                    career_gp = career_nhl_games(career.data) if career and not career.stale and career.data and career.data.get('playerId') == player_id else None
+                    roster, schedule = contexts[tid]
                     advanced = [r for r in mp_teams.data or [] if ALIASES.get(r['team'], r['team']) == game[side + 'Team']['abbrev']]
                     comparison[side] = {'summary': card_team_stats(by_team.get(tid)),
                                         'advanced': advanced_summary(advanced),
                                         'form': last_five((schedule.data or {}).get('games', []), tid),
                                         'goalie': card_goalie(starters[side], (roster.data or {}).get('goalies', []),
                                                               goalie_stats.data or [], mp_goalies.data or []),
-                                        'signals': matchup_signals(game, tid, (signal_schedule.data or {}).get('games', []) if not signal_schedule.stale else [],
-                                                                   starters[side], career_gp)}
+                                        'signals': matchup_signals(game, tid, (schedule.data or {}).get('games', []) if not schedule.stale else [])}
                 comparisons[str(game['id'])] = comparison
         return {'date': date, 'games': [game_info(g, goalies.data) for g in games],
                 'comparisons': comparisons, 'sources': latest_sources(sources), 'error': None}
@@ -157,10 +128,8 @@ class Dashboard:
             return None
         game = landing.data
         season = int(game['season'])
-        league, goalies, injuries = await asyncio.gather(self.p.stats('team/summary', season, is_game=False),
-                                                       self.p.goalies(game['gameDate']), self.p.injuries())
-        completed = [r for r in (league.data or []) if (number(r.get('gamesPlayed')) or 0) > 0]
-        stats_season = choose_season(season, completed) if league.data is not None else season
+        goalies, injuries = await asyncio.gather(self.p.goalies(game['gameDate']), self.p.injuries())
+        stats_season = season
         mp_teams, mp_goalies, skater_totals, mp_skaters = await asyncio.gather(
             self.p.mp('teams', stats_season), self.p.mp('goalies', stats_season),
             self.p.mp('skaters', stats_season),
@@ -170,22 +139,22 @@ class Dashboard:
         sides = await asyncio.gather(*[self.team(game, side, stats_season, window, mp_teams, mp_goalies, mp_skaters,
                                                 skater_totals, injuries, info[side]['starter']) for side in ['away', 'home']])
         return {'game': info, 'season': stats_season, 'season_label': season_label(stats_season),
-                'previous_season': stats_season != season, 'window': window, 'as_of': today_et(),
+                'previous_season': False, 'window': window, 'as_of': today_et(),
                 'away': sides[0][0], 'home': sides[1][0],
-                'sources': latest_sources([landing, league, goalies, mp_teams, mp_goalies, mp_skaters, skater_totals, injuries,
+                'sources': latest_sources([landing, goalies, mp_teams, mp_goalies, mp_skaters, skater_totals, injuries,
                                             *sides[0][1], *sides[1][1]])}
 
     async def team(self, game, side, season, window, mp_teams, mp_goalies, mp_skaters, skaters, injuries, starter):
         raw_team = game[side + 'Team']
         abbrev, tid = raw_team['abbrev'], raw_team['id']
-        summary, pp, pk, roster, schedule, lineup, stat_schedule = await asyncio.gather(
+        summary, pp, pk, roster, schedule, lineup = await asyncio.gather(
             self.p.stats('team/summary', season, f' and teamId={tid}'),
             self.p.stats('team/powerplay', season, f' and teamId={tid}'),
             self.p.stats('team/penaltykill', season, f' and teamId={tid}'),
             self.p.nhl(f'roster/{abbrev}/current', 3600),
-            self.p.nhl(f'club-schedule-season/{abbrev}/{game["season"]}', 600), self.p.lineup(abbrev),
-            self.p.nhl(f'club-schedule-season/{abbrev}/{season}', 600))
-        sources = [summary, pp, pk, roster, schedule, lineup, stat_schedule]
+            self.p.nhl(f'club-schedule-season/{abbrev}/{season}', 600), self.p.lineup(abbrev))
+        stat_schedule = schedule
+        sources = [summary, pp, pk, roster, schedule, lineup]
         game_map = {r['id']: r for r in (stat_schedule.data or {}).get('games', [])}
         pp_map = {r['gameId']: r for r in pp.data or []}
         pk_map = {r['gameId']: r for r in pk.data or []}
@@ -225,7 +194,7 @@ class Dashboard:
             feed = log_feeds[player['id']]
             log_rows = feed.data.get('gameLog') if isinstance(feed.data, dict) and isinstance(feed.data.get('gameLog'), list) else None
             usage[str(player['id'])] = lineup_usage_windows(
-                log_rows, mp_by_player.get(player['id']) if mp_skaters.data is not None else None, cutoff)
+                log_rows, mp_by_player.get(player['id']) if mp_skaters.data is not None else None, cutoff, season)
         goalie_players = [p for p in players if p['position'] == 'G']
         goalie_feed = Feed(None, 'NHL Stats', 'https://api.nhle.com/stats/rest/en/goalie/summary', error='Goalie roster unavailable')
         if goalie_players:

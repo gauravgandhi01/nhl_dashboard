@@ -342,13 +342,6 @@ function PeriodCard({
             <strong>{m.game.home.abbrev}</strong>
           </div>
         </div>
-        <ComparisonRow
-          label="Sample GP"
-          a={a.games}
-          h={h.games}
-          digits={0}
-          neutral
-        />
         <ComparisonRow label="1P goals for / G" a={a.gf_pg} h={h.gf_pg} />
         <ComparisonRow
           label="1P goals against / G"
@@ -383,7 +376,7 @@ function PeriodCard({
           ))}
         </div>
         <ComparisonRow
-          label="Verified 1P GP"
+          label="GP"
           a={ag?.games}
           h={hg?.games}
           digits={0}
@@ -856,7 +849,6 @@ function PeriodContent({
             <div className="data-context">
               <span>
                 {data.season_label} regular season
-                {data.previous_season ? " / Previous-season baseline" : ""}
               </span>
             </div>
             {(data.build.status === "building" || data.build.error) && (
