@@ -32,7 +32,7 @@ class LineupData(BaseModel):
         if any(len(players) > 30 for players in sections.values()):
             raise ValueError('Too many players in a section')
         if not any(players for label, players in sections.items()
-                   if label in {'Forwards', 'Defensive Pairings'} or label.startswith(('Forward line ', 'Defense pair ')):
+                   if label in {'Forwards', 'Defensive Pairings'} or label.startswith(('Forward line ', 'Defense pair '))):
             raise ValueError('A lineup must include forwards or defense pairs')
         return sections
 

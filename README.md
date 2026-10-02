@@ -318,12 +318,22 @@ Optional build/runtime settings:
   The default is enabled.
 
 Daily Faceoff access can differ between your machine and the hosted server.
-If `robots.txt` cannot be retrieved, no lineup-page request is made. The app
+In direct mode, a failed `robots.txt` request is logged and the page fetch is
+still attempted; an explicit robots disallow prevents the fetch. The app
 retains a dated last-good projection when available; otherwise Lines shows an
 explicit NHL roster-only fallback, not inferred line assignments. Server logs
-identify the failing stage (`robots` or `page`) and HTTP status when available.
+identify the failing stage and HTTP status when available.
 The default `/tmp` database does not survive instance replacement; preserving
 last-good feeds across deployments requires a persistent mounted database path.
+
+If Render cannot fetch lineups, use the [laptop lineup uploader](docs/lineup-uploader.md).
+It collects all 32 teams locally and sends authenticated snapshots to Render
+every five minutes, without a GitHub commit or redeploy for each update.
+Set `NHL_DFO_LINEUP_MODE=uploaded` and a private `NHL_LINEUP_UPLOAD_TOKEN` on
+Render. Local fetching remains the default. Uploaded lineups are marked stale
+after 20 minutes and expire after 24 hours; the original source and collection
+timestamps are preserved. This transport covers team lines and power-play
+units; the separate starting-goalie confirmation feed retains its existing path.
 
 Player-prop failures are independent of lineup availability. Responses and logs
 distinguish roster/event validation, rejected credentials, provider errors, and
