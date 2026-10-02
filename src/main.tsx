@@ -993,11 +993,27 @@ function Roster({ side, season }: { side: Side; season: string }) {
   );
 }
 
+function LinePlayerHeading({ name, player }: { name: string; player?: Player }) {
+  return (
+    <div className="line-player-heading">
+      <strong title={name}>{name.replace(/^(\S+)\s+/, (_, first: string) => first[0] + ". ")}</strong>
+      <div className="line-scoring" role="group" aria-label="Season scoring totals" title="Season totals, all strengths">
+        {[["goals", "G", "Goals"], ["assists", "A", "Assists"], ["points", "P", "Points"]].map(([key, label, full]) => (
+          <span key={key} aria-label={`${full}: ${player?.stats?.[key] ?? "unavailable"}`}>
+            <b>{label}</b>{fmt(player?.stats?.[key], 0)}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Lineups({ side, props, gameId }: { side: Side; props: PropsState; gameId: number }) {
   const sections = Object.entries(side.lineup?.sections || {}).filter(
     ([name, players]) => !["Injuries", "Goalies"].includes(name) && players.length > 0,
   );
   const rosterSkaters = side.roster.filter((p) => p.position !== "G");
+  const rosterById = new Map(rosterSkaters.map(player => [player.id, player]));
   const [strength, setStrength] = useState<"all" | "5v5">("all");
   const hasFiveOnFive = Object.values(side.lineup_usage || {}).some(
     (usage) =>
@@ -1011,7 +1027,7 @@ function Lineups({ side, props, gameId }: { side: Side; props: PropsState; gameI
     for (const name of names) {
       const id = side.lineup_player_ids?.[name];
       if (id == null) continue;
-      const position = side.roster.find(player => player.id === id)?.position;
+      const position = rosterById.get(id)?.position;
       const group = position === "D" ? "defense"
         : ["C", "L", "R", "LW", "RW", "F"].includes(position || "") ? "forwards"
         : /defen/i.test(section) ? "defense"
@@ -1115,7 +1131,7 @@ function Lineups({ side, props, gameId }: { side: Side; props: PropsState; gameI
                     );
                     return (
                       <div className="line-player" key={p + i}>
-                        <strong title={p}>{p.replace(/^(\S+)\s+/, (_, first: string) => first[0] + ". ")}</strong>
+                        <LinePlayerHeading name={p} player={rosterById.get(side.lineup_player_ids?.[p] ?? -1)} />
                         {sharedReason ? <span className="line-usage-missing">{first}</span> : values.map((value, index) => (
                           <span key={index} className={typeof value === "string" ? "line-toi" : "line-usage-missing"}
                             {...(typeof value === "string" ? usageFormatting(p, usageWindows[index]) : {})}>
@@ -1153,7 +1169,7 @@ function Lineups({ side, props, gameId }: { side: Side; props: PropsState; gameI
           <div className="line-grid">
             {rosterSkaters.map((p) => (
               <div className="line-player" key={p.id}>
-                <strong title={p.name}>{p.name.replace(/^(\S+)\s+/, (_, first: string) => first[0] + ". ")}</strong>
+                <LinePlayerHeading name={p.name} player={p} />
                 <span>{p.position}</span>
                 <CompactProps state={props} gameId={gameId} playerId={p.id} overOnly />
               </div>

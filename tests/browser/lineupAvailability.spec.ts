@@ -43,7 +43,7 @@ test("lineup TOI follows NHL IDs across name variants and explains missing value
   const side = {
     team, summary: {}, advanced: {}, recent: [], rest: {},
     starter: { name: null, status: "Unconfirmed" }, goalies: [],
-    roster: [{ id: 8484210, name: "Gabe Perreault", position: "R", stats: {} }],
+    roster: [{ id: 8484210, name: "Gabe Perreault", position: "R", stats: { goals: 0, assists: 4, points: 4 } }],
     roster_source: source,
     lineup: { sections: {
       "Forward Line 1": ["Gabriel Perreault", "Unknown Skater", "New Rookie"],
@@ -74,6 +74,9 @@ test("lineup TOI follows NHL IDs across name variants and explains missing value
     const forward = player("Gabriel Perreault").first();
     const defense = player("Low Defender").first();
     await expect(forward).toContainText("16:20");
+    await expect(forward.locator(".line-scoring")).toContainText("G0A4P4");
+    await expect(player("Unknown Skater").locator(".line-scoring")).toContainText("G--A--P--");
+    await expect(player("Gabriel Perreault").nth(1).locator(".line-scoring")).toContainText("G0A4P4");
     await expect(forward.locator(".line-toi").nth(0)).toHaveCSS("background-color", "rgba(89, 190, 151, 0.26)");
     await expect(forward.locator(".line-toi").nth(2)).toHaveCSS("background-color", "rgba(222, 132, 145, 0.26)");
     await expect(defense.locator(".line-toi").nth(0)).toHaveCSS("background-color", "rgba(222, 132, 145, 0.26)");
@@ -87,6 +90,7 @@ test("lineup TOI follows NHL IDs across name variants and explains missing value
     await expect(player("Unavailable Log")).toContainText("NHL unavailable");
     await page.getByRole("button", { name: "5v5 TOI", exact: true }).click();
     await expect(forward).toContainText("13:20");
+    await expect(forward.locator(".line-scoring")).toContainText("G0A4P4");
     // A single available forward is neutral; defense uses its own 5v5 range.
     await expect(forward.locator(".line-toi").nth(0)).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
     await expect(defense.locator(".line-toi").nth(0)).toHaveCSS("background-color", "rgba(89, 190, 151, 0.26)");

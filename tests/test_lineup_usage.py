@@ -62,3 +62,54 @@ def test_team_usage_uses_nhl_ids_for_provider_aliases():
         assert team['lineup_usage']['8484210']['season'] == 980
         assert team['lineup_usage']['8484210']['l5_5v5'] == 800
     asyncio.run(run())
+
+
+def test_matchup_routes_nhl_scoring_and_moneypuck_usage_to_correct_fields():
+    from unittest.mock import Mock
+
+    class Fake:
+        store = Mock()
+
+        async def nhl(self, path, *args):
+            if path.startswith('gamecenter/'):
+                data = {'id': 2026020002, 'season': 20262027, 'gameDate': '2026-10-02',
+                        'awayTeam': {'id': 3, 'abbrev': 'NYR'}, 'homeTeam': {'id': 6, 'abbrev': 'BOS'}}
+            elif path.startswith('roster/'):
+                data = {'forwards': [{'id': 8484210, 'firstName': {'default': 'Gabe'},
+                                      'lastName': {'default': 'Perreault'}, 'positionCode': 'R'}]}
+            elif path.startswith('player/'):
+                data = {'gameLog': [{'gameId': 2026020001, 'gameDate': '2026-10-01', 'toi': '16:20'}]}
+            else:
+                data = {'games': []}
+            return Feed(data, 'NHL', path)
+
+        async def stats(self, report, *args, **kwargs):
+            rows = [{'playerId': 8484210, 'gamesPlayed': 1, 'goals': 0, 'assists': 2,
+                     'points': 2, 'shots': 3, 'timeOnIcePerGame': 980}] if report == 'skater/summary' else []
+            return Feed(rows, 'NHL Stats', report)
+
+        async def mp(self, kind, season):
+            rows = [{'playerId': '8484210', 'gameId': '2026020001', 'situation': '5on5',
+                     'icetime': 800, 'I_F_goals': 0, 'I_F_points': 1}] if kind == 'skaters' else []
+            return Feed(rows, 'MoneyPuck', kind)
+
+        async def goalies(self, *args):
+            return Feed([], 'DFO', 'goalies')
+
+        async def injuries(self):
+            return Feed({}, 'ESPN', 'injuries')
+
+        async def lineup(self, *args):
+            return Feed({'sections': {'Forward Line 1': ['Gabriel Perreault']}}, 'DFO', 'lines')
+
+    async def run():
+        for window in ['season', 'last10']:
+            result = await Dashboard(Fake()).matchup(2026020002, window)
+            for side in ['away', 'home']:
+                player = result[side]['roster'][0]
+                assert player['stats']['goals'] == 0
+                assert player['stats']['assists'] == 2
+                assert player['stats']['points'] == 2
+                assert result[side]['lineup_player_ids']['Gabriel Perreault'] == player['id']
+                assert result[side]['lineup_usage'][str(player['id'])]['l5_5v5'] == 800
+    asyncio.run(run())

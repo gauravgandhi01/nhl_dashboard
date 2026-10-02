@@ -130,7 +130,7 @@ class Dashboard:
         season = int(game['season'])
         goalies, injuries = await asyncio.gather(self.p.goalies(game['gameDate']), self.p.injuries())
         stats_season = season
-        mp_teams, mp_goalies, skater_totals, mp_skaters = await asyncio.gather(
+        mp_teams, mp_goalies, mp_skaters, skater_totals = await asyncio.gather(
             self.p.mp('teams', stats_season), self.p.mp('goalies', stats_season),
             self.p.mp('skaters', stats_season),
             self.p.stats('skater/summary', stats_season, is_game=False))

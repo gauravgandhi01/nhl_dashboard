@@ -18,6 +18,7 @@ from .streaks import Streaks
 from .moneyline import Moneylines
 from .player_props import PlayerProps
 from .runtime_db import database_path
+from .lineup_uploads import router as lineup_upload_router
 
 ROOT = Path(__file__).resolve().parents[1]
 FALSE_VALUES = {'0', 'false', 'no', 'off', 'disabled'}
@@ -38,6 +39,8 @@ def odds_refresh_payload(payload):
 
 @asynccontextmanager
 async def lifespan(app):
+    if os.environ.get('NHL_DFO_LINEUP_MODE', 'direct') not in {'direct', 'uploaded'}:
+        raise RuntimeError('NHL_DFO_LINEUP_MODE must be direct or uploaded')
     store = Store(database_path(ROOT))
     providers = Providers(store)
     app.state.dashboard = Dashboard(providers)
@@ -53,6 +56,7 @@ async def lifespan(app):
 
 
 app = FastAPI(title='NHL Matchup Dashboard', lifespan=lifespan)
+app.include_router(lineup_upload_router)
 
 
 @app.get('/api/health')

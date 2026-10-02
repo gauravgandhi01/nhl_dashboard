@@ -290,6 +290,9 @@ class Providers:
         if not name:
             return Feed(None, 'Daily Faceoff', DFO, error='Team mapping unavailable')
         slug = name.lower().replace(' ', '-')
+        if os.environ.get('NHL_DFO_LINEUP_MODE', 'direct') == 'uploaded':
+            from .lineup_uploads import uploaded_lineup
+            return uploaded_lineup(self.store, abbrev, f'{DFO}/teams/{slug}/line-combinations')
         ttl = self.dfo_fast_ttl()
         return await self.dfo(f'/teams/{slug}/line-combinations', parse_lineups, ttl)
 

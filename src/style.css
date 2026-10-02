@@ -2129,3 +2129,9 @@ tr:hover td {
 .card-record { font: 9px var(--mono); color: var(--muted); white-space: nowrap; }
 .card-team .team-moneyline { display: flex; align-items: baseline; justify-content: center; gap: 4px; margin: 0 0 5px; }
 .card-team .team-moneyline small { font-size: 7px; }
+
+.line-player-heading { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 3px 6px; }
+.line-player-heading > strong { flex: 1 1 70px; min-width: 0; }
+.line-scoring { display: flex; gap: 5px; margin-left: auto; }
+.line-scoring > span { display: inline-flex; align-items: baseline; gap: 2px; font-size: 9px; font-variant-numeric: tabular-nums; }
+.line-scoring b { font-size: 8px; }
