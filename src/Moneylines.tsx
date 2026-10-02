@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshButton } from "./RefreshButton";
 import type { Game } from "./types";
 
 type Price = {
@@ -95,17 +95,12 @@ export function MoneylineControls({
     .join(" / ");
   if (!data?.manual_refresh_enabled) return null;
   return (
-    <div className="moneyline-controls">
-      <button
-        className="icon-button compact-icon"
-        onClick={odds.load}
-        disabled={busy}
-        title={details ? `Refresh moneylines / ${details}` : "Refresh moneylines"}
-        aria-label="Refresh moneylines"
-      >
-        <RefreshCw size={13} className={busy ? "spin" : ""} />
-      </button>
-    </div>
+    <RefreshButton
+      label="Moneylines"
+      description={`Fetch latest moneylines for all games on this date. Uses odds API credits.${details ? ` ${details}` : ""}`}
+      busy={busy}
+      onClick={odds.load}
+    />
   );
 }
 

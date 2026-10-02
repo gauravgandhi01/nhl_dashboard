@@ -1,3 +1,4 @@
+import { RefreshButton } from "./RefreshButton";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
@@ -9,7 +10,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import type { Source } from "./types";
-import { usePlayerProps, PropsControls, CompactProps, type PropsState } from "./PlayerProps";
+import { usePlayerProps, PropsControls, PropsRefreshButton, CompactProps, type PropsState } from "./PlayerProps";
 import { todayEt } from "./dates";
 
 type Entry = {
@@ -286,15 +287,12 @@ export function Streaks() {
             On slate
           </button>
         </div>
-        <button
-          className="icon-button"
-          title="Refresh streaks"
-          aria-label="Refresh streaks"
-          disabled={busy}
-          onClick={refresh}
-        >
-          <RefreshCw size={15} className={busy ? "spin" : ""} />
-        </button>
+        <div className="toolbar-right refresh-actions" role="group" aria-label="Refresh data">
+          <RefreshButton label="Stats" ariaLabel="Refresh streaks"
+            description="Reload streak leaderboards for this date and scope. Cached history rebuilds when due."
+            busy={busy} onClick={refresh} />
+          {scope === "tonight" && kind === "skater" && <PropsRefreshButton state={props} />}
+        </div>
       </div>
       {scope === "tonight" && kind === "skater" && <PropsControls state={props} />}
       {error ? (

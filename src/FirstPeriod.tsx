@@ -1,3 +1,4 @@
+import { RefreshButton } from "./RefreshButton";
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
@@ -801,37 +802,23 @@ function PeriodContent({
             </button>
           ))}
         </div>
-        <div className="toolbar-right">
-          <button
-            className="icon-button"
-            onClick={refresh}
-            disabled={busy}
-            title="Refresh first-period statistics"
-            aria-label="Refresh first-period statistics"
-          >
-            <RefreshCw size={15} className={busy ? "spin" : ""} />
-          </button>
+        <div className="toolbar-right refresh-actions" role="group" aria-label="Refresh data">
+          <RefreshButton label="Stats" ariaLabel="Refresh first-period statistics"
+            description="Reload first-period team and goalie stats. Cached sources refresh when due."
+            busy={busy} onClick={refresh} />
+          {odds?.manual_refresh_enabled && (
+            <RefreshButton label="1P odds" ariaLabel="Refresh first-period odds"
+              description="Fetch latest first-period odds for all games on this date. Uses odds API credits."
+              busy={oddsBusy} onClick={loadOdds} />
+          )}
         </div>
       </div>
-      {(oddsMeta || odds?.manual_refresh_enabled) && (
-      <div className="fp-odds-meta">
-        {oddsMeta && (
+      {oddsMeta && (
+        <div className="fp-odds-meta">
           <span className={oddsError || odds?.error ? "warning" : "muted"}>
             {oddsMeta}
           </span>
-        )}
-        {odds?.manual_refresh_enabled && (
-          <button
-            className="text-button"
-            onClick={loadOdds}
-            disabled={oddsBusy}
-            title="Refresh first-period odds"
-          >
-            <RefreshCw size={13} className={oddsBusy ? "spin" : ""} />
-            Refresh odds
-          </button>
-        )}
-      </div>
+        </div>
       )}
       {!data && !error ? (
         <div className="loading-label" role="status">

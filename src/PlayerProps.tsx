@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshButton } from "./RefreshButton";
 
 export type Quote = {
   side: string;
@@ -193,6 +193,17 @@ export function usePlayerProps(date: string, gameId?: number, enabled = true) {
   };
 }
 
+export function PropsRefreshButton({ state, gameId }: { state: PropsState; gameId?: number }) {
+  if (!state.data?.manual_refresh_enabled) return null;
+  return <RefreshButton
+    label="Player odds"
+    ariaLabel={gameId == null ? "Refresh slate player odds" : "Refresh game player odds"}
+    description={`Fetch latest player odds for ${gameId == null ? "all games on this date" : "this game"}. Uses odds API credits.`}
+    busy={state.busy}
+    onClick={() => state.load(gameId)}
+  />;
+}
+
 export function PropsControls({
   state,
   gameId,
@@ -220,21 +231,6 @@ export function PropsControls({
         <span className={status ? "warning" : "muted"} role="status">
           {message}
         </span>
-      )}
-      {state.data?.manual_refresh_enabled && (
-        <button
-          className="text-button"
-          onClick={() => state.load(gameId)}
-          disabled={state.busy}
-          title={
-            gameId == null
-              ? "Refresh slate player odds"
-              : "Refresh game player odds"
-          }
-        >
-          <RefreshCw size={13} className={state.busy ? "spin" : ""} />
-          Refresh odds
-        </button>
       )}
       {unmatched > 0 && (
         <span

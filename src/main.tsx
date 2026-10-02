@@ -33,10 +33,11 @@ import type {
   Team,
 } from "./types";
 import "./style.css";
+import { RefreshButton } from "./RefreshButton";
 import { Players } from "./Players";
 import { FirstPeriod } from "./FirstPeriod";
 import { Streaks } from "./Streaks";
-import { usePlayerProps, PropsControls, CompactProps, type PropsState } from "./PlayerProps";
+import { usePlayerProps, PropsControls, PropsRefreshButton, CompactProps, type PropsState } from "./PlayerProps";
 import { useMoneylines, MoneylineControls, TeamMoneyline } from "./Moneylines";
 import { et, todayEt } from "./dates";
 
@@ -564,14 +565,12 @@ function Slate() {
           ))}
         </div>
         <div className="toolbar-right">
-          <MoneylineControls odds={odds} />
-          <IconButton
-            label="Refresh games"
-            onClick={refresh}
-            disabled={refreshing}
-          >
-            <RefreshCw size={15} className={refreshing ? "spin" : ""} />
-          </IconButton>
+          <div className="refresh-actions" role="group" aria-label="Refresh data">
+            <RefreshButton label="Stats" ariaLabel="Refresh games"
+              description="Reload games, scores, team stats and goalie context. Cached sources refresh when due."
+              onClick={refresh} busy={refreshing || loading} />
+            <MoneylineControls odds={odds} />
+          </div>
         </div>
       </div>
       {loading ? (
@@ -1329,13 +1328,12 @@ function Matchup() {
                   Last 10
                 </button>
               </div>
-              <IconButton
-                label="Refresh matchup"
-                disabled={refreshing}
-                onClick={refresh}
-              >
-                <RefreshCw size={15} className={refreshing ? "spin" : ""} />
-              </IconButton>
+              <div className="refresh-actions" role="group" aria-label="Refresh data">
+                <RefreshButton label="Stats" ariaLabel="Refresh matchup"
+                  description="Reload matchup stats, lines, injuries and goalie context. Cached sources refresh when due."
+                  busy={refreshing} onClick={refresh} />
+                {tab === "lineups" && <PropsRefreshButton state={props} gameId={data.game.id} />}
+              </div>
             </div>
           </div>
           <div className="data-context">

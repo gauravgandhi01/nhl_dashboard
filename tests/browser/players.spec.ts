@@ -2,7 +2,15 @@ import { test, expect } from "@playwright/test";
 
 test("players windows, filters, sorting, expansion and navigation on desktop and phone", async ({
   page,
+  request,
 }) => {
+  // Provide qualified season samples independently of the live season's start date.
+  const fixture = await (await request.get("/api/players?date=2026-09-26")).json();
+  for (const player of fixture.players) {
+    player.windows.season = { ...player.windows.season, games: 10,
+      points: player.id % 20, points_pg: (player.id % 20) / 10 };
+  }
+  await page.route("**/api/players?*", route => route.fulfill({ json: fixture }));
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   for (const width of [1440, 375]) {

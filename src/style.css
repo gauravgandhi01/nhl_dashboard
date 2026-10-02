@@ -2151,3 +2151,10 @@ tr:hover td {
   .line-player .prop-quote small { display: none; }
   .line-player .compact-props .compact-prop-label { font-size: 8px; }
 }
+
+/* Consistent compact refresh actions in each page toolbar. */
+.refresh-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.refresh-button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 28px; padding: 0 7px; border: 1px solid var(--border); border-radius: 4px; background: transparent; color: inherit; font-size: 10px; white-space: nowrap; }
+.refresh-button:hover:not(:disabled) { background: #292b2e; }
+.refresh-button:focus-visible { outline: 2px solid #9ebdce; outline-offset: 2px; }
+.props-controls:empty { display: none; }

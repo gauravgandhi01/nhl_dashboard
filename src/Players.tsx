@@ -1,3 +1,4 @@
+import { RefreshButton } from "./RefreshButton";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
@@ -9,7 +10,7 @@ import {
 } from "lucide-react";
 import type { Source, Stats } from "./types";
 import { buildPeers, cellFormat, type Peers } from "./playerFormatting";
-import { usePlayerProps, PropsControls, PlayerPropPanel, type PropsState } from "./PlayerProps";
+import { usePlayerProps, PropsControls, PropsRefreshButton, PlayerPropPanel, type PropsState } from "./PlayerProps";
 import { todayEt } from "./dates";
 
 type Window = "last5" | "last10" | "season";
@@ -126,6 +127,7 @@ export function Players() {
   const [team, setTeam] = useState("all");
   const [position, setPosition] = useState("all");
   const [sort, setSort] = useState({ key: "points_pg", desc: true });
+  const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const props = usePlayerProps(date);
   const update = (key: string, value: string) => {
@@ -139,6 +141,7 @@ export function Players() {
     const cached = pageCache.get(date);
     setData(cached || null);
     setError(null);
+    setBusy(true);
     if (!cached) {
       setTeam("all");
       setExpanded(null);
@@ -154,7 +157,8 @@ export function Players() {
       })
       .catch((e) => {
         if (!controller.signal.aborted) setError(e.message);
-      });
+      })
+      .finally(() => { if (!controller.signal.aborted) setBusy(false); });
     return () => controller.abort();
   }, [date, revision]);
   const teams = [...new Set(data?.players.map((p) => p.team) || [])].sort();
@@ -243,15 +247,12 @@ export function Players() {
             <option value="F">Forwards</option>
             <option value="D">Defense</option>
           </select>
-          <button
-            className="icon-button"
-            aria-label="Refresh players"
-            title="Refresh players"
-            disabled={!data && !error}
-            onClick={() => setRevision((r) => r + 1)}
-          >
-            <RefreshCw size={15} />
-          </button>
+          <div className="refresh-actions" role="group" aria-label="Refresh data">
+            <RefreshButton label="Stats" ariaLabel="Refresh players"
+              description="Reload player stats and rosters for this date. Cached sources refresh when due."
+              busy={busy} onClick={() => setRevision((r) => r + 1)} />
+            <PropsRefreshButton state={props} />
+          </div>
         </div>
       </div>
       <PropsControls state={props} />
