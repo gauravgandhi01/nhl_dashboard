@@ -530,6 +530,39 @@ main {
   color: #cba2a0;
   background: #cc8c8910;
 }
+.card-metric .rank-elite {
+  color: #9fdbb8;
+  background: #70b79616;
+  box-shadow: inset 2px 0 #70b79690;
+}
+.card-metric .rank-good {
+  color: #9bd3d0;
+  background: #73bdc414;
+  box-shadow: inset 2px 0 #73bdc470;
+}
+.card-metric .rank-average {
+  color: #d5c28b;
+  background: #d3b37512;
+  box-shadow: inset 2px 0 #d3b37555;
+}
+.card-metric .rank-poor {
+  color: #d5ad82;
+  background: #c9955d14;
+  box-shadow: inset 2px 0 #c9955d65;
+}
+.card-metric .rank-bad {
+  color: #cda09e;
+  background: #cc8c8914;
+  box-shadow: inset 2px 0 #cc8c8975;
+}
+.card-metric .league-rank.rank-elite,
+.card-metric .league-rank.rank-good,
+.card-metric .league-rank.rank-average,
+.card-metric .league-rank.rank-poor,
+.card-metric .league-rank.rank-bad {
+  background: transparent;
+  box-shadow: none;
+}
 .card-form-row {
   margin: 4px 0 6px;
   grid-template-columns: repeat(2, minmax(0, 1fr));

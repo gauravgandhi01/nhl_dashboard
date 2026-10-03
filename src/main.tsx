@@ -279,31 +279,46 @@ function CardMetric({
   neutral?: boolean;
   ranks?: { away?: { rank: number | null; eligible: number }; home?: { rank: number | null; eligible: number } };
 }) {
+  const ranked = Boolean(ranks);
   const comparable =
     !neutral &&
+    !ranked &&
     away != null &&
     home != null &&
     away.toFixed(digits) !== home.toFixed(digits);
   const awayBetter = comparable && (lower ? away < home : away > home);
   const help = `${lower ? "Lower" : "Higher"} is better`;
-  const rankBadge = (value: number | null | undefined, rank?: { rank: number | null; eligible: number }) => (
-    <span className="league-rank" title={rank?.rank != null && value != null
+  const rankClass = (value: number | null | undefined, rank?: { rank: number | null; eligible: number }) => {
+    if (value == null || rank?.rank == null || !rank.eligible) {
+      return "";
+    }
+    const percentile = rank.rank / rank.eligible;
+    if (percentile <= 0.2) return "rank-elite";
+    if (percentile <= 0.4) return "rank-good";
+    if (percentile <= 0.6) return "rank-average";
+    if (percentile <= 0.8) return "rank-poor";
+    return "rank-bad";
+  };
+  const awayRankClass = rankClass(away, ranks?.away);
+  const homeRankClass = rankClass(home, ranks?.home);
+  const rankBadge = (value: number | null | undefined, rank?: { rank: number | null; eligible: number }, className = "") => (
+    <span className={`league-rank ${className}`} title={rank?.rank != null && value != null
       ? `League rank ${rank.rank} among ${rank.eligible} teams with data this season; all 32 NHL teams considered. Ties share a rank. ${help}.`
       : "League rank unavailable"}>
       {rank?.rank != null && value != null ? rank.rank : "—"}
     </span>
   );
   return (
-    <div className={`card-metric${ranks ? " card-metric-ranked" : ""}`}>
-      <strong className={comparable ? (awayBetter ? "better" : "worse") : ""}>
+    <div className={`card-metric${ranked ? " card-metric-ranked" : ""}`}>
+      <strong className={ranked ? awayRankClass : comparable ? (awayBetter ? "better" : "worse") : ""}>
         {fmt(away, digits, suffix)}
       </strong>
-      {ranks && rankBadge(away, ranks.away)}
+      {ranks && rankBadge(away, ranks.away, awayRankClass)}
       <span title={neutral ? label : help}>
         {label}
       </span>
-      {ranks && rankBadge(home, ranks.home)}
-      <strong className={comparable ? (awayBetter ? "worse" : "better") : ""}>
+      {ranks && rankBadge(home, ranks.home, homeRankClass)}
+      <strong className={ranked ? homeRankClass : comparable ? (awayBetter ? "worse" : "better") : ""}>
         {fmt(home, digits, suffix)}
       </strong>
     </div>
