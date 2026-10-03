@@ -2124,9 +2124,16 @@ tr:hover td {
 .refresh-button:focus-visible { outline: 2px solid #9ebdce; outline-offset: 2px; }
 .props-controls:empty { display: none; }
 
-.card-matchup > .card-team { grid-template-columns: 40px auto; gap: 2px 4px; }
-.card-team .logo { width: 40px; height: 40px; }
-.card-record { font: 9px var(--mono); color: var(--muted); white-space: nowrap; }
+.card-stats .card-matchup { grid-template-columns: minmax(0, 1fr) 22px minmax(0, 1fr); gap: 2px; }
+.card-matchup > .card-team { gap: 1px 4px; }
+.card-matchup > .card-away { grid-template-columns: minmax(0, 1fr) 46px; }
+.card-matchup > .card-home { grid-template-columns: 46px minmax(0, 1fr); }
+.card-matchup > .card-away .logo { grid-column: 2; grid-row: 1; }
+.card-matchup > .card-away .card-record { grid-column: 1; grid-row: 1; text-align: right; }
+.card-matchup > .card-home .logo { grid-column: 1; grid-row: 1; }
+.card-matchup > .card-home .card-record { grid-column: 2; grid-row: 1; text-align: left; }
+.card-team .logo { width: 46px; height: 46px; }
+.card-record { overflow: hidden; text-overflow: ellipsis; font: 8px var(--mono); color: var(--muted); white-space: nowrap; }
 .card-team .team-moneyline { display: flex; align-items: baseline; justify-content: center; gap: 4px; margin: 0 0 5px; }
 .card-team .team-moneyline small { font-size: 7px; }
 

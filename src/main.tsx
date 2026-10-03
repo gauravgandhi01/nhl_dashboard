@@ -368,6 +368,17 @@ function CardSignals({ game, comparison }: { game: Game; comparison?: CardCompar
   );
 }
 
+function cardRecord(record: string | null) {
+  if (!record) {
+    return "--";
+  }
+  const [wins, , otLosses] = record.split("-").map(Number);
+  if (!Number.isFinite(wins) || !Number.isFinite(otLosses)) {
+    return record;
+  }
+  return `${record} (${wins * 2 + otLosses})`;
+}
+
 function CardStats({
   game,
   comparison,
@@ -382,15 +393,15 @@ function CardStats({
   return (
     <div className="card-stats">
       <div className="card-matchup">
-        <div className="card-team" role="group" aria-label={game.away.name} title={game.away.name}>
+        <div className="card-team card-away" role="group" aria-label={game.away.name} title={game.away.name}>
           <Logo team={game.away} />
-          <span className="card-record" title="Team record (W–L–OT)">{game.away.record || "--"}</span>
+          <span className="card-record" title="Team record (W–L–OT) and points">{cardRecord(game.away.record)}</span>
           <TeamMoneyline game={game} odds={odds} side="away" />
         </div>
         <span className="eyebrow">AT</span>
-        <div className="card-team" role="group" aria-label={game.home.name} title={game.home.name}>
+        <div className="card-team card-home" role="group" aria-label={game.home.name} title={game.home.name}>
           <Logo team={game.home} />
-          <span className="card-record" title="Team record (W–L–OT)">{game.home.record || "--"}</span>
+          <span className="card-record" title="Team record (W–L–OT) and points">{cardRecord(game.home.record)}</span>
           <TeamMoneyline game={game} odds={odds} side="home" />
         </div>
       </div>
