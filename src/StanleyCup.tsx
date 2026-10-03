@@ -186,7 +186,6 @@ export function StanleyCup() {
       <section className="section-head cup-head">
         <div>
           <h2>Teams</h2>
-          <span className="eyebrow">RECORDS / POINTS / TEAM STATS / FANDUEL ODDS</span>
         </div>
       </section>
       {(error || data?.error) && (
