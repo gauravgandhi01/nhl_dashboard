@@ -1616,12 +1616,13 @@ tr:hover td {
 }
 .cup-head {
   align-items: center;
+  margin-bottom: 8px;
 }
 .cup-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin: -8px 0 14px;
+  margin: 0 0 16px;
   color: var(--muted);
   font-size: 12px;
 }

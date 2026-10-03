@@ -185,8 +185,8 @@ export function StanleyCup() {
     <>
       <section className="section-head cup-head">
         <div>
-          <h2>Stanley Cup</h2>
-          <span className="eyebrow">TEAM RECORDS / POINTS / FANDUEL ODDS</span>
+          <h2>Teams</h2>
+          <span className="eyebrow">RECORDS / POINTS / TEAM STATS / FANDUEL ODDS</span>
         </div>
       </section>
       {(error || data?.error) && (
@@ -228,7 +228,7 @@ export function StanleyCup() {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={columns.length}>Loading Stanley Cup board...</td>
+                <td colSpan={columns.length}>Loading teams...</td>
               </tr>
             )}
             {!loading &&

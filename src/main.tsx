@@ -1462,7 +1462,7 @@ function DashboardNav() {
         to={`/stanley-cup?date=${date}`}
         aria-current={location.pathname === "/stanley-cup" ? "page" : undefined}
       >
-        Stanley Cup
+        Teams
       </Link>
     </nav>
   );
