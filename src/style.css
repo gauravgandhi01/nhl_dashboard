@@ -1616,13 +1616,14 @@ tr:hover td {
 }
 .cup-head {
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 2px;
 }
 .cup-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin: 0 0 16px;
+  justify-content: flex-end;
+  margin: -18px 0 8px;
   color: var(--muted);
   font-size: 12px;
 }
@@ -2296,7 +2297,12 @@ tr:hover td {
 .card-matchup > .card-away .card-record { grid-column: 1; grid-row: 1; text-align: right; }
 .card-matchup > .card-home .logo { grid-column: 1; grid-row: 1; }
 .card-matchup > .card-home .card-record { grid-column: 2; grid-row: 1; text-align: left; }
-.card-team .logo { width: 46px; height: 46px; }
+.card-team .logo {
+  width: 46px;
+  height: 46px;
+  transform: scale(1.16);
+  transform-origin: center;
+}
 .card-record { overflow: hidden; text-overflow: ellipsis; font: 8px var(--mono); color: var(--muted); white-space: nowrap; }
 .card-team .team-moneyline { display: flex; align-items: baseline; justify-content: center; gap: 4px; margin: 0 0 5px; }
 .card-team .team-moneyline small { font-size: 7px; }
