@@ -22,6 +22,17 @@ def test_player_identity_requires_unique_game_roster_member():
     assert resolve_player('John Smith', players + [{'id': 2, 'name': 'John Smith', 'team': 'CAR'}], {}) is None
 
 
+def test_player_identity_alias_disambiguates_duplicate_roster_names():
+    players = [
+        {'id': 8480012, 'name': 'Elias Pettersson', 'team': 'VAN'},
+        {'id': 8483678, 'name': 'Elias Pettersson', 'team': 'VAN'},
+    ]
+    aliases = {'Elias Pettersson': 8480012, 'Elias Pettersson (2004)': 8483678}
+    assert resolve_player('Elias Pettersson', players, aliases)['id'] == 8480012
+    assert resolve_player('Elias Pettersson (2004)', players, aliases)['id'] == 8483678
+    assert resolve_player('Elias Pettersson', players, {}) is None
+
+
 def event():
     start = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
     return {'id': 'abc123', 'commence_time': start, 'away_team': 'Florida Panthers', 'home_team': 'Carolina Hurricanes',

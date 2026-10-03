@@ -266,6 +266,7 @@ function ComparisonRow({
   h,
   awayRank,
   homeRank,
+  rankTitle = "League rank",
   percent = false,
   digits = 2,
   risk = false,
@@ -276,11 +277,23 @@ function ComparisonRow({
   h: number | null | undefined;
   awayRank?: number;
   homeRank?: number;
+  rankTitle?: string;
   percent?: boolean;
   digits?: number;
   risk?: boolean;
   neutral?: boolean;
 }) {
+  const rankClass = (rank: number | undefined) => {
+    if (rank == null) return "";
+    const percentile = rank / 32;
+    if (percentile <= 0.2) return "rank-elite";
+    if (percentile <= 0.4) return "rank-good";
+    if (percentile <= 0.6) return "rank-average";
+    if (percentile <= 0.8) return "rank-poor";
+    return "rank-bad";
+  };
+  const awayRankClass = rankClass(awayRank);
+  const homeRankClass = rankClass(homeRank);
   const style = (v: typeof a, other: typeof a) =>
     neutral && label.includes("GP") && v != null && v < 5
       ? "warning"
@@ -293,23 +306,27 @@ function ComparisonRow({
           : risk
             ? ""
             : "worse";
+  const awayClass = awayRankClass || style(a, h);
+  const homeClass = homeRankClass || style(h, a);
   return (
-    <div className={`card-metric${awayRank || homeRank ? " card-metric-ranked fp-rank-row" : ""}`}>
-      <strong className={style(a, h)}>{percent ? pct(a) : f(a, digits)}</strong>
-      {(awayRank || homeRank) && <span className="league-rank" title="League rank by first-period 2+ goal frequency">{awayRank ?? "—"}</span>}
+    <div className={`card-metric${awayRank != null || homeRank != null ? " card-metric-ranked fp-rank-row" : ""}`}>
+      <strong className={awayClass}>{percent ? pct(a) : f(a, digits)}</strong>
+      {(awayRank != null || homeRank != null) && <span className={`league-rank ${awayRankClass}`} title={rankTitle}>{awayRank ?? "—"}</span>}
       <span
         title={
           risk
             ? "Higher goals allowed, not better performance"
             : neutral
               ? label
+            : awayRank != null || homeRank != null
+              ? "League-rank based conditional formatting"
               : "Higher/lower than the opposing comparison value"
         }
       >
         {label}
       </span>
-      {(awayRank || homeRank) && <span className="league-rank" title="League rank by first-period 2+ goal frequency">{homeRank ?? "—"}</span>}
-      <strong className={style(h, a)}>{percent ? pct(h) : f(h, digits)}</strong>
+      {(awayRank != null || homeRank != null) && <span className={`league-rank ${homeRankClass}`} title={rankTitle}>{homeRank ?? "—"}</span>}
+      <strong className={homeClass}>{percent ? pct(h) : f(h, digits)}</strong>
     </div>
   );
 }
@@ -324,7 +341,7 @@ function PeriodCard({
   window: Window;
   date: string;
   odds: Odds | null;
-  ranks: Map<number, number>;
+  ranks: Record<string, Map<number, number>>;
 }) {
   const a = m.away.windows[window],
     h = m.home.windows[window];
@@ -351,25 +368,47 @@ function PeriodCard({
             <strong>{m.game.home.abbrev}</strong>
           </div>
         </div>
-        <ComparisonRow label="1P goals for / G" a={a.gf_pg} h={h.gf_pg} />
+        <ComparisonRow
+          label="1P goals for / G"
+          a={a.gf_pg}
+          h={h.gf_pg}
+          awayRank={ranks.gf_pg.get(m.game.away.id)}
+          homeRank={ranks.gf_pg.get(m.game.home.id)}
+          rankTitle="League rank by first-period goals for per game"
+        />
         <ComparisonRow
           label="1P goals against / G"
           a={a.ga_pg}
           h={h.ga_pg}
+          awayRank={ranks.ga_pg.get(m.game.away.id)}
+          homeRank={ranks.ga_pg.get(m.game.home.id)}
+          rankTitle="League rank by first-period goals against per game; lower is better"
           risk
         />
         <ComparisonRow
           label="Combined goals / G"
           a={a.combined_pg}
           h={h.combined_pg}
+          awayRank={ranks.combined_pg.get(m.game.away.id)}
+          homeRank={ranks.combined_pg.get(m.game.home.id)}
+          rankTitle="League rank by combined first-period goals per game"
         />
-        <ComparisonRow label="2+ goal games" a={a.hits} h={h.hits} digits={0} />
+        <ComparisonRow
+          label="2+ goal games"
+          a={a.hits}
+          h={h.hits}
+          awayRank={ranks.hits.get(m.game.away.id)}
+          homeRank={ranks.hits.get(m.game.home.id)}
+          rankTitle="League rank by first-period 2+ goal game count"
+          digits={0}
+        />
         <ComparisonRow
           label="2+ goal frequency"
           a={a.hit_pct}
           h={h.hit_pct}
-          awayRank={ranks.get(m.game.away.id)}
-          homeRank={ranks.get(m.game.home.id)}
+          awayRank={ranks.hit_pct.get(m.game.away.id)}
+          homeRank={ranks.hit_pct.get(m.game.home.id)}
+          rankTitle="League rank by first-period 2+ goal frequency"
           percent
         />
         <div className="card-goalie-names">
@@ -417,16 +456,25 @@ function PeriodCard({
   );
 }
 
-function hitPctRanks(rankings: Data["rankings"], window: Window) {
-  const values = rankings
-    .map((r) => ({ id: r.id, value: r.windows[window].hit_pct }))
-    .filter((r): r is { id: number; value: number } => r.value != null);
-  return new Map(
-    values.map((r) => [
-      r.id,
-      1 + values.filter((other) => other.value > r.value).length,
-    ]),
-  );
+function teamMetricRanks(rankings: Data["rankings"], window: Window) {
+  const rankMetric = (metric: string, lower = false) => {
+    const values = rankings
+      .map((r) => ({ id: r.id, value: r.windows[window][metric] }))
+      .filter((r): r is { id: number; value: number } => r.value != null);
+    return new Map(
+      values.map((r) => [
+        r.id,
+        1 + values.filter((other) => lower ? other.value < r.value : other.value > r.value).length,
+      ]),
+    );
+  };
+  return {
+    gf_pg: rankMetric("gf_pg"),
+    ga_pg: rankMetric("ga_pg", true),
+    combined_pg: rankMetric("combined_pg"),
+    hits: rankMetric("hits"),
+    hit_pct: rankMetric("hit_pct"),
+  };
 }
 
 const teamCols: [string, string][] = [
@@ -969,7 +1017,7 @@ function PeriodContent({
                 {data.matchups.length ? (
                   <div className="slate fp-slate">
                     {(() => {
-                      const ranks = hitPctRanks(data.rankings, window);
+                      const ranks = teamMetricRanks(data.rankings, window);
                       return data.matchups.map((m) => (
                         <PeriodCard
                           key={m.game.id}

@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from datetime import date as Date
+import asyncio
 import os
 from pathlib import Path
 from typing import Literal
@@ -16,7 +17,9 @@ from .first_period import FirstPeriod
 from .first_period_odds import FirstPeriodOdds
 from .streaks import Streaks
 from .moneyline import Moneylines
+from .odds_client import odds_configured
 from .player_props import PlayerProps
+from .stanley_cup import StanleyCup
 from .runtime_db import database_path
 from .lineup_uploads import router as lineup_upload_router
 
@@ -37,6 +40,22 @@ def odds_refresh_payload(payload):
     return {**payload, 'manual_refresh_enabled': manual_odds_refresh_enabled()}
 
 
+async def automatic_odds_refresh(app, interval=3600):
+    try:
+        while True:
+            if odds_configured():
+                try:
+                    current = today_et()
+                    await app.state.moneylines.refresh(current, force=True)
+                    await app.state.first_period_odds.refresh(current, force=True)
+                    await app.state.player_props.view(current, refresh=True)
+                except Exception:
+                    pass
+            await asyncio.sleep(interval)
+    except asyncio.CancelledError:
+        raise
+
+
 @asynccontextmanager
 async def lifespan(app):
     if os.environ.get('NHL_DFO_LINEUP_MODE', 'direct') not in {'direct', 'uploaded'}:
@@ -49,10 +68,22 @@ async def lifespan(app):
     app.state.streaks = Streaks(providers)
     app.state.moneylines = Moneylines(providers)
     app.state.player_props = PlayerProps(providers)
-    yield
-    await app.state.first_period.close()
-    await app.state.streaks.close()
-    await store.close()
+    app.state.stanley_cup = StanleyCup(providers)
+    app.state.automatic_odds_refresh = None
+    if not manual_odds_refresh_enabled():
+        app.state.automatic_odds_refresh = asyncio.create_task(automatic_odds_refresh(app))
+    try:
+        yield
+    finally:
+        if app.state.automatic_odds_refresh:
+            app.state.automatic_odds_refresh.cancel()
+            try:
+                await app.state.automatic_odds_refresh
+            except asyncio.CancelledError:
+                pass
+        await app.state.first_period.close()
+        await app.state.streaks.close()
+        await store.close()
 
 
 app = FastAPI(title='NHL Matchup Dashboard', lifespan=lifespan)
@@ -123,6 +154,17 @@ async def first_period_odds(date: Date | None = None):
 async def first_period_odds_refresh(date: Date | None = None):
     require_manual_odds_refresh()
     return odds_refresh_payload(await app.state.first_period_odds.refresh(date.isoformat() if date else today_et(), force=True))
+
+
+@app.get('/api/stanley-cup')
+async def stanley_cup():
+    return await app.state.stanley_cup.view()
+
+
+@app.post('/api/stanley-cup/refresh')
+async def stanley_cup_refresh():
+    require_manual_odds_refresh()
+    return await app.state.stanley_cup.view(refresh=True)
 
 
 @app.get('/api/matchups/{game_id}')

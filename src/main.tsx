@@ -37,6 +37,7 @@ import { RefreshButton } from "./RefreshButton";
 import { Players } from "./Players";
 import { FirstPeriod } from "./FirstPeriod";
 import { Streaks } from "./Streaks";
+import { StanleyCup } from "./StanleyCup";
 import { usePlayerProps, PropsControls, PropsRefreshButton, CompactProps, type PropsState } from "./PlayerProps";
 import { useMoneylines, MoneylineControls, TeamMoneyline, GameTotal } from "./Moneylines";
 import { et, todayEt } from "./dates";
@@ -1457,6 +1458,12 @@ function DashboardNav() {
       >
         Streaks
       </Link>
+      <Link
+        to={`/stanley-cup?date=${date}`}
+        aria-current={location.pathname === "/stanley-cup" ? "page" : undefined}
+      >
+        Stanley Cup
+      </Link>
     </nav>
   );
 }
@@ -1489,6 +1496,7 @@ function App() {
           <Route path="/" element={<Slate />} />
           <Route path="/players" element={<Players />} />
           <Route path="/streaks" element={<Streaks />} />
+          <Route path="/stanley-cup" element={<StanleyCup />} />
           <Route
             path="/first-period"
             element={<FirstPeriod />}

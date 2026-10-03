@@ -18,10 +18,17 @@ def resolve_player(name, players, aliases=None):
     key = normalized_name(name)
     if not key:
         return None
-    ids = {p['id'] for p in players if normalized_name(p['name']) == key}
+    exact_matches = [p for p in players if normalized_name(p['name']) == key]
+    ids = {p['id'] for p in exact_matches}
     alias_ids = {value for alias, value in aliases.items()
                  if normalized_name(alias) == key and isinstance(value, int)}
-    ids.update(alias_ids)
+
+    if alias_ids:
+        candidates = [p for p in players if p['id'] in alias_ids]
+        if len(candidates) == 1 and (not exact_matches or len(exact_matches) > 1 or candidates[0]['id'] in ids):
+            return candidates[0]
+        return None
+
     if len(ids) != 1:
         return None
     candidates = [p for p in players if p['id'] in ids]

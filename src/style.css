@@ -1614,6 +1614,81 @@ tr:hover td {
   color: #edf0f2;
   border-color: #93cbb1;
 }
+.cup-head {
+  align-items: center;
+}
+.cup-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: -8px 0 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.cup-scroll {
+  border-block: 1px solid var(--border);
+}
+.cup-table {
+  min-width: 1060px;
+}
+.cup-table th:nth-child(n + 2),
+.cup-table td:nth-child(n + 2) {
+  text-align: right;
+}
+.cup-table th.left,
+.cup-table td.left {
+  text-align: left;
+}
+.cup-sort {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+.cup-table th.left .cup-sort {
+  justify-content: flex-start;
+}
+.cup-sort span {
+  width: 8px;
+  color: #93cbb1;
+}
+.cup-team {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cup-team strong,
+.cup-team span {
+  display: block;
+}
+.cup-team span {
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 2px;
+}
+.cup-logo {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  flex: 0 0 32px;
+}
+.cup-logo.fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
 .player-filters {
   display: flex;
   flex-wrap: wrap;
