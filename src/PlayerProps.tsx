@@ -287,37 +287,27 @@ function MarketRow({
 }) {
   const lines = propLines(player, family);
   const [choice, setChoice] = useState("");
-  const [book, setBook] = useState("best");
-  const selected = lines.find((l) => l.id === choice) || lines[0];
-  const books = [
-    ...new Map(
-      (selected?.quotes || []).map((q) => [q.bookmaker, q.book]),
-    ).entries(),
-  ];
-  const selectedBook = books.some(([id]) => id === book) ? book : "best";
-  const line =
-    selectedBook === "best"
-      ? selected
-      : selected && {
-          ...selected,
-          quotes: selected.quotes.filter((q) => q.bookmaker === selectedBook),
-        };
+  const selected = lines.find((l) => l.id === choice) || lines.find((l) => !l.alternate) || lines[0];
+  const line = selected;
   const binary = selected?.point == null;
+  const showUnder = family !== "first_goal";
   return (
     <div className="prop-market-row">
       <span className="prop-market-label">{label}</span>
       {lines.length ? (
-        <select
-          aria-label={`${label} line`}
-          value={selected.id}
-          onChange={(e) => setChoice(e.target.value)}
-        >
+        <div className="prop-line-buttons" aria-label={`${label} line`}>
           {lines.map((l) => (
-            <option key={l.id} value={l.id}>
+            <button
+              key={l.id}
+              type="button"
+              className={l.id === selected.id ? "selected" : ""}
+              aria-pressed={l.id === selected.id}
+              onClick={() => setChoice(l.id)}
+            >
               {lineLabel(l)}
-            </option>
+            </button>
           ))}
-        </select>
+        </div>
       ) : (
         <span className="prop-missing">Unavailable</span>
       )}
@@ -325,23 +315,12 @@ function MarketRow({
         quote={bestQuote(line, binary ? "yes" : "over")}
         prefix={binary ? "Yes" : "O"}
       />
-      <Price
-        quote={bestQuote(line, binary ? "no" : "under")}
-        prefix={binary ? "No" : "U"}
-      />
-      <select
-        aria-label={`${label} sportsbook`}
-        value={selectedBook}
-        disabled={!books.length}
-        onChange={(e) => setBook(e.target.value)}
-      >
-        <option value="best">Best prices</option>
-        {books.map(([key, name]) => (
-          <option key={key} value={key}>
-            {name}
-          </option>
-        ))}
-      </select>
+      {showUnder && (
+        <Price
+          quote={bestQuote(line, binary ? "no" : "under")}
+          prefix={binary ? "No" : "U"}
+        />
+      )}
     </div>
   );
 }

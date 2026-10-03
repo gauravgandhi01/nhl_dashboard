@@ -264,6 +264,8 @@ function ComparisonRow({
   label,
   a,
   h,
+  awayRank,
+  homeRank,
   percent = false,
   digits = 2,
   risk = false,
@@ -272,6 +274,8 @@ function ComparisonRow({
   label: string;
   a: number | null | undefined;
   h: number | null | undefined;
+  awayRank?: number;
+  homeRank?: number;
   percent?: boolean;
   digits?: number;
   risk?: boolean;
@@ -290,8 +294,9 @@ function ComparisonRow({
             ? ""
             : "worse";
   return (
-    <div className="card-metric">
+    <div className={`card-metric${awayRank || homeRank ? " card-metric-ranked fp-rank-row" : ""}`}>
       <strong className={style(a, h)}>{percent ? pct(a) : f(a, digits)}</strong>
+      {(awayRank || homeRank) && <span className="league-rank" title="League rank by first-period 2+ goal frequency">{awayRank ?? "—"}</span>}
       <span
         title={
           risk
@@ -303,6 +308,7 @@ function ComparisonRow({
       >
         {label}
       </span>
+      {(awayRank || homeRank) && <span className="league-rank" title="League rank by first-period 2+ goal frequency">{homeRank ?? "—"}</span>}
       <strong className={style(h, a)}>{percent ? pct(h) : f(h, digits)}</strong>
     </div>
   );
@@ -312,11 +318,13 @@ function PeriodCard({
   window,
   date,
   odds,
+  ranks,
 }: {
   m: Matchup;
   window: Window;
   date: string;
   odds: Odds | null;
+  ranks: Map<number, number>;
 }) {
   const a = m.away.windows[window],
     h = m.home.windows[window];
@@ -360,6 +368,8 @@ function PeriodCard({
           label="2+ goal frequency"
           a={a.hit_pct}
           h={h.hit_pct}
+          awayRank={ranks.get(m.game.away.id)}
+          homeRank={ranks.get(m.game.home.id)}
           percent
         />
         <div className="card-goalie-names">
@@ -404,6 +414,18 @@ function PeriodCard({
         )}
       </div>
     </Link>
+  );
+}
+
+function hitPctRanks(rankings: Data["rankings"], window: Window) {
+  const values = rankings
+    .map((r) => ({ id: r.id, value: r.windows[window].hit_pct }))
+    .filter((r): r is { id: number; value: number } => r.value != null);
+  return new Map(
+    values.map((r) => [
+      r.id,
+      1 + values.filter((other) => other.value > r.value).length,
+    ]),
   );
 }
 
@@ -946,15 +968,19 @@ function PeriodContent({
               <>
                 {data.matchups.length ? (
                   <div className="slate fp-slate">
-                    {data.matchups.map((m) => (
-                      <PeriodCard
-                        key={m.game.id}
-                        m={m}
-                        window={window}
-                        date={date}
-                        odds={odds}
-                      />
-                    ))}
+                    {(() => {
+                      const ranks = hitPctRanks(data.rankings, window);
+                      return data.matchups.map((m) => (
+                        <PeriodCard
+                          key={m.game.id}
+                          m={m}
+                          window={window}
+                          date={date}
+                          odds={odds}
+                          ranks={ranks}
+                        />
+                      ));
+                    })()}
                   </div>
                 ) : (
                   <div className="state-message">
