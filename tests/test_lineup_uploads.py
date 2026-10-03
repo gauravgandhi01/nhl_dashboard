@@ -9,9 +9,9 @@ from fastapi.testclient import TestClient
 
 from backend.app import app
 from backend.cache import Feed, Store
-from backend.collect_lineups import collect, initialize, read_config, remote_request, site_url
+from backend.collect_lineups import collect, collect_goalies, initialize, read_config, remote_request, site_url
 from backend.lineup_uploads import FRESH_SECONDS, MAX_AGE_SECONDS, MAX_BODY_BYTES
-from backend.providers import Providers
+from backend.providers import Providers, starter_for
 
 TOKEN = 'test-only-' + 'x' * 32
 HEADERS = {'Authorization': 'Bearer ' + TOKEN}
@@ -186,3 +186,143 @@ def test_uploader_sends_auth_without_following_redirects():
             with pytest.raises(RuntimeError, match='HTTP 302'):
                 await remote_request(client, {'site': 'https://example.com', 'token': TOKEN}, 'GET')
     asyncio.run(scenario())
+
+
+def goalie_batch(age=0):
+    return {'version': 1, 'goalies': [{
+        'date': '2026-10-02', 'retrieved_at': datetime.fromtimestamp(time.time() - age, timezone.utc).isoformat(),
+        'data': [{'dateGmt': '2026-10-03T01:00:00Z', 'awayTeamName': 'New York Rangers',
+                  'homeTeamName': 'Detroit Red Wings', 'awayGoalieName': 'Dylan Garand',
+                  'homeGoalieName': 'John Gibson', 'awayNewsStrengthName': 'Confirmed',
+                  'homeNewsStrengthName': 'Likely', 'awayNewsCreatedAt': '2026-10-02T20:20:14.175Z',
+                  'homeNewsCreatedAt': None}],
+    }]}
+
+
+GOALIE_GAME = {'awayTeam': {'abbrev': 'NYR'}, 'homeTeam': {'abbrev': 'DET'},
+               'startTimeUTC': '2026-10-03T01:00:00Z'}
+
+
+def test_goalie_upload_preserves_confirmations_and_matches_game_without_network(client, monkeypatch):
+    async def forbidden(*args, **kwargs):
+        raise AssertionError('Uploaded goalie reads must not fetch Daily Faceoff')
+    monkeypatch.setattr(app.state.dashboard.p.store, 'fetch', forbidden)
+    p = app.state.dashboard.p
+    assert asyncio.run(p.goalies('2026-10-02')).data is None
+    payload = goalie_batch()
+    assert client.post('/api/admin/lineups', headers=HEADERS, json=payload).json()['accepted_goalies'] == ['2026-10-02']
+    feed = asyncio.run(p.goalies('2026-10-02'))
+    assert feed.retrieved_at == payload['goalies'][0]['retrieved_at']
+    starters = starter_for(GOALIE_GAME, feed.data)
+    assert starters['away'] == {'name': 'Dylan Garand', 'status': 'Confirmed', 'updated_at': '2026-10-02T20:20:14.175Z'}
+    assert starters['home']['status'] == 'Likely'
+    assert asyncio.run(p.goalies('2026-10-03')).data is None
+    wrong_game = {**GOALIE_GAME, 'startTimeUTC': '2026-10-04T01:00:00Z'}
+    assert starter_for(wrong_game, feed.data)['away']['status'] == 'Unknown'
+    status = client.get('/api/admin/lineups', headers=HEADERS).json()
+    assert status['goalie_uploads'] is True
+    assert status['goalies'][0]['games'] == 1
+
+
+def test_goalies_expire_without_old_confirmations_or_lineup_loss(client):
+    payload = goalie_batch(age=FRESH_SECONDS + 1)
+    payload['lineups'] = batch()['lineups']
+    client.post('/api/admin/lineups', headers=HEADERS, json=payload)
+    feed = asyncio.run(app.state.dashboard.p.goalies('2026-10-02'))
+    assert feed.data is None and 'expired' in feed.error
+    assert starter_for(GOALIE_GAME, feed.data)['away']['status'] == 'Unknown'
+    assert lineup().data is not None
+    assert client.get('/api/admin/lineups', headers=HEADERS).json()['goalies'][0]['status'] == 'expired'
+
+
+def test_goalie_replays_empty_days_and_missing_names(client):
+    payload = goalie_batch()
+    payload['goalies'][0]['data'][0]['homeGoalieName'] = None
+    client.post('/api/admin/lineups', headers=HEADERS, json=payload)
+    assert client.post('/api/admin/lineups', headers=HEADERS, json=payload).json()['ignored_goalies'] == ['2026-10-02']
+    older = goalie_batch(age=60)
+    older['goalies'][0]['data'] = []
+    assert client.post('/api/admin/lineups', headers=HEADERS, json=older).json()['ignored_goalies'] == ['2026-10-02']
+    feed = asyncio.run(app.state.dashboard.p.goalies('2026-10-02'))
+    assert starter_for(GOALIE_GAME, feed.data)['home']['status'] == 'Unknown'
+    empty = goalie_batch()
+    empty['goalies'][0]['data'] = []
+    client.post('/api/admin/lineups', headers=HEADERS, json=empty)
+    feed = asyncio.run(app.state.dashboard.p.goalies('2026-10-02'))
+    assert feed.data == [] and feed.meta()['status'] == 'available'
+
+
+@pytest.mark.parametrize('case', ['date', 'duplicate_date', 'duplicate_game', 'missing_field', 'future', 'empty_batch'])
+def test_invalid_goalies_reject_whole_batch(client, case):
+    payload = goalie_batch()
+    if case == 'date':
+        payload['goalies'][0]['date'] = '2026-10-03'
+    elif case == 'duplicate_date':
+        payload['goalies'] *= 2
+    elif case == 'duplicate_game':
+        payload['goalies'][0]['data'] *= 2
+    elif case == 'missing_field':
+        del payload['goalies'][0]['data'][0]['awayGoalieName']
+    elif case == 'future':
+        payload = goalie_batch(age=-120)
+    else:
+        payload['goalies'] = []
+    if case != 'empty_batch':
+        payload['lineups'] = batch()['lineups']
+    assert client.post('/api/admin/lineups', headers=HEADERS, json=payload).status_code == 422
+    assert lineup().data is None
+
+
+def test_goalie_collector_skips_failed_dates_without_relabeling_stale_data(tmp_path, monkeypatch):
+    snapshot = goalie_batch()['goalies'][0]
+    async def fake(self, path, *args, **kwargs):
+        stale = path.endswith('2026-10-01')
+        return Feed(snapshot['data'], 'Daily Faceoff', path, snapshot['retrieved_at'], stale,
+                    'HTTP 403' if stale else None)
+    monkeypatch.setattr(Providers, 'dfo', fake)
+    async def scenario():
+        store = Store(tmp_path / 'collector.sqlite3')
+        try:
+            entries, failures = await collect_goalies(store, ['2026-10-01', '2026-10-02'], pause=0)
+            assert failures == ['2026-10-01']
+            assert entries[0]['date'] == '2026-10-02'
+            assert datetime.fromisoformat(entries[0]['retrieved_at']) == datetime.fromisoformat(snapshot['retrieved_at'])
+        finally:
+            await store.close()
+    asyncio.run(scenario())
+
+
+def test_goalie_direct_mode_still_fetches(client, monkeypatch):
+    monkeypatch.delenv('NHL_DFO_LINEUP_MODE')
+    calls = []
+    async def direct(path, *args):
+        calls.append(path)
+        return Feed([], 'Daily Faceoff', path)
+    monkeypatch.setattr(app.state.dashboard.p, 'dfo', direct)
+    assert asyncio.run(app.state.dashboard.p.goalies('2026-10-02')).data == []
+    assert calls == ['/starting-goalies/2026-10-02']
+
+
+@pytest.mark.parametrize('support,failed_lines', [(False, False), (True, False), (True, True)])
+def test_collector_rollout_and_goalie_only_success(tmp_path, monkeypatch, support, failed_lines):
+    from argparse import Namespace
+    import backend.collect_lineups as collector
+    monkeypatch.setattr(collector, 'ROOT', tmp_path)
+    monkeypatch.setattr(collector, 'read_config', lambda path: {'site': 'https://example.com', 'token': TOKEN})
+    requests = []
+    async def remote(client, config, method, payload=None):
+        if method == 'GET':
+            return {'mode': 'uploaded', 'goalie_uploads': support}
+        requests.append(payload)
+        return {'accepted': [], 'ignored': [], 'accepted_goalies': ['2026-10-02'], 'ignored_goalies': []}
+    async def lines(*args):
+        return {'version': 1, 'lineups': [] if failed_lines else batch()['lineups']}, ['NYR'] if failed_lines else []
+    async def goalies(*args):
+        assert support
+        return goalie_batch()['goalies'], []
+    monkeypatch.setattr(collector, 'remote_request', remote)
+    monkeypatch.setattr(collector, 'collect', lines)
+    monkeypatch.setattr(collector, 'collect_goalies', goalies)
+    args = Namespace(dry_run=False, config=None, goalie_dates=['2026-10-02'], teams=['NYR'])
+    assert asyncio.run(collector.run(args)) == (1 if failed_lines else 0)
+    assert bool(requests[0].get('goalies')) == support

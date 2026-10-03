@@ -282,6 +282,9 @@ class Providers:
         return feed
 
     async def goalies(self, date):
+        if os.environ.get('NHL_DFO_LINEUP_MODE', 'direct') == 'uploaded':
+            from .lineup_uploads import uploaded_goalies
+            return uploaded_goalies(self.store, date, f'{DFO}/starting-goalies/{date}')
         ttl = self.dfo_fast_ttl()
         return await self.dfo(f'/starting-goalies/{date}', parse_goalies, ttl)
 

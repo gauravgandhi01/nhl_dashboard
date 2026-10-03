@@ -327,13 +327,16 @@ The default `/tmp` database does not survive instance replacement; preserving
 last-good feeds across deployments requires a persistent mounted database path.
 
 If Render cannot fetch lineups, use the [laptop lineup uploader](docs/lineup-uploader.md).
-It collects all 32 teams locally and sends authenticated snapshots to Render
+It collects all 32 teams and starting-goalie pages for yesterday, today, and
+tomorrow (Eastern time) locally and sends authenticated snapshots to Render
 every five minutes, without a GitHub commit or redeploy for each update.
 Set `NHL_DFO_LINEUP_MODE=uploaded` and a private `NHL_LINEUP_UPLOAD_TOKEN` on
 Render. Local fetching remains the default. Uploaded lineups are marked stale
 after 20 minutes and expire after 24 hours; the original source and collection
-timestamps are preserved. This transport covers team lines and power-play
-units; the separate starting-goalie confirmation feed retains its existing path.
+timestamps are preserved. The same settings also route starting-goalie names,
+confirmation strengths, and news timestamps through the uploader for the slate,
+matchup, and first-period views. Goalie snapshots expire after 20 minutes and
+then return Unknown, so old confirmations are not silently retained.
 
 Player-prop failures are independent of lineup availability. Responses and logs
 distinguish roster/event validation, rejected credentials, provider errors, and

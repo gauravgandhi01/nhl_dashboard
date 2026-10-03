@@ -1,11 +1,13 @@
-# Laptop-to-Render lineup uploads
+# Laptop-to-Render lineup and starting-goalie uploads
 
 The laptop fetches Daily Faceoff using the existing parser and uploads parsed
-team lineups to `POST /api/admin/lineups`. Render serves the snapshots through
-the existing matchup API and Lines UI. No frontend changes or per-update
+team lineups and dated starting-goalie snapshots to `POST /api/admin/lineups`.
+Render serves the snapshots through the existing slate, matchup, and first-period
+APIs. No frontend changes or per-update
 deployments are needed. This includes forward lines, defense pairs, power-play
-units, and the goalies listed on team lineup pages. The separate daily
-starting-goalie confirmation feed is not part of this upload.
+units, and Daily Faceoff's starting-goalie names, confirmation statuses, and
+news timestamps. The existing `NHL_DFO_LINEUP_MODE=uploaded` setting controls
+both lineups and starting goalies; the existing token and schedule are reused.
 
 ## One-time setup
 
@@ -45,7 +47,7 @@ Run these commands from `nhl_dashboard/`, using its existing virtual environment
    ```
 
    Status should show `"mode": "uploaded"`. After the first successful run,
-   it lists the uploaded teams with source retrieval times and freshness.
+   it lists uploaded teams and goalie dates with source retrieval times and freshness.
    Reopen or refresh a matchup's Lines tab to see the uploaded lineup.
 
 5. Activate the macOS schedule:
@@ -66,23 +68,39 @@ Run these commands from `nhl_dashboard/`, using its existing virtual environment
 ## Freshness, failures, and storage
 
 - Each run collects all 32 teams sequentially with a one-second pause between
-  teams. The existing two-minute source cache and robots checks still apply.
+  teams, plus goalie pages for yesterday, today, and tomorrow in Eastern time.
+  The existing two-minute source cache and robots checks still apply.
 - Only successfully fetched and validated lineups are uploaded. A failed team
   leaves that team's server snapshot unchanged. Partial runs upload successes
   and exit with status 1 so failures remain visible in the logs.
+- Goalie collection failures leave existing snapshots for those dates unchanged.
+  Lineups can upload when goalie pages fail, and goalie snapshots can upload
+  when lineups fail. An empty but successfully parsed goalie page is a valid
+  no-games/no-published-starters snapshot, not a failed request.
 - `retrieved_at` is the laptop's actual source fetch time, not the upload time.
   Daily Faceoff's published `updated_at` is preserved separately; a fresh fetch
   does not mean Daily Faceoff has published a new lineup.
+- Starting-goalie snapshots preserve each news timestamp and the source's
+  confirmation strength. Matching still requires both teams and a game start
+  within one hour. Snapshot dates are checked in Eastern time, including games
+  starting after midnight UTC. Names and confirmations are never inferred.
 - Snapshots become stale after 20 minutes without a source refresh. The Lines
   UI uses its existing warning. After 24 hours the lineup is withheld and the
   roster-only fallback is used. Sleeping or offline laptops therefore cannot
   silently keep old assignments looking fresh.
+- Starting-goalie snapshots expire after **20 minutes**, at which point starter
+  status returns to Unknown. Old confirmations are not retained for 24 hours.
+  Dates outside the uploaded range remain unavailable unless explicitly
+  collected with `--goalie-dates`; no other date's starter is substituted.
 - Uploads require a bearer token of at least 32 characters, have a 256 KiB body
   limit, and validate team names, timestamps, and lineup structure. Older or
   identical snapshots cannot overwrite newer ones. Validation is atomic for
   each batch. Redirects are not followed by the uploader.
-- In uploaded mode, lineup reads never contact Daily Faceoff, even if no
+- In uploaded mode, lineup and starting-goalie reads never contact Daily Faceoff, even if no
   snapshot exists. In the default `direct` mode, existing fetching is unchanged.
+- During deployment to an older backend, the collector continues uploading
+  lineups only until the server advertises `goalie_uploads: true`. Existing
+  lineup-only clients remain compatible with the extended endpoint.
 - Snapshots live in the database selected by `NHL_DASHBOARD_DB`. With the default
   `/tmp/dashboard.sqlite3`, a restart or redeploy can empty them. The next
   collector run repopulates them if the laptop is online. For persistence,
@@ -104,6 +122,12 @@ Inspect the authenticated server status or upload selected teams:
 ```sh
 .venv/bin/python -m backend.collect_lineups status
 .venv/bin/python -m backend.collect_lineups run --teams NYR TOR
+```
+
+Collect specific goalie page dates (up to seven; overrides the default window):
+
+```sh
+.venv/bin/python -m backend.collect_lineups run --goalie-dates 2026-10-02 2026-10-03
 ```
 
 The private config path can be overridden **before** the subcommand:
