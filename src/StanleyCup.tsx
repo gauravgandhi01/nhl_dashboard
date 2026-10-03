@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { RefreshButton } from "./RefreshButton";
 import type { Source } from "./types";
 
 type CupTeam = {
@@ -133,7 +132,6 @@ function TeamLogo({ team }: { team: CupTeam }) {
 export function StanleyCup() {
   const [data, setData] = useState<CupData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sort, setSort] = useState<{ key: SortKey; direction: "asc" | "desc" }>({
     key: "points",
@@ -141,7 +139,6 @@ export function StanleyCup() {
   });
 
   const load = async (refresh = false) => {
-    setBusy(true);
     setError(null);
     try {
       const r = await fetch(`/api/stanley-cup${refresh ? "/refresh" : ""}`, {
@@ -154,7 +151,6 @@ export function StanleyCup() {
       setError(e instanceof Error ? e.message : "Stanley Cup odds unavailable");
     } finally {
       setLoading(false);
-      setBusy(false);
     }
   };
 
@@ -192,13 +188,6 @@ export function StanleyCup() {
           <h2>Stanley Cup</h2>
           <span className="eyebrow">TEAM RECORDS / POINTS / FANDUEL ODDS</span>
         </div>
-        <RefreshButton
-          label="Odds"
-          ariaLabel="Refresh Stanley Cup odds"
-          description="Fetch latest FanDuel Stanley Cup prices. Uses odds API credits."
-          busy={busy}
-          onClick={() => void load(true)}
-        />
       </section>
       {(error || data?.error) && (
         <p className="confirmation warning">{error || data?.error}</p>
