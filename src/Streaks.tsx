@@ -302,7 +302,6 @@ export function Streaks() {
         </div>
       ) : data ? (
         <>
-          <p className="footnote">{data.season_label || "Selected season"} regular season only. Last 10 uses up to 10 appearances.</p>
           {data.build.status === "building" && (
             <div className="loading-label" role="status">
               <RefreshCw size={14} className="spin" />
@@ -340,11 +339,6 @@ export function Streaks() {
                     </button>
                   ))}
                 </nav>
-                <span className="eyebrow">
-                  {kind === "skater"
-                    ? "SCORING & SHOT VOLUME"
-                    : "WINS & GOALS ALLOWED"}
-                </span>
               </div>
               <div className="streak-grid">
                 {data.boards
