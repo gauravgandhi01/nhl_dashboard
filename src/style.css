@@ -488,6 +488,16 @@ main {
   border-radius: 3px;
   color: #d9dce1;
 }
+.card-metric.card-metric-ranked {
+  grid-template-columns: minmax(0, 1fr) 24px 98px 24px minmax(0, 1fr);
+  gap: 2px;
+}
+.card-metric .league-rank {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--muted);
+  white-space: nowrap;
+}
 .card-metric .better {
   color: #99d5b7;
   background: #70b79612;

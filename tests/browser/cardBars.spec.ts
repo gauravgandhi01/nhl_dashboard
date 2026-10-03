@@ -7,6 +7,8 @@ test("matchup cards show numeric comparisons without bars and leave missing valu
   const side = (home: boolean) => ({
     summary: { gf: home ? 4 : 2, ga: home ? 3 : 2, sf: 30, pp: home ? 25 : null },
     advanced: { xgf_pct: 0 }, form: [],
+    ranks: Object.fromEntries(["gf", "ga", "sf", "pp", "xgf_pct"].map(key => [key,
+      { rank: key === "pp" && !home ? null : home ? 16 : 30, eligible: 32 }])),
     goalie: { name: "Test Goalie", basis: "Likely", stats: { games: 20, sv: .915, gaa: 2.5, gsax: 4 }, advanced_games: 20 },
   });
   await page.route("**/api/**", route => route.fulfill({ json: route.request().url().includes("/api/slate?")
@@ -22,6 +24,13 @@ test("matchup cards show numeric comparisons without bars and leave missing valu
     await expect(row("Goals for / G").locator("strong.better")).toHaveText("4.00");
     await expect(row("Goals against / G").locator("strong.better")).toHaveText("2.00");
     await expect(row("Shots / G").locator(".better, .worse")).toHaveCount(0);
+    await expect(row("Shots / G").locator(".league-rank")).toHaveText(["#30", "#16"]);
+    await expect(row("Power play").locator(".league-rank").first()).toHaveText("—");
+    await expect(row("Shots / G").locator(".league-rank").first()).toHaveAttribute("title", /all 32 NHL teams considered/);
+    const positions = await row("Shots / G").locator(":scope > *").evaluateAll(elements =>
+      elements.map(element => ({ left: element.getBoundingClientRect().left, right: element.getBoundingClientRect().right })));
+    expect(positions).toHaveLength(5);
+    for (let i = 1; i < positions.length; i++) expect(positions[i].left).toBeGreaterThanOrEqual(positions[i - 1].right);
     await expect(row("Power play").locator(".better, .worse")).toHaveCount(0);
     await expect(page.getByText("Goals for / G", { exact: true })).toHaveAttribute("title", "Higher is better");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

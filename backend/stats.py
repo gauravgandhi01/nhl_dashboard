@@ -81,6 +81,21 @@ def card_team_stats(row):
             'pp': number(row['powerPlayPct']) * 100 if number(row.get('powerPlayPct')) is not None else None}
 
 
+def league_ranks(teams, metrics, lower=()):
+    """Competition ranks from the full league; missing/zero-game teams stay unranked."""
+    result = {team: {} for team in teams}
+    for metric in metrics:
+        values = {team: number(stats.get(metric)) for team, stats in teams.items()
+                  if (number(stats.get('games')) or 0) > 0}
+        values = {team: value for team, value in values.items() if value is not None}
+        for team in teams:
+            value = values.get(team)
+            rank = None if value is None else 1 + sum(
+                other < value if metric in lower else other > value for other in values.values())
+            result[team][metric] = {'rank': rank, 'eligible': len(values)}
+    return result
+
+
 def last_five(games, team_id):
     completed = [g for g in games if g.get('gameType') == 2 and g.get('gameState') in ['OFF', 'FINAL']]
     completed.sort(key=lambda g: (g.get('gameDate', ''), g['id']), reverse=True)

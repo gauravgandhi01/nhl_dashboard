@@ -4,6 +4,12 @@ Local daily slate and matchup research: comparison cards with season scoring,
 last-five form, and goalie statistics; season/last-10 team statistics, MoneyPuck
 5-on-5 metrics, goalie comparisons, current rosters, projected lines, and injuries.
 
+Slate cards show `#x` league ranks between each team stat and its label for
+5-on-5 expected-goal share, goals for/against per game, shots per game, and power
+play. Ranks use full-league current-season data, including teams off the slate.
+Lower goals against ranks better; ties share a rank (1, 1, 3). Missing stats and
+teams without games are unranked; hover a rank for the number of teams with data.
+
 ## Start
 
 From this folder:

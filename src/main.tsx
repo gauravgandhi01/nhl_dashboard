@@ -268,6 +268,7 @@ function CardMetric({
   suffix = "",
   lower = false,
   neutral = false,
+  ranks,
 }: {
   label: string;
   away: number | null | undefined;
@@ -276,6 +277,7 @@ function CardMetric({
   suffix?: string;
   lower?: boolean;
   neutral?: boolean;
+  ranks?: { away?: { rank: number | null; eligible: number }; home?: { rank: number | null; eligible: number } };
 }) {
   const comparable =
     !neutral &&
@@ -284,14 +286,23 @@ function CardMetric({
     away.toFixed(digits) !== home.toFixed(digits);
   const awayBetter = comparable && (lower ? away < home : away > home);
   const help = `${lower ? "Lower" : "Higher"} is better`;
+  const rankBadge = (value: number | null | undefined, rank?: { rank: number | null; eligible: number }) => (
+    <span className="league-rank" title={rank?.rank != null && value != null
+      ? `League rank ${rank.rank} among ${rank.eligible} teams with data this season; all 32 NHL teams considered. Ties share a rank. ${help}.`
+      : "League rank unavailable"}>
+      {rank?.rank != null && value != null ? `#${rank.rank}` : "—"}
+    </span>
+  );
   return (
-    <div className="card-metric">
+    <div className={`card-metric${ranks ? " card-metric-ranked" : ""}`}>
       <strong className={comparable ? (awayBetter ? "better" : "worse") : ""}>
         {fmt(away, digits, suffix)}
       </strong>
+      {ranks && rankBadge(away, ranks.away)}
       <span title={neutral ? label : help}>
         {label}
       </span>
+      {ranks && rankBadge(home, ranks.home)}
       <strong className={comparable ? (awayBetter ? "worse" : "better") : ""}>
         {fmt(home, digits, suffix)}
       </strong>
@@ -407,6 +418,7 @@ function CardStats({
       </div>
       <CardMetric
         label="5v5 xG%"
+        ranks={{ away: a?.ranks?.xgf_pct, home: h?.ranks?.xgf_pct }}
         away={a?.advanced.xgf_pct}
         home={h?.advanced.xgf_pct}
         digits={1}
@@ -414,23 +426,27 @@ function CardStats({
       />
       <CardMetric
         label="Goals for / G"
+        ranks={{ away: a?.ranks?.gf, home: h?.ranks?.gf }}
         away={a?.summary.gf}
         home={h?.summary.gf}
       />
       <CardMetric
         label="Goals against / G"
+        ranks={{ away: a?.ranks?.ga, home: h?.ranks?.ga }}
         away={a?.summary.ga}
         home={h?.summary.ga}
         lower
       />
       <CardMetric
         label="Shots / G"
+        ranks={{ away: a?.ranks?.sf, home: h?.ranks?.sf }}
         away={a?.summary.sf}
         home={h?.summary.sf}
         digits={1}
       />
       <CardMetric
         label="Power play"
+        ranks={{ away: a?.ranks?.pp, home: h?.ranks?.pp }}
         away={a?.summary.pp}
         home={h?.summary.pp}
         digits={1}

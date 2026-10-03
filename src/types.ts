@@ -91,6 +91,7 @@ export type SlateData = {
   error: string | null;
 };
 export type CardSide = {
+  ranks?: Record<string, { rank: number | null; eligible: number }>;
   signals?: { id: string; label: string; detail: string }[];
   summary: Stats;
   advanced: Stats;

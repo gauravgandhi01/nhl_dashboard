@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections import defaultdict
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -9,7 +10,7 @@ from .player_identity import resolve_player
 from .signals import matchup_signals
 from .providers import ALIASES, TEAM_NAMES, Providers, starter_for
 from .stats import (advanced_summary, in_season, season_for_date, goalie_summary, match_player, normalized_name,
-                    number, recent, rest_context, season_label, team_summary, card_team_stats, last_five, card_goalie)
+                    number, recent, rest_context, season_label, team_summary, card_team_stats, last_five, card_goalie, league_ranks)
 
 
 def today_et():
@@ -103,6 +104,15 @@ class Dashboard:
             for roster, schedule in contexts.values():
                 sources.extend([roster, schedule])
             by_team = {r['teamId']: r for r in league.data or []}
+            summary_ranks = league_ranks({tid: card_team_stats(row) for tid, row in by_team.items()},
+                                        ['gf', 'ga', 'sf', 'pp'], lower={'ga'})
+            advanced_rows = defaultdict(list)
+            for row in mp_teams.data or []:
+                abbrev = ALIASES.get(row['team'], row['team'])
+                if abbrev in TEAM_NAMES:
+                    advanced_rows[abbrev].append(row)
+            advanced_stats = {abbrev: advanced_summary(rows) for abbrev, rows in advanced_rows.items()}
+            advanced_ranks = league_ranks(advanced_stats, ['xgf_pct'])
             for game in games:
                 if int(game['season']) != season:
                     continue
@@ -114,6 +124,8 @@ class Dashboard:
                     advanced = [r for r in mp_teams.data or [] if ALIASES.get(r['team'], r['team']) == game[side + 'Team']['abbrev']]
                     comparison[side] = {'summary': card_team_stats(by_team.get(tid)),
                                         'advanced': advanced_summary(advanced),
+                                        'ranks': {**summary_ranks.get(tid, {}),
+                                                  **advanced_ranks.get(game[side + 'Team']['abbrev'], {})},
                                         'form': last_five((schedule.data or {}).get('games', []), tid),
                                         'goalie': card_goalie(starters[side], (roster.data or {}).get('goalies', []),
                                                               goalie_stats.data or [], mp_goalies.data or []),
