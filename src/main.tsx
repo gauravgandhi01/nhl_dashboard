@@ -38,7 +38,7 @@ import { Players } from "./Players";
 import { FirstPeriod } from "./FirstPeriod";
 import { Streaks } from "./Streaks";
 import { usePlayerProps, PropsControls, PropsRefreshButton, CompactProps, type PropsState } from "./PlayerProps";
-import { useMoneylines, MoneylineControls, TeamMoneyline } from "./Moneylines";
+import { useMoneylines, MoneylineControls, TeamMoneyline, GameTotal } from "./Moneylines";
 import { et, todayEt } from "./dates";
 
 const today = todayEt;
@@ -416,6 +416,7 @@ function CardStats({
           <TeamMoneyline game={game} odds={odds} side="home" />
         </div>
       </div>
+      <GameTotal game={game} odds={odds} />
       <CardMetric
         label="5v5 xG%"
         ranks={{ away: a?.ranks?.xgf_pct, home: h?.ranks?.xgf_pct }}

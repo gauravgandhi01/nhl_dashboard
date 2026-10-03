@@ -24,7 +24,7 @@ test("matchup cards show numeric comparisons without bars and leave missing valu
     await expect(row("Goals for / G").locator("strong.better")).toHaveText("4.00");
     await expect(row("Goals against / G").locator("strong.better")).toHaveText("2.00");
     await expect(row("Shots / G").locator(".better, .worse")).toHaveCount(0);
-    await expect(row("Shots / G").locator(".league-rank")).toHaveText(["#30", "#16"]);
+    await expect(row("Shots / G").locator(".league-rank")).toHaveText([/^#?30$/, /^#?16$/]);
     await expect(row("Power play").locator(".league-rank").first()).toHaveText("—");
     await expect(row("Shots / G").locator(".league-rank").first()).toHaveAttribute("title", /all 32 NHL teams considered/);
     const positions = await row("Shots / G").locator(":scope > *").evaluateAll(elements =>

@@ -23,6 +23,13 @@ type Odds = {
   retrieved_at: string | null;
   manual_refresh_enabled?: boolean;
   prices: Record<string, Price[]>;
+  totals?: Record<string, {
+    total: number; over: number; under: number;
+    over_bookmaker: string; over_name: string; over_updated_at: string | null; over_effective?: number;
+    under_bookmaker: string; under_name: string; under_updated_at: string | null; under_effective?: number;
+    fair_over: number; paired_books: number;
+  }>;
+  totals_loaded?: boolean;
   usage?: { remaining: string | null } | null;
 };
 const stamp = (s: string | null) =>
@@ -60,7 +67,7 @@ export function useMoneylines(date: string) {
       const result = await r.json();
       if (!current.signal.aborted) setData(result);
     } catch {
-      if (!current.signal.aborted) setError("Moneylines unavailable");
+      if (!current.signal.aborted) setError("Game odds unavailable");
     } finally {
       if (!current.signal.aborted) setBusy(false);
     }
@@ -96,8 +103,8 @@ export function MoneylineControls({
   if (!data?.manual_refresh_enabled) return null;
   return (
     <RefreshButton
-      label="Moneylines"
-      description={`Fetch latest moneylines for all games on this date. Uses odds API credits.${details ? ` ${details}` : ""}`}
+      label="Moneylines + totals"
+      description={`Fetch latest moneylines and game totals for all games on this date. Uses odds API credits for two markets.${details ? ` ${details}` : ""}`}
       busy={busy}
       onClick={odds.load}
     />
@@ -214,4 +221,30 @@ export function TeamMoneyline({
       <small title={book || price.name} aria-label={book || price.name}>{sportsbookCode(bookKey, book || price.name)}</small>
     </span>
   );
+}
+
+export function GameTotal({ game, odds }: { game: Game; odds: ReturnType<typeof useMoneylines> }) {
+  const { data, error, busy } = odds;
+  if (["PPD", "CNCL"].includes(game.schedule_state)) return null;
+  const price = data?.totals?.[String(game.id)];
+  const snapshot = !["FUT", "PRE"].includes(game.state) || new Date(game.start).getTime() <= Date.now();
+  const stale = data?.status === "stale" || !!error;
+  if (!price) return <div className="card-total card-total-empty" aria-label="Game total">
+    {busy ? "Loading total…" : data?.status === "not_configured" ? "Total unavailable · odds not configured"
+      : data?.totals_loaded === false || !data?.totals ? "Total not loaded" : "Total unavailable"}
+  </div>;
+  const outcome = (side: "over" | "under") => {
+    const book = price[`${side}_name`];
+    const effective = price[`${side}_effective`];
+    return <span className="total-price" title={`${side === "over" ? "Over" : "Under"} ${price.total} at ${book}. Updated ${stamp(price[`${side}_updated_at`])}.${effective != null && Math.abs(effective - price[side]) > .5 ? ` Estimated odds after fees: ${american(Math.round(effective))}.` : ""}`}>
+      <span>{side === "over" ? "O" : "U"} {american(price[side])}</span>
+      <small title={book}>{sportsbookCode(price[`${side}_bookmaker`], book)}</small>
+    </span>;
+  };
+  return <div className={`card-total${stale ? " total-stale" : ""}`} aria-label={`Game total ${price.total}`}>
+    {outcome("over")}
+    <span className="total-line" title={`Offered game-total line closest to a 50/50 split across paired books after removing margin. Best prices shown at this exact line; books may differ. Integer totals can push. Retrieved ${stamp(data?.retrieved_at || null)}.`}>Total <strong>{price.total}</strong></span>
+    {outcome("under")}
+    {(stale || snapshot) && <small className="total-status">{[stale && "Stale", snapshot && "Pregame snapshot"].filter(Boolean).join(" · ")}</small>}
+  </div>;
 }

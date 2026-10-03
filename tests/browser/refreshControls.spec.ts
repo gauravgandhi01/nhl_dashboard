@@ -14,7 +14,7 @@ test("refresh actions share one compact toolbar and keep stats and odds scopes s
     } });
   });
   const views = [
-    { name: "slate", path: `/?date=${date}`, stats: "Refresh games", endpoint: "/api/slate", odds: "Refresh moneylines", post: "/api/odds/moneyline/refresh" },
+    { name: "slate", path: `/?date=${date}`, stats: "Refresh games", endpoint: "/api/slate", odds: "Refresh moneylines + totals", post: "/api/odds/moneyline/refresh" },
     { name: "players", path: `/players?date=${date}`, stats: "Refresh players", endpoint: "/api/players", odds: "Refresh slate player odds", post: "/api/player-props/refresh" },
     { name: "lines", path: `/matchups/${gameId}?date=${date}&tab=lineups`, stats: "Refresh matchup", endpoint: `/api/matchups/${gameId}`, odds: "Refresh game player odds", post: "/api/player-props/refresh" },
     { name: "first-period", path: `/first-period?date=${date}`, stats: "Refresh first-period statistics", endpoint: "/api/first-period", odds: "Refresh first-period odds", post: "/api/first-period/odds/refresh" },

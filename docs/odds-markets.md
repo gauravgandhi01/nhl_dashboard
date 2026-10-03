@@ -210,7 +210,7 @@ Start with shots, points, assists, and anytime goalscorer. Use one explicit
 source/time/availability. Do not fetch all props on navigation. This original
 proposal is now partly implemented; historical games-over-line counts remain deferred.
 
-## Moneyline Behavior and Cost
+## Moneyline and Game Total Behavior and Cost
 
 Cards show the best available paired `h2h` price for each side across requested
 The Odds API US regions (`us,us2,us_ex`), not regulation three-way or first-period
@@ -222,11 +222,24 @@ never labels mixed markets as equivalent. Bookmaker settlement rules still apply
 `GET /api/odds/moneyline?date=YYYY-MM-DD` reads SQLite only.
 `POST /api/odds/moneyline/refresh?date=YYYY-MM-DD` explicitly fetches eligible
 pregame prices for that Eastern date. No live or historical prices are requested.
-The 30-minute cache deduplicates refreshes and preserves last-good data on errors;
+The one-hour cache deduplicates non-forced refreshes and preserves last-good data on errors;
 failed attempts back off for 10 minutes. First-period and moneyline requests share
 a credential-safe transport, request lock, and quota cooldown.
 
-Moneyline requests use all requested regions and one market unless
+The same response now includes `totals`, keyed by NHL game ID. Game totals use
+the same configured books as moneylines, with both `h2h,totals` requested in one
+call. For each returned main total line, calculate the no-vig Over probability
+from each valid same-book Over/Under pair, then take the median across books.
+Select the line nearest 50%, breaking ties by paired book count and then the
+lower threshold. Best fee-adjusted payouts compete separately for Over and Under
+at that selected line, with each side's raw price, book, and update time retained.
+Never construct a probability from cross-book best prices or different lines.
+Integer-line probabilities describe Over versus Under conditional on no push;
+the total remains exactly as offered. Alternate totals are not additionally
+requested. Missing totals do not hide moneylines, and cached old-format
+moneylines remain readable until the next explicit refresh.
+
+Moneyline/total requests use all requested regions and two markets unless
 `config/odds.json` selects specific books, so cost scales by provider region or bookmaker
 accounting rather than the former three-bookmaker filter. Player queries are per
 event and charged per returned market/region or selected bookmaker. Market

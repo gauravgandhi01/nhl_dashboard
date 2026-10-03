@@ -1,4 +1,4 @@
-"""On-demand, paired two-way NHL moneylines. Navigation is cache-only."""
+"""On-demand NHL moneylines and balanced game totals. Navigation is cache-only."""
 import asyncio
 import json
 import math
@@ -11,6 +11,7 @@ from .odds_fees import effective_american, net_decimal
 from .odds_client import odds_client, odds_configured
 from .odds_config import market_params, odds_scope
 from .stats import normalized_name, number
+from .game_totals import total_price
 
 
 def moneyline_prices(event, game):
@@ -67,7 +68,8 @@ class Moneylines:
         configured = odds_configured()
         data = json.loads(row[0]) if row and row[0] else {'prices': {}}
         fresh = bool(row and row[0] and time.time() - row[1] < 3600)
-        return {**data, 'date': date, 'configured': configured, 'source': SOURCE,
+        return {**data, 'totals': data.get('totals', {}), 'totals_loaded': 'totals' in data,
+                'date': date, 'configured': configured, 'source': SOURCE,
                 'retrieved_at': datetime.fromtimestamp(row[1], timezone.utc).isoformat() if row and row[1] else None,
                 'status': ('stale' if row[3] or not fresh else 'available') if row and row[0]
                           else 'not_configured' if not configured else 'unavailable' if row and row[3] else 'not_loaded',
@@ -76,7 +78,7 @@ class Moneylines:
     async def refresh(self, date, force=False):
         async with self.lock:
             cached = self.cached(date)
-            if not cached['configured'] or (cached['status'] == 'available' and not force):
+            if not cached['configured'] or (cached['status'] == 'available' and cached['totals_loaded'] and not force):
                 return cached
             row = self.p.store.db.execute('SELECT attempted FROM moneyline_odds WHERE date=?', (date,)).fetchone()
             now = time.time()
@@ -89,12 +91,13 @@ class Moneylines:
                 games = [g for g in schedule.data.get('games', [])
                          if g.get('gameState') in ['FUT', 'PRE'] and g.get('gameScheduleState') not in ['PPD', 'CNCL']
                          and datetime.fromisoformat(g['startTimeUTC'].replace('Z', '+00:00')).timestamp() > now]
-                prices, usage = {}, None
+                prices, totals, usage = {}, {}, None
+                scope = odds_scope()
                 if games:
                     start = datetime.fromisoformat(date).replace(tzinfo=ZoneInfo('America/New_York'))
                     iso = lambda d: d.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
                     events = await self.client.request('/odds', market_params({
-                        'markets': 'h2h', 'oddsFormat': 'american', 'commenceTimeFrom': iso(start),
+                        'markets': 'h2h,totals', 'oddsFormat': 'american', 'commenceTimeFrom': iso(start),
                         'commenceTimeTo': iso(start + timedelta(days=1) - timedelta(seconds=1))}))
                     usage = dict(self.client.usage)
                     if not isinstance(events, list):
@@ -109,12 +112,15 @@ class Moneylines:
                             values = moneyline_prices(*candidates[0])
                             if values:
                                 prices[str(gid)] = values
-                body = {'prices': prices, 'usage': usage, 'eligible_games': len(games),
-                        'odds_scope': odds_scope()}
+                            total = total_price(candidates[0][0], scope['bookmakers'])
+                            if total:
+                                totals[str(gid)] = total
+                body = {'prices': prices, 'totals': totals, 'usage': usage, 'eligible_games': len(games),
+                        'odds_scope': scope}
                 self.p.store.db.execute('INSERT OR REPLACE INTO moneyline_odds VALUES(?,?,?,?,NULL)',
                                        (date, json.dumps(body), now, now))
             except (ValueError, KeyError, TypeError):
-                error = 'Odds quota exhausted' if time.time() < self.client.exhausted_until else 'Moneylines unavailable; check configuration or provider availability'
+                error = 'Odds quota exhausted' if time.time() < self.client.exhausted_until else 'Moneylines and totals unavailable; check configuration or provider availability'
                 self.p.store.db.execute('''INSERT INTO moneyline_odds VALUES(?,NULL,0,?,?)
                     ON CONFLICT(date) DO UPDATE SET attempted=excluded.attempted,error=excluded.error''', (date, now, error))
             self.p.store.db.commit()

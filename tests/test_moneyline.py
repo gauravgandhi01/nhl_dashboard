@@ -20,7 +20,9 @@ def fixture():
             'homeTeam': {'abbrev': 'FLA'}, 'gameState': 'FUT', 'gameScheduleState': 'OK'}
     event = {'id': 'abcd123', 'commence_time': start, 'away_team': 'Chicago Blackhawks', 'home_team': 'Florida Panthers',
              'bookmakers': [{'key': 'fanduel', 'title': 'FanDuel', 'last_update': start, 'markets': [{'key': 'h2h',
-                'outcomes': [{'name': 'Florida Panthers', 'price': -140}, {'name': 'Chicago Blackhawks', 'price': 120}]}]}]}
+                'outcomes': [{'name': 'Florida Panthers', 'price': -140}, {'name': 'Chicago Blackhawks', 'price': 120}]},
+                {'key': 'totals', 'outcomes': [{'name': 'Over', 'point': 6.5, 'price': -110},
+                                             {'name': 'Under', 'point': 6.5, 'price': -110}]}]}]}
     return game, event
 
 
@@ -51,7 +53,7 @@ def test_paired_moneylines_and_reject_ambiguous_markets():
     assert moneyline_prices(event, game) == []
 
 
-@pytest.mark.parametrize('mode', ['success', 'bookmaker_filter', 'missing', 'duplicate', 'started', 'postponed', 'empty', 'schedule_failure', 'no_key', 'quota', 'failure'])
+@pytest.mark.parametrize('mode', ['success', 'bookmaker_filter', 'totals_only', 'no_totals', 'missing', 'duplicate', 'started', 'postponed', 'empty', 'schedule_failure', 'no_key', 'quota', 'failure'])
 def test_cache_and_failure_isolation(tmp_path, monkeypatch, mode):
     keys_path = tmp_path / 'keys.json'
     keys_path.write_text(json.dumps({'api_keys': [] if mode == 'no_key' else ['TEST_SECRET']}))
@@ -67,6 +69,8 @@ def test_cache_and_failure_isolation(tmp_path, monkeypatch, mode):
         if mode == 'started': game['gameState'] = 'LIVE'
         if mode == 'postponed': game['gameScheduleState'] = 'PPD'
         if mode == 'missing': event['bookmakers'] = []
+        if mode == 'totals_only': event['bookmakers'][0]['markets'] = event['bookmakers'][0]['markets'][1:]
+        if mode == 'no_totals': event['bookmakers'][0]['markets'] = event['bookmakers'][0]['markets'][:1]
         calls = []
         class Providers:
             async def nhl(self, *args):
@@ -74,7 +78,7 @@ def test_cache_and_failure_isolation(tmp_path, monkeypatch, mode):
         p = Providers(); p.store = store
         def respond(request):
             calls.append(request)
-            assert request.url.params['markets'] == 'h2h'
+            assert request.url.params['markets'] == 'h2h,totals'
             assert request.url.params['oddsFormat'] == 'american'
             if mode == 'bookmaker_filter':
                 assert request.url.params['bookmakers'] == 'fanduel,espnbet'
@@ -96,6 +100,8 @@ def test_cache_and_failure_isolation(tmp_path, monkeypatch, mode):
             assert results[0]['prices']['2026020001'][0]['away'] == 120
             assert results[0]['prices']['2026020001'][0]['name'] == 'Best available'
             assert results[0]['odds_scope']['mode'] == 'bookmakers'
+            assert results[0]['totals']['2026020001']['total'] == 6.5
+            assert results[0]['totals_loaded'] is True
             assert len(calls) == 1
             forced = await service.refresh('2026-11-01', force=True)
             assert forced['prices']['2026020001'][0]['away'] == 120
@@ -106,8 +112,18 @@ def test_cache_and_failure_isolation(tmp_path, monkeypatch, mode):
             store.client = httpx.AsyncClient(transport=httpx.MockTransport(fail))
             stale = await service.refresh('2026-11-01')
             assert stale['status'] == 'stale' and stale['prices']
+            assert stale['totals']['2026020001']['over'] == -110
+        elif mode == 'totals_only':
+            assert not results[0]['prices']
+            assert results[0]['totals']['2026020001']['total'] == 6.5
+            assert len(calls) == 1
+        elif mode == 'no_totals':
+            assert results[0]['prices'] and not results[0]['totals']
+            assert results[0]['totals_loaded'] is True
+            assert len(calls) == 1
         else:
             assert not results[0]['prices']
+            assert not results[0]['totals']
         if mode in ['no_key', 'started', 'postponed', 'empty', 'schedule_failure']:
             assert not calls
         if mode == 'quota':

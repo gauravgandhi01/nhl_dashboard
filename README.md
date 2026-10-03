@@ -198,12 +198,21 @@ retry after ten minutes and retain last-good snapshots. The page polls only whil
 building, pauses in hidden tabs, and never polls live scores. Date/scope changes
 do not mutate any upstream data. First league-wide loads may take a minute.
 
-## Matchup Moneylines and Player-Prop Coverage
+## Matchup Moneylines, Game Totals, and Player-Prop Coverage
 
 Matchups cards show the best available paired two-way moneyline for each side
 across the requested The Odds API US regions (`us,us2,us_ex`), with the source
 bookmaker and timestamp shown under each away/home price.
-Use **Load moneylines** for the selected date. Navigation reads the 30-minute
+Cards also show a game total and both Over/Under prices from the same configured
+bookmakers. Among returned main `totals` lines, select the line whose median
+same-book, no-vig Over probability is closest to 50%; ties prefer more paired
+books, then the smaller line. Best Over and Under prices are selected separately
+at that exact threshold using the same fee adjustments as moneylines. Each side
+shows its book; integer totals can push. Unpaired and mismatched lines are excluded.
+
+Use **Moneylines + totals** for the selected date. Both markets share one
+provider request and cache; old moneyline-only snapshots show totals as not loaded
+until refreshed. Navigation reads the one-hour
 SQLite cache only; there is no automatic polling or quota spend. Missing, stale,
 and pregame-snapshot prices are labeled. Market favorites use a separate highlight
 from statistical advantages.
