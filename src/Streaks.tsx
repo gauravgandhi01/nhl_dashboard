@@ -8,6 +8,7 @@ import {
   Crosshair,
   ShieldCheck,
   TrendingUp,
+  Clock3,
 } from "lucide-react";
 import type { Source } from "./types";
 import { usePlayerProps, PropsControls, PropsRefreshButton, CompactProps, type PropsState } from "./PlayerProps";
@@ -37,8 +38,10 @@ type Board = {
   period: string;
   kind: "skater" | "goalie";
   entries: Entry[];
+  unit?: "seconds" | "count";
 };
 type Data = {
+  toi_window?: "last5" | "last10" | "season";
   season_label?: string;
   scope: "league" | "tonight";
   boards: Board[];
@@ -62,6 +65,10 @@ type Data = {
   sources: Source[];
 };
 const today = todayEt;
+const formatTOI = (value: number) => {
+  const rounded = Math.round(value);
+  return `${Math.floor(rounded / 60)}:${String(rounded % 60).padStart(2, "0")}`;
+};
 const shortDate = (date: string) =>
   new Date(date + "T12:00:00").toLocaleDateString("en-US", {
     month: "short",
@@ -135,10 +142,11 @@ function Leaderboard({
   props?: PropsState;
 }) {
   const streak = board.id.endsWith("streak");
+  const toi = board.unit === "seconds";
   const lastTen =
     board.id.endsWith("10") || board.period.toLowerCase().includes("last 10");
   const Icon =
-    board.id === "shots10"
+    toi ? Clock3 : board.id === "shots10"
       ? Crosshair
       : board.id === "win_streak"
         ? Trophy
@@ -148,7 +156,7 @@ function Leaderboard({
             ? Flame
             : TrendingUp;
   return (
-    <section className="streak-board" aria-label={board.title}>
+    <section className={`streak-board${toi ? " streak-board-toi" : ""}`} aria-label={board.title}>
       <div className="streak-board-heading">
         <Icon size={17} />
         <h3>{board.title}</h3>
@@ -157,8 +165,8 @@ function Leaderboard({
       <p className="streak-period">{board.period}</p>
       <div className="streak-columns">
         <span>Player</span>
-        <span>Odds</span>
-        <span>{streak ? "Streak" : "Total"}</span>
+        {!toi && <span>Odds</span>}
+        <span>{toi ? "TOI / G" : streak ? "Streak" : "Total"}</span>
         <span>Recent 5</span>
       </div>
       {board.entries.length ? (
@@ -186,22 +194,22 @@ function Leaderboard({
                   )}
                 </div>
               </div>
-              <div className="streak-odds">
+              {!toi && <div className="streak-odds">
                 {props && board.kind === "skater" && p.matchups.map(m => (
                   <CompactProps key={m.game_id} state={props} gameId={m.game_id} playerId={p.id}
                     family={board.id === "shots10" ? "shots" : ["goals10", "goal_streak"].includes(board.id) ? "scorer" : "points"}
                     showLabel={false} />
                 ))}
-              </div>
+              </div>}
               <div
                 className="streak-value"
                 title={`${p.start_date} through ${p.end_date}; ${p.seasons.join(", ")}${p.lower_bound ? "; earlier history is incomplete" : ""}`}
               >
                 <strong>
-                  {p.value}
+                  {toi ? formatTOI(p.value) : p.value}
                   {p.lower_bound ? "+" : ""}
                 </strong>
-                {(!lastTen || p.sample_size < 10) && (
+                {(toi || !lastTen || p.sample_size < 10) && (
                   <span>
                     {streak
                       ? board.id === "win_streak"
@@ -222,7 +230,7 @@ function Leaderboard({
                   return (
                     <span
                       key={r.date + i}
-                      className={good ? "streak-hit" : "streak-miss"}
+                      className={toi ? "streak-toi-time" : good ? "streak-hit" : "streak-miss"}
                       title={`${r.date} vs ${r.opponent || "--"}: ${r.value ?? "--"}${board.id === "low_ga10" ? " goals allowed" : ""}`}
                     >
                       {r.value ?? "--"}
@@ -253,6 +261,8 @@ export function Streaks() {
     : today();
   const scope = params.get("scope") === "league" ? "league" : "tonight";
   const kind = params.get("kind") === "goalie" ? "goalie" : "skater";
+  const toiWindow = ["last5", "last10", "season"].includes(params.get("toi_window") || "")
+    ? params.get("toi_window")! : "last10";
   const props = usePlayerProps(date, undefined, scope === "tonight" && kind === "skater");
   const update = (key: string, value: string) => {
     if (!value) return;
@@ -265,9 +275,9 @@ export function Streaks() {
     error,
     busy,
     refresh,
-  } = useStreaks(`/api/streaks?date=${date}&scope=${scope}`);
+  } = useStreaks(`/api/streaks?date=${date}&scope=${scope}&toi_window=${toiWindow}`);
   const data =
-    response?.date === date && response.scope === scope ? response : null;
+    response?.date === date && response.scope === scope && (response.toi_window || "last10") === toiWindow ? response : null;
   return (
     <>
       <div className="toolbar">
@@ -339,6 +349,14 @@ export function Streaks() {
                     </button>
                   ))}
                 </nav>
+                {kind === "skater" && <label className="streak-toi-window">
+                  TOI span
+                  <select aria-label="TOI span" value={toiWindow} onChange={event => update("toi_window", event.target.value)}>
+                    <option value="last5">Last 5</option>
+                    <option value="last10">Last 10</option>
+                    <option value="season">Season</option>
+                  </select>
+                </label>}
               </div>
               <div className="streak-grid">
                 {data.boards

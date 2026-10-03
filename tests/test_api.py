@@ -129,6 +129,7 @@ def test_api_validation_and_spa_routes(tmp_path, monkeypatch):
         assert client.get('/api/odds/moneyline?date=2026-09-28').json()['prices'] == {}
         assert client.get('/api/streaks?date=not-a-date').status_code == 422
         assert client.get('/api/streaks?scope=invalid').status_code == 422
+        assert client.get('/api/streaks?toi_window=invalid').status_code == 422
         assert client.get('/api/first-period?date=not-a-date').status_code == 422
         assert client.get('/api/first-period?window=last20').status_code == 422
         assert client.get('/api/first-period/matchups/123').status_code == 404

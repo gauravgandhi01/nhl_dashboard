@@ -6,9 +6,10 @@ import time
 from .providers import TEAM_NAMES
 from .service import display_name, latest_sources, today_et
 from .stats import number, season_label, season_for_date, in_season
-from .players import seconds
-
-SNAPSHOT_VERSION = 2
+SNAPSHOT_VERSION = 3
+TOI_WINDOWS = {'last5': 5, 'last10': 10, 'season': None}
+TOI_BOARDS = {f'toi_{position}_{window}': (position, window, count)
+              for window, count in TOI_WINDOWS.items() for position in ['forward', 'defense']}
 
 BOARDS = [
     ('points10', 'Points', 'Last 10 appearances', 'skater', 'points'),
@@ -20,6 +21,30 @@ BOARDS = [
     ('low_ga10', 'Starts with 0-1 GA', 'Last 10 starts; relief appearances excluded', 'goalie', 'goalsAgainst'),
     ('shutouts10', 'Shutouts', 'Last 10 starts; official NHL shutouts', 'goalie', 'shutouts'),
 ]
+BOARDS += [(key, 'Average TOI · ' + ('Forwards' if position == 'forward' else 'Defense'),
+            (f'Last {count} appearances' if count else 'Season appearances') + ' · All strengths', 'skater', 'toi')
+           for key, (position, _, count) in TOI_BOARDS.items()]
+
+
+def toi_seconds(value):
+    if not isinstance(value, str):
+        return None
+    parts = value.split(':')
+    if len(parts) != 2 or any(not part.isdigit() for part in parts) or int(parts[1]) >= 60:
+        return None
+    result = int(parts[0]) * 60 + int(parts[1])
+    return result if result > 0 else None
+
+
+def position_group(player):
+    position = player.get('position_group')
+    if position in ['forward', 'defense']:
+        return position
+    if player.get('position') == 'D':
+        return 'defense'
+    if player.get('position') in ['C', 'L', 'R', 'LW', 'RW', 'F']:
+        return 'forward'
+    return None
 
 
 def normalize(rows, cutoff, season=None):
@@ -27,7 +52,7 @@ def normalize(rows, cutoff, season=None):
     grouped = {}
     for r in rows:
         gid = r.get('gameId')
-        if not in_season(gid, season) or str(gid)[4:6] != '02' or r.get('gameDate', '9999') >= cutoff or not seconds(r.get('toi')):
+        if not in_season(gid, season) or str(gid)[4:6] != '02' or r.get('gameDate', '9999') >= cutoff or not toi_seconds(r.get('toi')):
             continue
         if gid in grouped and grouped[gid] != r:
             raise ValueError('Conflicting player-game records')
@@ -37,6 +62,12 @@ def normalize(rows, cutoff, season=None):
 
 def metric(rows, key, complete):
     field = next(b[4] for b in BOARDS if b[0] == key)
+    if key in TOI_BOARDS:
+        sample = rows[:TOI_BOARDS[key][2]]
+        values = [toi_seconds(row.get('toi')) for row in sample]
+        if not sample or any(value is None for value in values):
+            return None
+        return {'value': sum(values) / len(values), 'sample': sample, 'open': False}
     sample = [r for r in rows if r.get('gamesStarted') == 1] if key in ['low_ga10', 'shutouts10'] else rows
     if key == 'win_streak':
         sample = [r for r in rows if r.get('decision') not in [None, '', 'N', 'ND']]
@@ -63,6 +94,8 @@ def entries_for(player, rows, complete):
     entries = {}
     for key, _, _, kind, field in BOARDS:
         if kind != player['kind']:
+            continue
+        if key in TOI_BOARDS and position_group(player) != TOI_BOARDS[key][0]:
             continue
         result = metric(rows, key, complete)
         if result is None or result['value'] <= 0:
@@ -160,6 +193,7 @@ class Streaks:
                         identities.setdefault(r['id'], []).append({
                             'id': r['id'], 'name': f"{display_name(r.get('firstName'))} {display_name(r.get('lastName'))}",
                             'kind': kind, 'team': team, 'position': r.get('positionCode'),
+                            'position_group': 'forward' if group == 'forwards' else 'defense' if group == 'defensemen' else 'goalie',
                             'logo': f'https://assets.nhle.com/logos/nhl/svg/{team}_light.svg'})
             players = [candidates[0] for candidates in identities.values() if len(candidates) == 1]
             progress['total'] = len(players)
@@ -197,7 +231,9 @@ class Streaks:
             self.p.store.db.commit()
             progress['status'] = 'unavailable'
 
-    async def view(self, date, scope='league'):
+    async def view(self, date, scope='league', toi_window='last10'):
+        if toi_window not in TOI_WINDOWS:
+            raise ValueError('Invalid TOI window')
         cutoff = min(date, today_et())
         self.ensure_build(cutoff)
         schedule = await self.p.nhl(f'score/{date}', 600)
@@ -213,12 +249,16 @@ class Streaks:
         body = json.loads(row[0]) if row and row[0] else None
         boards = []
         for key, title, period, kind, _ in BOARDS:
+            if key in TOI_BOARDS and TOI_BOARDS[key][1] != toi_window:
+                continue
             entries = (body or {}).get('entries', {}).get(key, [])
             eligible = [e for e in entries if scope == 'league' or e['team'] in opponents]
             boards.append({'id': key, 'title': title, 'period': period, 'kind': kind,
+                           'unit': 'seconds' if key in TOI_BOARDS else 'count',
                            'entries': [{**e, 'matchups': opponents.get(e['team'], [])} for e in top_ten(eligible)]})
         from datetime import datetime, timezone
-        return {'date': date, 'season_label': season_label(season_for_date(cutoff)), 'as_of': cutoff, 'scope': scope, 'boards': boards,
+        return {'date': date, 'season_label': season_label(season_for_date(cutoff)), 'as_of': cutoff, 'scope': scope,
+                'toi_window': toi_window, 'boards': boards,
                 'build': self.progress.get(cutoff, {'status': 'ready', 'done': 0, 'total': 0}),
                 'retrieved_at': datetime.fromtimestamp(row[1], timezone.utc).isoformat() if row and row[1] else None,
                 'stale': bool(row and row[0] and (row[3] or time.time() - row[1] >= 21600)),

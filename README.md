@@ -165,10 +165,17 @@ API additions:
 
 ## Streaks and Leaders
 
-The **Streaks** tab (`/streaks?date=YYYY-MM-DD`) contains eight top-10 boards:
+The **Streaks** tab (`/streaks?date=YYYY-MM-DD`) contains ten top-10 boards:
 points, goals and shots in the last ten appearances; active point and goal
 streaks; consecutive goalie wins; starts allowing 0-1 goals in the last ten starts;
-and official shutouts in those starts. League-wide is the default; **On slate**
+official shutouts in those starts; and separate average TOI boards for forwards
+and defensemen. **TOI span** selects Last 5, Last 10 (default), or Season for
+these two boards only. TOI/G is total all-strengths ice time divided by actual
+appearances in that span, displayed as minutes:seconds with the sample GP and
+recent game TOI. These are averages, not cumulative minutes. All spans reuse
+the same season snapshot without extra history requests.
+
+The page defaults to **On slate**, which
 recomputes the top ten among players whose current teams play on the selected
 date. Scheduled-team badges are not player/goalie participation confirmations.
 

@@ -86,8 +86,9 @@ async def moneyline_refresh(date: Date | None = None):
 
 
 @app.get('/api/streaks')
-async def streaks(date: Date | None = None, scope: Literal['league', 'tonight'] = 'league'):
-    return await app.state.streaks.view(date.isoformat() if date else today_et(), scope)
+async def streaks(date: Date | None = None, scope: Literal['league', 'tonight'] = 'league',
+                  toi_window: Literal['last5', 'last10', 'season'] = 'last10'):
+    return await app.state.streaks.view(date.isoformat() if date else today_et(), scope, toi_window)
 
 
 @app.get('/api/player-props')

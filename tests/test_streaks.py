@@ -136,3 +136,73 @@ def test_snapshot_build_dedup_slate_scope_failures_and_no_games(tmp_path,monkeyp
             assert view['ready'] and view['stale'] and view['error']
         finally:await service.close();await store.close()
     asyncio.run(scenario())
+
+
+def test_toi_averages_by_span_and_position_not_total_minutes():
+    rows = normalize([row(i, toi='30:00' if i > 5 else '10:00') for i in range(1, 13)], '2026-01-01')
+    forward = entries_for(player(), rows, True)
+    assert forward['toi_forward_last5']['value'] == 1800
+    assert forward['toi_forward_last10']['value'] == 1440
+    assert forward['toi_forward_season']['value'] == 1300
+    assert forward['toi_forward_last5']['sample_size'] == 5
+    assert forward['toi_forward_season']['sample_size'] == 12
+    assert not any(key.startswith('toi_defense') for key in forward)
+    defense = entries_for({**player(), 'position': 'D'}, rows, True)
+    assert defense['toi_defense_last10']['value'] == 1440
+    assert not any(key.startswith('toi_forward') for key in defense)
+    unknown = entries_for({**player(), 'position': None}, rows, True)
+    assert not any(key.startswith('toi_') for key in unknown)
+    roster_group = entries_for({**player(), 'position': None, 'position_group': 'defense'}, rows, True)
+    assert 'toi_defense_last10' in roster_group
+    short = entries_for({**player(), 'id': 2}, rows[:2], True)['toi_forward_last10']
+    assert short['sample_size'] == 2
+    assert top_ten([forward['toi_forward_last10'], short])[0]['id'] == 2
+    assert short['recent'][0]['value'] == '30:00'
+
+
+def test_toi_excludes_bad_times_and_retains_small_current_season_samples():
+    rows = normalize([row(1, 2026, toi='20:30'), row(2, 2026, toi='21:31'),
+                      row(3, 2026, toi='00:00'), row(4, 2026, toi='20:99'),
+                      row(5, 2026, toi='-1:30'), row(6, 2026, toi=None), row(1, 2025)], '2026-11-07')
+    entry = entries_for(player(), rows, True)['toi_forward_last10']
+    assert entry['sample_size'] == 2
+    assert entry['value'] == 1260.5
+    assert entry['seasons'] == ['2026-27']
+    assert metric([row(1, toi='bad')], 'toi_forward_last5', True) is None
+
+
+def test_toi_scope_window_and_snapshot_reuse(tmp_path):
+    async def scenario():
+        import json, time
+        from backend.streaks import SNAPSHOT_VERSION
+        store = Store(tmp_path / 'toi.sqlite3')
+        class Fake:
+            async def nhl(self, path, *args):
+                assert path.startswith('score/')  # Changing spans must reuse player history.
+                return Feed({'games': [{'id': 2025020001, 'awayTeam': {'abbrev': 'CAR'},
+                                         'homeTeam': {'abbrev': 'BOS'}}]}, 'NHL', path)
+        p = Fake(); p.store = store
+        service = Streaks(p)
+        all_entries = {}
+        for identity, team, position, toi in [(1, 'CAR', 'C', '20:00'), (2, 'NYR', 'R', '25:00'), (3, 'BOS', 'D', '30:00')]:
+            entries = entries_for({**player(), 'id': identity, 'team': team, 'position': position}, [row(1, toi=toi)], True)
+            for key, entry in entries.items():
+                all_entries.setdefault(key, []).append(entry)
+        body = {'version': SNAPSHOT_VERSION, 'entries': all_entries}
+        store.db.execute('INSERT INTO streak_snapshots VALUES(?,?,?,?,NULL)',
+                         ('2026-01-01', json.dumps(body), time.time(), time.time()))
+        store.db.commit()
+        try:
+            league = await service.view('2026-01-01', 'league', 'last5')
+            toi = [b for b in league['boards'] if b['unit'] == 'seconds']
+            assert len(toi) == 2 and all(b['id'].endswith('last5') for b in toi)
+            assert toi[0]['entries'][0]['id'] == 2
+            slate = await service.view('2026-01-01', 'tonight', 'season')
+            toi = [b for b in slate['boards'] if b['unit'] == 'seconds']
+            assert all(b['id'].endswith('season') for b in toi)
+            assert toi[0]['entries'][0]['id'] == 1
+            assert toi[1]['entries'][0]['id'] == 3
+            assert not service.tasks
+        finally:
+            await service.close(); await store.close()
+    asyncio.run(scenario())
