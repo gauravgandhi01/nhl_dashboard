@@ -639,17 +639,28 @@ main {
 }
 .card-goalie-names > div {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
+  align-items: center;
+  gap: 4px;
   min-width: 0;
+}
+.card-goalie-names > div.away {
+  justify-content: flex-end;
+  text-align: right;
+}
+.card-goalie-names > div.home {
+  justify-content: flex-start;
+  text-align: left;
 }
 .card-goalie-names strong {
   font-size: 10px;
   font-weight: 500;
   overflow-wrap: anywhere;
+  min-width: 0;
 }
-.card-goalie-names span {
+.goalie-status-icon {
+  flex: 0 0 auto;
   font-size: 9px;
+  line-height: 1;
 }
 .card-coverage {
   grid-template-columns: minmax(0, 1fr) 132px minmax(0, 1fr);
@@ -2289,7 +2300,45 @@ tr:hover td {
 .refresh-button:focus-visible { outline: 2px solid #9ebdce; outline-offset: 2px; }
 .props-controls:empty { display: none; }
 
-.card-stats .card-matchup { grid-template-columns: minmax(0, 1fr) 22px minmax(0, 1fr); gap: 2px; }
+.card-stats .card-matchup { grid-template-columns: minmax(0, 1fr) 50px minmax(0, 1fr); gap: 2px; }
+.card-center-market {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 1px;
+  min-width: 0;
+}
+.card-center-market .eyebrow {
+  font-size: 8px;
+}
+.card-center-market .card-total {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1px;
+  margin: 15px 0 0;
+  padding: 0;
+  border: 0;
+  font-size: 8px;
+}
+.card-center-market .total-line strong {
+  font-size: 8px;
+}
+.card-center-market .total-prices {
+  gap: 3px;
+  justify-content: center;
+}
+.card-center-market .total-price {
+  gap: 1px;
+  font-size: 7px;
+}
+.card-center-market .total-price small,
+.card-center-market .total-status {
+  display: none;
+}
+.card-center-market .card-total-empty {
+  font-size: 7px;
+  line-height: 1.05;
+}
 .card-matchup > .card-team { gap: 1px 4px; }
 .card-matchup > .card-away { grid-template-columns: minmax(0, 1fr) 46px; }
 .card-matchup > .card-home { grid-template-columns: 46px minmax(0, 1fr); }
@@ -2304,8 +2353,8 @@ tr:hover td {
   transform-origin: center;
 }
 .card-record { overflow: hidden; text-overflow: ellipsis; font: 8px var(--mono); color: var(--muted); white-space: nowrap; }
-.card-team .team-moneyline { display: flex; align-items: baseline; justify-content: center; gap: 4px; margin: 0 0 5px; }
-.card-team .team-moneyline small { font-size: 7px; }
+.card-team .team-moneyline { display: flex; align-items: baseline; justify-content: center; gap: 3px; margin: 0 0 3px; font-size: 9px; }
+.card-team .team-moneyline small { font-size: 6px; }
 
 .line-player-heading { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 3px 6px; }
 .line-player-heading > strong { flex: 1 1 70px; min-width: 0; }

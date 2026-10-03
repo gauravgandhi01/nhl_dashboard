@@ -86,6 +86,8 @@ const clock = (value: number | null | undefined) =>
   value == null
     ? "--"
     : `${Math.floor(Math.round(value) / 60)}:${String(Math.round(value) % 60).padStart(2, "0")}`;
+const goalieStatusIcon = (status: string | null | undefined) =>
+  status === "Confirmed" ? "✅" : status === "Likely" ? "⚠️" : "⛔️";
 
 function useData<T>(url: string) {
   const [state, setState] = useState<{
@@ -425,14 +427,16 @@ function CardStats({
           <span className="card-record" title="Team record (W–L–OT) and points">{cardRecord(game.away.record)}</span>
           <TeamMoneyline game={game} odds={odds} side="away" />
         </div>
-        <span className="eyebrow">AT</span>
+        <span className="card-center-market">
+          <span className="eyebrow">AT</span>
+          <GameTotal game={game} odds={odds} />
+        </span>
         <div className="card-team card-home" role="group" aria-label={game.home.name} title={game.home.name}>
           <Logo team={game.home} />
           <span className="card-record" title="Team record (W–L–OT) and points">{cardRecord(game.home.record)}</span>
           <TeamMoneyline game={game} odds={odds} side="home" />
         </div>
       </div>
-      <GameTotal game={game} odds={odds} />
       <CardMetric
         label="5v5 xG%"
         ranks={{ away: a?.ranks?.xgf_pct, home: h?.ranks?.xgf_pct }}
@@ -482,20 +486,20 @@ function CardStats({
       </div>
       <div className="card-goalie-names">
         {[a, h].map((side, i) => (
-          <div key={i}>
-            <strong>{side?.goalie.name || "--"}</strong>
+          <div key={i} className={i === 0 ? "away" : "home"}>
+            {i === 0 && <strong>{side?.goalie.name || "--"}</strong>}
             <span
-              className={
-                side?.goalie.basis === "Confirmed" ? "positive" : "muted"
-              }
+              className="goalie-status-icon"
               title={
                 side?.goalie.basis === "Roster leader"
                   ? "Most-used goalie on the current roster during the displayed season. Not a projected starter."
-                  : "Reported starter status"
+                  : `Reported starter status: ${side?.goalie.basis || "Unknown"}`
               }
+              aria-label={side?.goalie.basis || "Unknown"}
             >
-              {side?.goalie.basis || "Unknown"}
+              {goalieStatusIcon(side?.goalie.basis)}
             </span>
+            {i === 1 && <strong>{side?.goalie.name || "--"}</strong>}
           </div>
         ))}
       </div>
