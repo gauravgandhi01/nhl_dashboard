@@ -25,8 +25,13 @@ test("cards show a total with both prices and books without paid navigation requ
     await page.goto(`/?date=${date}`);
     const total = page.getByLabel("Game total 6", { exact: true });
     await expect(total).toBeVisible();
-    await expect(total.locator(".total-price")).toHaveText(["O -105DK", "U +100FD"]);
-    await expect(total.locator(".total-line")).toHaveText("Total 6");
+    await expect(total.locator(".total-price")).toHaveText(["-105DK", "+100FD"]);
+    await expect(total.locator(".total-line")).toHaveText("6");
+    await expect(total.locator(".total-price").first()).toHaveAttribute("aria-label", /^Over 6:/);
+    await expect(total.locator(".total-price").last()).toHaveAttribute("aria-label", /^Under 6:/);
+    const lineBox = await total.locator(".total-line").boundingBox();
+    const pricesBox = await total.locator(".total-prices").boundingBox();
+    expect(pricesBox!.x).toBeGreaterThan(lineBox!.x + lineBox!.width);
     await expect(total.locator(".total-price small").first()).toHaveAttribute("title", "DraftKings");
     expect(posts).toBe(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

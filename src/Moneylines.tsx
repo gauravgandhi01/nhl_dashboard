@@ -236,15 +236,14 @@ export function GameTotal({ game, odds }: { game: Game; odds: ReturnType<typeof 
   const outcome = (side: "over" | "under") => {
     const book = price[`${side}_name`];
     const effective = price[`${side}_effective`];
-    return <span className="total-price" title={`${side === "over" ? "Over" : "Under"} ${price.total} at ${book}. Updated ${stamp(price[`${side}_updated_at`])}.${effective != null && Math.abs(effective - price[side]) > .5 ? ` Estimated odds after fees: ${american(Math.round(effective))}.` : ""}`}>
-      <span>{side === "over" ? "O" : "U"} {american(price[side])}</span>
+    return <span className="total-price" aria-label={`${side === "over" ? "Over" : "Under"} ${price.total}: ${american(price[side])} at ${book}`} title={`${side === "over" ? "Over" : "Under"} ${price.total} at ${book}. Updated ${stamp(price[`${side}_updated_at`])}.${effective != null && Math.abs(effective - price[side]) > .5 ? ` Estimated odds after fees: ${american(Math.round(effective))}.` : ""}`}>
+      <span>{american(price[side])}</span>
       <small title={book}>{sportsbookCode(price[`${side}_bookmaker`], book)}</small>
     </span>;
   };
   return <div className={`card-total${stale ? " total-stale" : ""}`} aria-label={`Game total ${price.total}`}>
-    {outcome("over")}
-    <span className="total-line" title={`Offered game-total line closest to a 50/50 split across paired books after removing margin. Best prices shown at this exact line; books may differ. Integer totals can push. Retrieved ${stamp(data?.retrieved_at || null)}.`}>Total <strong>{price.total}</strong></span>
-    {outcome("under")}
+    <span className="total-line" title={`Offered game-total line closest to a 50/50 split across paired books after removing margin. Best prices shown at this exact line; books may differ. Integer totals can push. Retrieved ${stamp(data?.retrieved_at || null)}.`}><strong>{price.total}</strong></span>
+    <span className="total-prices">{outcome("over")}{outcome("under")}</span>
     {(stale || snapshot) && <small className="total-status">{[stale && "Stale", snapshot && "Pregame snapshot"].filter(Boolean).join(" · ")}</small>}
   </div>;
 }

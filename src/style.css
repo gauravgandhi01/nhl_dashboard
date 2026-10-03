@@ -503,19 +503,21 @@ main {
 }
 .card-total {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 98px minmax(0, 1fr);
+  grid-template-columns: max-content max-content;
+  justify-content: center;
   align-items: center;
-  gap: 3px;
+  gap: 3px 8px;
   margin: 3px 0 6px;
   padding: 5px 0;
   border-block: 1px solid var(--border);
   text-align: center;
   font-size: 10px;
 }
-.total-price { display: flex; align-items: baseline; justify-content: center; gap: 4px; font-family: var(--mono); white-space: nowrap; }
-.total-price small { font-size: 8px; color: var(--muted); }
+.total-prices { display: flex; align-items: baseline; gap: 8px; }
+.total-price { display: flex; align-items: baseline; justify-content: center; gap: 3px; font-family: var(--mono); font-size: 9px; white-space: nowrap; }
+.total-price small { font-size: 7px; color: var(--muted); }
 .total-line { color: var(--muted); }
-.total-line strong { color: #e4e5e7; font-family: var(--mono); font-weight: 500; }
+.total-line strong { color: #e4e5e7; font-family: var(--mono); font-size: 11px; font-weight: 500; }
 .total-status { grid-column: 1 / -1; color: var(--muted); font-size: 8px; }
 .total-stale .total-status { color: #d7b877; }
 .card-total-empty { display: block; color: var(--muted); font-size: 9px; }
