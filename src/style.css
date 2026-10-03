@@ -332,16 +332,19 @@ main {
   min-width: 0;
   gap: 6px;
   padding: 8px;
-  background: #191a1c;
-  border: 1px solid var(--border);
+  background: #1c1d20;
+  border: 1px solid #3a3d42;
   border-radius: 6px;
+  box-shadow: 0 1px 0 #ffffff08 inset, 0 10px 22px #00000014;
   transition:
     background 0.12s,
-    border-color 0.12s;
+    border-color 0.12s,
+    box-shadow 0.12s;
 }
 .game-card:hover {
-  background: #202124;
-  border-color: #555a61;
+  background: #222327;
+  border-color: #5a5f67;
+  box-shadow: 0 1px 0 #ffffff0c inset, 0 12px 26px #0000001f;
 }
 .card-matchup,
 .card-metric,
@@ -489,12 +492,12 @@ main {
   color: #d9dce1;
 }
 .card-metric.card-metric-ranked {
-  grid-template-columns: minmax(0, 1fr) 24px 98px 24px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 20px 98px 20px minmax(0, 1fr);
   gap: 2px;
 }
 .card-metric .league-rank {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: 8px;
   color: var(--muted);
   white-space: nowrap;
 }
@@ -1767,7 +1770,7 @@ tr:hover td {
   color: var(--muted);
   width: 16px;
   flex-shrink: 0;
-  font: 9px var(--mono);
+  font: 8px var(--mono);
 }
 .streak-player .logo {
   width: 20px;
@@ -1978,6 +1981,10 @@ tr:hover td {
 .fp-playing td:nth-child(2) {
   color: #b5dbc8;
   box-shadow: inset 2px 0 #7eb79b;
+}
+.fp-rankings tbody td:first-child {
+  font: 9px var(--mono);
+  color: var(--muted);
 }
 @media (max-width: 600px) {
   .topbar {

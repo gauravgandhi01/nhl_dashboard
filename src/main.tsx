@@ -290,7 +290,7 @@ function CardMetric({
     <span className="league-rank" title={rank?.rank != null && value != null
       ? `League rank ${rank.rank} among ${rank.eligible} teams with data this season; all 32 NHL teams considered. Ties share a rank. ${help}.`
       : "League rank unavailable"}>
-      {rank?.rank != null && value != null ? `#${rank.rank}` : "—"}
+      {rank?.rank != null && value != null ? rank.rank : "—"}
     </span>
   );
   return (

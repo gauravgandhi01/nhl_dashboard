@@ -559,7 +559,7 @@ function GoalieDetail({ side, league }: { side: Side; league: Windows }) {
       <p className="footnote">
         {choice == null ? side.goalie_basis : "Inspecting roster goalie"} /{" "}
         {goalie?.rank
-          ? `Season GA rank #${goalie.rank.ga} / SV rank ${goalie.rank.sv == null ? "--" : "#" + goalie.rank.sv} of ${goalie.rank.qualified} (5+ 1P GP)`
+          ? `Season GA rank ${goalie.rank.ga} / SV rank ${goalie.rank.sv == null ? "--" : goalie.rank.sv} of ${goalie.rank.qualified} (5+ 1P GP)`
           : "Unranked / fewer than 5 verified 1P appearances"}
       </p>
       {goalie && <FormTable stats={goalie.windows} goalie league={league} />}
@@ -635,7 +635,7 @@ function Rankings({ data, window }: { data: Data; window: Window }) {
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className={r.playing ? "fp-playing" : ""}>
-                <td>#{r.rank}</td>
+                <td>{r.rank}</td>
                 <td>
                   <span className="player-matchup">
                     <img
