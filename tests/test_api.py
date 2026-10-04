@@ -3,7 +3,7 @@ import asyncio
 import httpx
 from fastapi.testclient import TestClient
 
-from backend.app import app, manual_odds_refresh_enabled
+from backend.app import app, automatic_odds_refresh_enabled, manual_odds_refresh_enabled
 from backend.cache import Feed, Store
 from backend.service import Dashboard
 from backend.providers import Providers
@@ -143,11 +143,17 @@ def test_api_validation_and_spa_routes(tmp_path, monkeypatch):
 def test_manual_odds_refresh_gate_defaults_on_and_can_disable_posts(tmp_path, monkeypatch):
     monkeypatch.setenv('NHL_DASHBOARD_DB', str(tmp_path / 'api.sqlite3'))
     monkeypatch.delenv('NHL_MANUAL_ODDS_REFRESH_ENABLED', raising=False)
+    monkeypatch.delenv('NHL_AUTOMATIC_ODDS_REFRESH_ENABLED', raising=False)
     assert manual_odds_refresh_enabled()
+    assert not automatic_odds_refresh_enabled()
     with TestClient(app) as client:
         assert client.get('/api/odds/moneyline?date=2026-09-28').json()['manual_refresh_enabled'] is True
     monkeypatch.setenv('NHL_MANUAL_ODDS_REFRESH_ENABLED', 'false')
     assert not manual_odds_refresh_enabled()
+    assert not automatic_odds_refresh_enabled()
+    monkeypatch.setenv('NHL_AUTOMATIC_ODDS_REFRESH_ENABLED', 'true')
+    assert automatic_odds_refresh_enabled()
+    monkeypatch.setenv('NHL_AUTOMATIC_ODDS_REFRESH_ENABLED', 'false')
     with TestClient(app) as client:
         assert client.post('/api/odds/moneyline/refresh?date=2026-09-28').status_code == 403
         assert client.post('/api/first-period/odds/refresh?date=2026-09-28').status_code == 403

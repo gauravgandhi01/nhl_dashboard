@@ -112,6 +112,12 @@ const timestamp = (s: string | null) =>
       }) + " ET"
     : "Unavailable";
 const selected = (s: Side) => s.goalies.find((g) => g.id === s.selected_goalie);
+const goalieStatusIcon = (status: string | null | undefined) =>
+  status === "Confirmed" ? "✅" : status === "Likely" ? "⚠️" : "⛔️";
+const lastName = (name: string | null | undefined) => {
+  const parts = (name || "").trim().split(/\s+/).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : "Unavailable";
+};
 
 function usePeriod(url: string) {
   const [data, setData] = useState<Data | null>(null),
@@ -412,18 +418,27 @@ function PeriodCard({
           percent
         />
         <div className="card-goalie-names">
-          {[m.away, m.home].map((s) => (
-            <div key={s.team.id}>
-              <strong>{s.starter.name || selected(s)?.name || "Unavailable"}</strong>
-              <span
-                className={
-                  s.starter.status === "Confirmed" ? "positive" : "muted"
-                }
-              >
-                {s.starter.name ? s.starter.status : s.goalie_basis}
-              </span>
-            </div>
-          ))}
+          {[m.away, m.home].map((s, i) => {
+            const name = s.starter.name || selected(s)?.name || "Unavailable";
+            const status = s.starter.name ? s.starter.status : s.goalie_basis;
+            return (
+              <div key={s.team.id} className={i === 0 ? "away" : "home"}>
+                {i === 0 && <strong title={name}>{lastName(name)}</strong>}
+                <span
+                  className="goalie-status-icon"
+                  title={
+                    status === "Roster leader"
+                      ? "Most-used goalie on the current roster during the displayed season. Not a projected starter."
+                      : `Reported starter status: ${status || "Unknown"}`
+                  }
+                  aria-label={status || "Unknown"}
+                >
+                  {goalieStatusIcon(status)}
+                </span>
+                {i === 1 && <strong title={name}>{lastName(name)}</strong>}
+              </div>
+            );
+          })}
         </div>
         <ComparisonRow
           label="GP"

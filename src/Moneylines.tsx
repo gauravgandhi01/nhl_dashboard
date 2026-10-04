@@ -243,7 +243,7 @@ export function GameTotal({ game, odds }: { game: Game; odds: ReturnType<typeof 
   };
   return <div className={`card-total${stale ? " total-stale" : ""}`} aria-label={`Game total ${price.total}`}>
     <span className="total-line" title={`Offered game-total line closest to a 50/50 split across paired books after removing margin. Best prices shown at this exact line; books may differ. Integer totals can push. Retrieved ${stamp(data?.retrieved_at || null)}.`}><strong>{price.total}</strong></span>
-    <span className="total-prices">{outcome("over")}{outcome("under")}</span>
+    <span className="total-prices">{outcome("under")}{outcome("over")}</span>
     {(stale || snapshot) && <small className="total-status">{[stale && "Stale", snapshot && "Pregame snapshot"].filter(Boolean).join(" · ")}</small>}
   </div>;
 }

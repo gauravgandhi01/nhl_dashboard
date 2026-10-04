@@ -2318,10 +2318,10 @@ tr:hover td {
   margin: 15px 0 0;
   padding: 0;
   border: 0;
-  font-size: 8px;
+  font-size: 9px;
 }
 .card-center-market .total-line strong {
-  font-size: 8px;
+  font-size: 9px;
 }
 .card-center-market .total-prices {
   gap: 3px;
@@ -2329,7 +2329,7 @@ tr:hover td {
 }
 .card-center-market .total-price {
   gap: 1px;
-  font-size: 7px;
+  font-size: 8px;
 }
 .card-center-market .total-price small,
 .card-center-market .total-status {

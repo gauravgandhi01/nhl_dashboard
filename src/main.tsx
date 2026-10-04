@@ -88,6 +88,10 @@ const clock = (value: number | null | undefined) =>
     : `${Math.floor(Math.round(value) / 60)}:${String(Math.round(value) % 60).padStart(2, "0")}`;
 const goalieStatusIcon = (status: string | null | undefined) =>
   status === "Confirmed" ? "✅" : status === "Likely" ? "⚠️" : "⛔️";
+const lastName = (name: string | null | undefined) => {
+  const parts = (name || "").trim().split(/\s+/).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : "--";
+};
 
 function useData<T>(url: string) {
   const [state, setState] = useState<{
@@ -342,11 +346,11 @@ function CardForm({ side }: { side?: CardSide }) {
                   ? "overtime"
                   : "loss"
             }
-            title={`${g.date} ${g.home ? "vs" : "at"} ${g.opponent}: ${g.result}`}
+            title={`${g.date} ${g.home ? "" : "at "}${g.opponent}: ${g.result}`}
           >
             <strong>{g.result === "OTL" ? "OT" : g.result}</strong>
             <small>
-              <b>{g.home ? "vs" : "@"}</b> {g.opponent}
+              {g.home ? g.opponent : <><b>@</b> {g.opponent}</>}
             </small>
           </span>
         ))
@@ -487,7 +491,7 @@ function CardStats({
       <div className="card-goalie-names">
         {[a, h].map((side, i) => (
           <div key={i} className={i === 0 ? "away" : "home"}>
-            {i === 0 && <strong>{side?.goalie.name || "--"}</strong>}
+            {i === 0 && <strong title={side?.goalie.name || undefined}>{lastName(side?.goalie.name)}</strong>}
             <span
               className="goalie-status-icon"
               title={
@@ -499,7 +503,7 @@ function CardStats({
             >
               {goalieStatusIcon(side?.goalie.basis)}
             </span>
-            {i === 1 && <strong>{side?.goalie.name || "--"}</strong>}
+            {i === 1 && <strong title={side?.goalie.name || undefined}>{lastName(side?.goalie.name)}</strong>}
           </div>
         ))}
       </div>

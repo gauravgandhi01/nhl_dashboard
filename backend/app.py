@@ -25,10 +25,15 @@ from .lineup_uploads import router as lineup_upload_router
 
 ROOT = Path(__file__).resolve().parents[1]
 FALSE_VALUES = {'0', 'false', 'no', 'off', 'disabled'}
+TRUE_VALUES = {'1', 'true', 'yes', 'on', 'enabled'}
 
 
 def manual_odds_refresh_enabled():
     return os.environ.get('NHL_MANUAL_ODDS_REFRESH_ENABLED', 'true').strip().lower() not in FALSE_VALUES
+
+
+def automatic_odds_refresh_enabled():
+    return os.environ.get('NHL_AUTOMATIC_ODDS_REFRESH_ENABLED', 'false').strip().lower() in TRUE_VALUES
 
 
 def require_manual_odds_refresh():
@@ -48,7 +53,6 @@ async def automatic_odds_refresh(app, interval=3600):
                     current = today_et()
                     await app.state.moneylines.refresh(current, force=True)
                     await app.state.first_period_odds.refresh(current, force=True)
-                    await app.state.player_props.view(current, refresh=True)
                 except Exception:
                     pass
             await asyncio.sleep(interval)
@@ -70,7 +74,7 @@ async def lifespan(app):
     app.state.player_props = PlayerProps(providers)
     app.state.stanley_cup = StanleyCup(providers)
     app.state.automatic_odds_refresh = None
-    if not manual_odds_refresh_enabled():
+    if automatic_odds_refresh_enabled():
         app.state.automatic_odds_refresh = asyncio.create_task(automatic_odds_refresh(app))
     try:
         yield

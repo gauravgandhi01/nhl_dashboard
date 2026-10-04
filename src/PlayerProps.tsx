@@ -274,7 +274,7 @@ const lineLabel = (line: PropLine) =>
     ? "ATG / O0.5"
     : line.point == null
       ? "First goal"
-      : `${line.point}${line.alternate ? " alt" : ""}`;
+      : `${line.point}`;
 
 function MarketRow({
   player,
