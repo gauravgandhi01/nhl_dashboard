@@ -309,12 +309,16 @@ or settlement conditions not captured by their listed price. No bets are placed.
 
 Expanded rows and on-slate skater streaks show how often the player went over
 the selected shots, points, assists, or goals line in last 5, last 10, and the
-season. Line tiles keep those counts off the card and show them when the odds
-are hovered or focused. Anytime goal and goals Over 0.5 use the
-same goals count. The figure is appearances over the line, with pushes separated
-on integer lines. It is a count of regular-season appearances before the selected
-date, not a probability. A missing stat drops that game from that stat only.
-First goalscorer has no count. Goalie rows and league-wide streaks do not show one.
+season. Anytime goal and goals Over 0.5 use the same goals count. The figure is
+appearances over the line, with pushes separated on integer lines. It is a count
+of regular-season appearances before the selected date, not a probability. A
+missing stat drops that game from that count only. First goalscorer has no count.
+Goalie rows and league-wide streaks do not show one.
+
+Line tiles keep those counts off the card. Hovering or focusing a price shows
+the newest regular-season games for that stat, up to ten, each with the opponent
+(`@` away, `vs` home) and the stat. A missing opponent or stat is a dash. Older
+games are noted as a count, not listed.
 
 Projected line names, matched injury names, and skater streak names open that
 player’s expanded Players row. Goalie streak names stay plain text. An id that

@@ -2352,7 +2352,6 @@ tr:hover td {
 .line-player .has-count-tip:hover .line-count-empty.compact,
 .line-player .has-count-tip:focus-within .line-count-empty.compact {
   opacity: 1;
-  pointer-events: auto;
 }
 .line-player:hover,
 .line-player:focus-within { z-index: 3; }
@@ -2365,6 +2364,16 @@ tr:hover td {
 }
 .line-player .has-count-tip .line-count-label { color: #b7bcc3; }
 .line-player .has-count-tip .line-count b { color: #d5d8dc; }
+.line-player .has-count-tip .line-log { overflow: visible; }
+.line-player .has-count-tip .line-log-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.line-player .has-count-tip .line-log-row b { font-weight: 600; color: #f3f3f4; }
 .line-player .prop-quote { margin-top: auto; }
 .line-player .prop-quote b { color: #a6d6e3; font-weight: 600; }
 .line-player .prop-quote small { font-size: 8px; }

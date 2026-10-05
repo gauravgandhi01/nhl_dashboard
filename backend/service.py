@@ -62,7 +62,10 @@ def skater_appearances(logs, cutoff, season=None):
 
 
 def appearance_series(rows):
-    return {key: [number(row.get(key)) for row in rows] for key in ('goals', 'assists', 'points', 'shots')}
+    series = {key: [number(row.get(key)) for row in rows] for key in ('goals', 'assists', 'points', 'shots')}
+    series['opponents'] = [row.get('opponentAbbrev') or None for row in rows]
+    series['home'] = [True if row.get('homeRoad') == 'H' else False if row.get('homeRoad') == 'R' else None for row in rows]
+    return series
 
 
 def lineup_usage_windows(logs, advanced, cutoff, season=None):

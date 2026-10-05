@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { RefreshButton } from "./RefreshButton";
-import { countTitle, formatCount, lineWindows, type AppearanceLog } from "./lineCounts";
+import { countTitle, formatCount, gameLogRows, lineWindows, type AppearanceLog } from "./lineCounts";
 
 export type Quote = {
   side: string;
@@ -290,6 +290,29 @@ export function LineCounts({
   compact?: boolean;
   showCaption?: boolean;
 }) {
+  const logged = showCaption ? gameLogRows(log, family, point) : null;
+  if (showCaption) {
+    if (!logged) return null;
+    if (logged.empty) {
+      return (
+        <span className="line-count-empty compact">
+          No regular-season appearances
+        </span>
+      );
+    }
+    return (
+      <span className="line-counts compact line-log" aria-label={`${logged.label} game log`}>
+        <span className="line-count-label">{logged.label}</span>
+        {logged.rows.map((row, index) => (
+          <span className="line-log-row" key={`${row.opponent ?? "game"}-${index}`}>
+            <span>{[row.where, row.opponent].filter(Boolean).join(" ") || "—"}</span>
+            <b>{row.value == null || !Number.isFinite(row.value) ? "—" : String(row.value)}</b>
+          </span>
+        ))}
+        {logged.earlier > 0 && <span className="line-count-label">+ {logged.earlier} earlier</span>}
+      </span>
+    );
+  }
   const result = lineWindows(log, family, point);
   if (!result) return null;
   if (result.empty) {
@@ -301,11 +324,7 @@ export function LineCounts({
   }
   return (
     <span className={`line-counts${compact ? " compact" : ""}`} aria-label="Appearances over this line">
-      {showCaption ? (
-        <span className="line-count-label">Over {result.spec.point} {result.spec.label}</span>
-      ) : !compact ? (
-        <span className="line-count-label">Appearances over this line</span>
-      ) : null}
+      {!compact && <span className="line-count-label">Appearances over this line</span>}
       {result.windows.map(({ label, count }) => (
         <span
           key={label}

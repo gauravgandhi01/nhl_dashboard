@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
-import { countWindow, formatCount } from "../../src/lineCounts";
+import { countWindow, formatCount, gameLogRows } from "../../src/lineCounts";
 
 const date = "2026-10-04";
 const source = { source: "NHL", url: "https://example.test", retrieved_at: null, status: "available" };
@@ -11,6 +11,30 @@ test("line counts drop missing values and separate integer pushes", () => {
   expect(formatCount(countWindow(shots, 2, 5)!)).toBe("1/5 · 2 pushes");
   expect(countWindow([2, null, 1], 1.5, 5)).toEqual({ games: 2, over: 1, under: 1, push: 0 });
   expect(countWindow([], 0.5, null)?.games).toBe(0);
+});
+
+test("a hover log lists the stat beside the opponent", () => {
+  const logged = gameLogRows({
+    goals: [1], assists: [0], points: [2, 1, null], shots: [3],
+    opponents: ["BOS", "MTL", null],
+    home: [false, true, false],
+  }, "points", 0.5);
+  expect(logged && !logged.empty && logged).toMatchObject({
+    label: "PTS",
+    earlier: 0,
+    rows: [
+      { where: "@", opponent: "BOS", value: 2 },
+      { where: "vs", opponent: "MTL", value: 1 },
+      { where: "", opponent: null, value: null },
+    ],
+  });
+  const long = gameLogRows({
+    goals: [], assists: [], points: Array.from({ length: 12 }, (_, i) => i), shots: [],
+  }, "points", 0.5);
+  expect(long && !long.empty && long.rows).toHaveLength(10);
+  expect(long && !long.empty && long.earlier).toBe(2);
+  expect(gameLogRows({ goals: [], assists: [], points: [], shots: [] }, "shots", 1.5)?.empty).toBe(true);
+  expect(gameLogRows(null, "points", 0.5)).toBeNull();
 });
 
 function quote(point: number | null, side = point == null ? "yes" : "over") {
@@ -56,7 +80,8 @@ const props = {
           id: 7, name: "Alex Skater", team: "TOR",
           markets: {
             shots: [propLine(1.5), propLine(2)],
-            points: [], assists: [], anytime: [], goals: [],
+            points: [propLine(0.5, "player_points")],
+            assists: [], anytime: [], goals: [],
             first_goal: [propLine(null, "player_goal_scorer_first")],
           },
         },
@@ -176,7 +201,14 @@ function side(abbrev: string, withPlayer: boolean) {
     roster_source: source,
     lineup: withPlayer ? { sections: { "Forward Line 1": ["Alex Skater", "Hurt Player"] }, updated_at: null } : null,
     lineup_usage: {},
-    lineup_logs: withPlayer ? { "7": { goals: [1], assists: [0], points: [1], shots } } : {},
+    lineup_logs: withPlayer ? {
+      "7": {
+        goals: [1, 0, 0, 1, 0], assists: [1, 1, 1, 0, 0], points: [2, 1, 1, 0, 1],
+        shots: [3, 2, null, 1, 0],
+        opponents: ["BOS", "MTL", "DET", "BUF", "PIT"],
+        home: [false, true, false, true, null],
+      },
+    } : {},
     lineup_player_ids: withPlayer ? { "Alex Skater": 7, "Hurt Player": null } : {},
     lineup_source: source,
     injuries: withPlayer ? [{ name: "Alex Skater", player_id: 7, status: "Day-To-Day", note: "Lower body", updated_at: "2026-10-04T00:00:00Z" }] : [],
@@ -196,14 +228,32 @@ test("line, injury, and streak names open the player", async ({ page }) => {
   for (const width of [1440, 375]) {
     await page.setViewportSize({ width, height: 800 });
     await page.goto(`/matchups/1?date=${date}&tab=lineups`);
-    const odds = page.locator(".line-player").first().locator(".has-count-tip");
-    const counts = odds.locator(".line-counts");
+    const player = page.locator(".line-player").first();
+    const pts = player.locator(".has-count-tip", { hasText: "PTS" });
+    const ptsLog = pts.locator(".line-log");
     await page.mouse.move(0, 0);
-    await expect(counts).toHaveCSS("opacity", "0");
-    await odds.hover();
-    await expect(counts).toHaveCSS("opacity", "1");
-    await expect(counts).toContainText("Over 1.5 shots");
-    await expect(counts).toContainText("3/5");
+    await expect(ptsLog).toHaveCSS("opacity", "0");
+    await pts.hover();
+    await expect(ptsLog).toHaveCSS("opacity", "1");
+    const ptsRows = ptsLog.locator(".line-log-row");
+    await expect(ptsRows).toHaveCount(5);
+    await expect(ptsRows.nth(0)).toContainText("@ BOS");
+    await expect(ptsRows.nth(0)).toContainText("2");
+    await expect(ptsRows.nth(1)).toContainText("vs MTL");
+    await expect(ptsRows.nth(1)).toContainText("1");
+    await expect(ptsLog).not.toContainText("L5");
+    await expect(ptsLog).not.toContainText("3/5");
+    const sog = player.locator(".has-count-tip", { hasText: "SOG" });
+    await sog.hover();
+    const sogRows = sog.locator(".line-log-row");
+    await expect(sog.locator(".line-log")).toHaveCSS("opacity", "1");
+    await expect(ptsLog).toHaveCSS("opacity", "0");
+    await expect(sogRows.nth(0)).toContainText("@ BOS");
+    await expect(sogRows.nth(0)).toContainText("3");
+    await expect(sogRows.nth(2)).toContainText("—");
+    await expect(sogRows.nth(4)).toContainText("PIT");
+    await expect(sogRows.nth(4)).not.toContainText("@");
+    await expect(sogRows.nth(4)).not.toContainText("vs");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   }
   await page.setViewportSize({ width: 1440, height: 800 });
