@@ -50,10 +50,17 @@ async def automatic_odds_refresh(app, interval=3600):
     try:
         while True:
             if odds_configured():
+                current = today_et()
                 try:
-                    current = today_et()
                     await app.state.moneylines.refresh(current, force=True)
+                except Exception:
+                    pass
+                try:
                     await app.state.first_period_odds.refresh(current, force=True)
+                except Exception:
+                    pass
+                try:
+                    await app.state.player_props.view(current, refresh=True)
                 except Exception:
                     pass
             await asyncio.sleep(interval)

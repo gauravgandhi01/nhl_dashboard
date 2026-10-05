@@ -46,6 +46,15 @@ type PropData = {
 export type PropsState = ReturnType<typeof usePlayerProps>;
 
 export const american = (n: number) => (n > 0 ? `+${n}` : String(n));
+
+export function oddsTone(price: number) {
+  if (!Number.isFinite(price)) return "odds-even";
+  if (price <= -180) return "odds-short";
+  if (price < -115) return "odds-lean-short";
+  if (price <= 115) return "odds-even";
+  if (price < 220) return "odds-lean-long";
+  return "odds-long";
+}
 const shortBook: Record<string, string> = {
   ballybet: "Bally",
   betonlineag: "BOL",
@@ -264,7 +273,7 @@ function Price({
       aria-label={title}
     >
       {prefix && <span>{prefix} </span>}
-      <b>{american(quote.price)}</b>
+      <b className={oddsTone(quote.price)}>{american(quote.price)}</b>
       {showBook && <small>{shortBook[quote.bookmaker] || quote.book}</small>}
     </span>
   );

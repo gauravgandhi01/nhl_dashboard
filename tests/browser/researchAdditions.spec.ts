@@ -37,16 +37,16 @@ test("a hover log lists the stat beside the opponent", () => {
   expect(gameLogRows(null, "points", 0.5)).toBeNull();
 });
 
-function quote(point: number | null, side = point == null ? "yes" : "over") {
+function quote(point: number | null, side = point == null ? "yes" : "over", price = 120) {
   return {
-    side, price: 120, bookmaker: "fanduel", book: "FanDuel",
+    side, price, bookmaker: "fanduel", book: "FanDuel",
     market: "player_shots_on_goal", updated_at: "2026-10-04T12:00:00Z",
   };
 }
-function propLine(point: number | null, market = "player_shots_on_goal") {
+function propLine(point: number | null, market = "player_shots_on_goal", price = 120) {
   return {
     id: `${market}:${point}`, market, point, alternate: false,
-    quotes: [quote(point), ...(point == null ? [] : [{ ...quote(point, "under"), price: -140 }])],
+    quotes: [quote(point, point == null ? "yes" : "over", price), ...(point == null ? [] : [{ ...quote(point, "under"), price: -140 }])],
   };
 }
 
@@ -79,8 +79,8 @@ const props = {
         "7": {
           id: 7, name: "Alex Skater", team: "TOR",
           markets: {
-            shots: [propLine(1.5), propLine(2)],
-            points: [propLine(0.5, "player_points")],
+            shots: [propLine(1.5, "player_shots_on_goal", -150), propLine(2)],
+            points: [propLine(0.5, "player_points", 180)],
             assists: [], anytime: [], goals: [],
             first_goal: [propLine(null, "player_goal_scorer_first")],
           },
@@ -238,6 +238,13 @@ test("line, injury, and streak names open the player", async ({ page }) => {
     expect(await odds.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
     expect(ptsBox && ptsLabel && ptsLabel.x <= ptsBox.x + 2).toBeTruthy();
     if ((cardBox?.width || 0) > 180) expect(ptsBox!.height).toBeLessThan(20);
+    const ptsPrice = pts.locator(".prop-quote b");
+    const sogPrice = player.locator(".has-count-tip", { hasText: "SOG" }).locator(".prop-quote b");
+    await expect(ptsPrice).toHaveClass(/odds-lean-long/);
+    await expect(ptsPrice).toHaveCSS("color", "rgb(215, 192, 154)");
+    await expect(sogPrice).toHaveClass(/odds-lean-short/);
+    await expect(sogPrice).toHaveCSS("color", "rgb(142, 195, 222)");
+    expect(await pts.locator(".compact-prop-label").evaluate((el) => getComputedStyle(el).color)).not.toBe("rgb(215, 192, 154)");
     const ptsLog = pts.locator(".line-log");
     await page.mouse.move(0, 0);
     await expect(ptsLog).toHaveCSS("opacity", "0");

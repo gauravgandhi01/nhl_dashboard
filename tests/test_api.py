@@ -3,7 +3,7 @@ import asyncio
 import httpx
 from fastapi.testclient import TestClient
 
-from backend.app import app, automatic_odds_refresh_enabled, manual_odds_refresh_enabled
+from backend.app import app, automatic_odds_refresh, automatic_odds_refresh_enabled, manual_odds_refresh_enabled
 from backend.cache import Feed, Store
 from backend.service import Dashboard
 from backend.providers import Providers
@@ -207,6 +207,56 @@ def test_manual_odds_refresh_gate_defaults_on_and_can_disable_posts(tmp_path, mo
         assert client.post('/api/player-props/refresh?date=2026-09-28').status_code == 403
         assert client.get('/api/odds/moneyline?date=2026-09-28').json()['manual_refresh_enabled'] is False
         assert client.get('/api/first-period/odds?date=2026-09-28').json()['manual_refresh_enabled'] is False
+
+
+def test_automatic_odds_refresh_includes_player_props(monkeypatch):
+    calls = []
+
+    class Moneylines:
+        async def refresh(self, date, force=False):
+            calls.append(('moneylines', date, force))
+            raise RuntimeError('moneyline failed')
+
+    class FirstPeriod:
+        async def refresh(self, date, force=False):
+            calls.append(('first_period', date, force))
+
+    class Props:
+        async def view(self, date, game_id=None, refresh=False):
+            calls.append(('props', date, game_id, refresh))
+
+    fake_app = type('App', (), {})()
+    fake_app.state = type('State', (), {
+        'moneylines': Moneylines(),
+        'first_period_odds': FirstPeriod(),
+        'player_props': Props(),
+    })()
+
+    async def stop(_interval):
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr('backend.app.today_et', lambda: '2026-10-05')
+    monkeypatch.setattr('backend.app.asyncio.sleep', stop)
+
+    async def once(configured):
+        monkeypatch.setattr('backend.app.odds_configured', lambda: configured)
+        try:
+            await automatic_odds_refresh(fake_app, interval=3600)
+        except asyncio.CancelledError:
+            return
+        raise AssertionError('refresh loop should stop after one pass')
+
+    async def scenario():
+        await once(False)
+        assert calls == []
+        await once(True)
+
+    asyncio.run(scenario())
+    assert calls == [
+        ('moneylines', '2026-10-05', True),
+        ('first_period', '2026-10-05', True),
+        ('props', '2026-10-05', None, True),
+    ]
 
 
 def test_pagination_advances_by_actual_page_size(tmp_path):

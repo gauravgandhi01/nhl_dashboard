@@ -1230,11 +1230,14 @@ function Lineups({ side, props, gameId, date }: { side: Side; props: PropsState;
             <p className="confirmation warning">Cached projection; refresh unavailable. {side.lineup_source.error}</p>
           )}
           {sections
-            .map(([name, players]) => (
+            .map(([name, players]) => {
+              const numberedUnit = /^(forward line|defense pair)\s+\d+$/i.test(name);
+              return (
               <div className="line-section" key={name}>
-                <h3>{name}</h3>
+                {!numberedUnit && <h3>{name}</h3>}
                 <div
                   className={`line-grid ${name === "Defensive Pairings" || name.startsWith("Defense pair") ? "pairs" : ""}`}
+                  aria-label={numberedUnit ? name : undefined}
                 >
                   {players.map((p, i) => {
                     const values = usageWindows.map(window => usageValue(p, window));
@@ -1262,7 +1265,8 @@ function Lineups({ side, props, gameId, date }: { side: Side; props: PropsState;
                   })}
                 </div>
               </div>
-            ))}
+              );
+            })}
           <p className="footnote">
             TOI shading: rose = lower, green = higher within this team’s displayed forwards or defense, per column.
             <br />

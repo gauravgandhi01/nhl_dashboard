@@ -280,7 +280,8 @@ or first-period configuration. Prices may be missing at any of these books.
 
 **Load game props** fetches one event; **Load slate props** fetches uncached
 eligible games for the selected date. Navigation/expansion only reads the shared
-SQLite cache. Ten requested markets across nine books cost at most ten credits
+SQLite cache. When `NHL_AUTOMATIC_ODDS_REFRESH_ENABLED` is on, today's eligible
+games are also fetched at startup and every hour. Ten requested markets across nine books cost at most ten credits
 per game with nonempty coverage; each load button's tooltip gives an upper bound.
 Prices cache for 30 minutes, concurrent refreshes deduplicate, failures back off
 for ten minutes, and last-good quotes remain visibly stale. Started games do
@@ -365,6 +366,10 @@ Optional build/runtime settings:
   `api_keys` array enables moneylines, player props, and first-period odds.
 - `NHL_MANUAL_ODDS_REFRESH_ENABLED=false` disables manual odds refresh requests.
   The default is enabled.
+- `NHL_AUTOMATIC_ODDS_REFRESH_ENABLED=true` refreshes today's moneylines,
+  first-period odds, and player props once at startup and then every hour.
+  The default is off. Started games are not requested. Stanley Cup odds stay
+  on their own fetch.
 
 Daily Faceoff access can differ between your machine and the hosted server.
 In direct mode, a failed `robots.txt` request is logged and the page fetch is

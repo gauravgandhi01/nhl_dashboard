@@ -74,6 +74,8 @@ test("lineup TOI follows NHL IDs across name variants and explains missing value
     const player = (name: string) => page.locator(".line-player").filter({ has: page.locator(`strong[title="${name}"]`) });
     const forward = player("Gabriel Perreault").first();
     const defense = player("Low Defender").first();
+    await expect(page.getByRole("heading", { name: /^(Forward [Ll]ine|Defense pair) \d+$/ })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "1st Powerplay Unit" })).toBeVisible();
     await expect(forward).toContainText("16:20");
     await expect(forward.locator(".line-scoring")).toContainText("G0A4P4");
     await expect(player("Unknown Skater").locator(".line-scoring")).toContainText("G--A--P--");

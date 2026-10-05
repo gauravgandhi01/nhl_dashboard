@@ -2312,6 +2312,11 @@ tr:hover td {
 .prop-line-buttons button:hover { background: #2b2d31; }
 .prop-quote { display: inline-flex; align-items: baseline; gap: 3px; white-space: nowrap; color: #a6d6e3; font: 10px var(--mono); }
 .prop-quote b { font-weight: 600; }
+.prop-quote b.odds-even { color: #a6d6e3; }
+.prop-quote b.odds-lean-short { color: #8ec3de; }
+.prop-quote b.odds-short { color: #6aadd4; }
+.prop-quote b.odds-lean-long { color: #d7c09a; }
+.prop-quote b.odds-long { color: #e0b56a; }
 .prop-quote small { font: 8px var(--sans); color: #9da6ae; }
 .prop-quote:focus-visible { outline: 1px solid #9ebdce; outline-offset: 2px; }
 .prop-missing { color: var(--muted); font-size: 10px; white-space: nowrap; }
@@ -2385,7 +2390,7 @@ tr:hover td {
 }
 .line-player .has-count-tip .line-log-row b { font-weight: 600; color: #f3f3f4; }
 .line-player .prop-quote { margin-top: 0; }
-.line-player .prop-quote b { color: #a6d6e3; font-weight: 600; }
+.line-player .prop-quote b { font-weight: 600; }
 .line-player .prop-quote small { font-size: 8px; }
 .prop-slash { color: var(--muted); font-size: 9px; }
 .prop-snapshot { font-size: 8px; color: var(--muted); }
