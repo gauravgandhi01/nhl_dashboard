@@ -596,7 +596,7 @@ function Slate() {
   };
   return (
     <>
-      <div className="toolbar">
+      <div className="toolbar slate-toolbar">
         <div className="segments" aria-label="Game status">
           {[
             ["upcoming", "Upcoming"],
@@ -615,34 +615,32 @@ function Slate() {
           ))}
         </div>
         <div className="toolbar-right">
+          <div className="slate-filter-toggles" aria-label="Slate filters">
+            <button
+              type="button"
+              className={b2bOnly ? "selected" : ""}
+              aria-pressed={b2bOnly}
+              title="Show games where either team played the previous night. A missing flag is not a claim that the schedule was checked."
+              onClick={() => setB2bOnly((value) => !value)}
+            >
+              Back-to-back
+            </button>
+            <button
+              type="button"
+              className={confirmedOnly ? "selected" : ""}
+              aria-pressed={confirmedOnly}
+              title="Show games where at least one reported starter is confirmed."
+              onClick={() => setConfirmedOnly((value) => !value)}
+            >
+              Confirmed starter
+            </button>
+          </div>
           <div className="refresh-actions" role="group" aria-label="Refresh data">
             <RefreshButton label="Stats" ariaLabel="Refresh games"
               description="Reload games, scores, team stats and goalie context. Cached sources refresh when due."
               onClick={refresh} busy={refreshing || loading} />
             <MoneylineControls odds={odds} />
           </div>
-        </div>
-      </div>
-      <div className="slate-filters" aria-label="Slate filters">
-        <div className="slate-filter-toggles">
-          <button
-            type="button"
-            className={b2bOnly ? "selected" : ""}
-            aria-pressed={b2bOnly}
-            title="Show games where either team played the previous night. A missing flag is not a claim that the schedule was checked."
-            onClick={() => setB2bOnly((value) => !value)}
-          >
-            Back-to-back
-          </button>
-          <button
-            type="button"
-            className={confirmedOnly ? "selected" : ""}
-            aria-pressed={confirmedOnly}
-            title="Show games where at least one reported starter is confirmed."
-            onClick={() => setConfirmedOnly((value) => !value)}
-          >
-            Confirmed starter
-          </button>
         </div>
       </div>
       {loading ? (

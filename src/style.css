@@ -268,33 +268,26 @@ main {
   gap: 12px;
   margin-bottom: 14px;
 }
-.slate-filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin: -4px 0 14px;
-}
 .slate-filter-toggles {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-left: auto;
+  gap: 4px;
 }
-.slate-filters button {
-  min-height: 24px;
+.slate-filter-toggles button {
+  height: 28px;
   border: 1px solid var(--border);
   border-radius: 4px;
   background: #1c1d20;
   color: var(--muted);
-  font-size: 11px;
-  padding: 2px 8px;
+  font-size: 10px;
+  padding: 0 8px;
+  white-space: nowrap;
 }
-.slate-filters button.selected {
+.slate-filter-toggles button.selected {
   background: #303236;
   color: #f3f3f4;
 }
-.slate-filters button:hover {
+.slate-filter-toggles button:hover {
   color: #fff;
 }
 .player-missing {
@@ -1602,6 +1595,10 @@ tr:hover td {
   .toolbar .toolbar-right {
     width: 100%;
     justify-content: space-between;
+  }
+  .slate-toolbar .toolbar-right {
+    width: auto;
+    justify-content: flex-end;
   }
   .toolbar .search {
     flex: 1;
