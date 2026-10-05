@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { Source } from "./types";
 import { usePlayerProps, PropsControls, PropsRefreshButton, CompactProps, type PropsState } from "./PlayerProps";
+import type { AppearanceLog } from "./lineCounts";
 import { todayEt } from "./dates";
 
 type Entry = {
@@ -31,6 +32,7 @@ type Entry = {
   stale: boolean;
   recent: { date: string; value: number | string | null; opponent: string }[];
   matchups: { game_id: number; opponent: string; home: boolean }[];
+  log?: AppearanceLog | null;
 };
 type Board = {
   id: string;
@@ -177,7 +179,13 @@ function Leaderboard({
                 <span className="streak-rank">{p.rank}</span>
                 <img className="logo" src={p.logo} alt="" />
                 <div>
-                  <strong>{p.name}</strong>
+                  {board.kind === "skater" ? (
+                    <Link className="player-link" to={`/players?date=${date}&player=${p.id}`} title={`${p.name}. Open on Players`}>
+                      <strong>{p.name}</strong>
+                    </Link>
+                  ) : (
+                    <strong>{p.name}</strong>
+                  )}
                   <div className="streak-player-meta">
                     {p.matchups.map((m) => (
                       <Link
@@ -198,7 +206,7 @@ function Leaderboard({
                 {props && board.kind === "skater" && p.matchups.map(m => (
                   <CompactProps key={m.game_id} state={props} gameId={m.game_id} playerId={p.id}
                     family={board.id === "shots10" ? "shots" : ["goals10", "goal_streak"].includes(board.id) ? "scorer" : "points"}
-                    showLabel={false} />
+                    showLabel={false} log={p.log} />
                 ))}
               </div>}
               <div

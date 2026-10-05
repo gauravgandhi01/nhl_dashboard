@@ -50,12 +50,25 @@ def average(values):
     return sum(values) / len(values) if values else None
 
 
-def lineup_usage_windows(logs, advanced, cutoff, season=None):
+def skater_appearances(logs, cutoff, season=None):
+    """Newest-first regular-season appearances with ice time. None if the feed is missing."""
+    if logs is None:
+        return None
     season = season or season_for_date(cutoff)
-    games = sorted({r['gameId']: r for r in logs or []
-                    if in_season(r.get('gameId'), season) and r.get('gameDate', '9999') < cutoff and clock_seconds(r.get('toi'))
-                    and str(r.get('gameId', ''))[4:6] == '02'}.values(),
-                   key=lambda r: (r['gameDate'], r['gameId']), reverse=True)
+    return sorted({r['gameId']: r for r in logs
+                   if in_season(r.get('gameId'), season) and r.get('gameDate', '9999') < cutoff
+                   and clock_seconds(r.get('toi')) and str(r.get('gameId', ''))[4:6] == '02'}.values(),
+                  key=lambda r: (r['gameDate'], r['gameId']), reverse=True)
+
+
+def appearance_series(rows):
+    return {key: [number(row.get(key)) for row in rows] for key in ('goals', 'assists', 'points', 'shots')}
+
+
+def lineup_usage_windows(logs, advanced, cutoff, season=None):
+    games = skater_appearances(logs, cutoff, season)
+    known = games is not None
+    games = games or []
     mp_5v5 = {}
     for row in advanced or []:
         if row.get('situation') == '5on5' and (number(row.get('icetime')) or 0) > 0:
@@ -65,9 +78,9 @@ def lineup_usage_windows(logs, advanced, cutoff, season=None):
         sample = games[:count]
         matched = [mp_5v5[str(g['gameId'])][0] for g in sample if len(mp_5v5.get(str(g['gameId']), [])) == 1]
         result[key] = average([clock_seconds(g.get('toi')) for g in sample])
-        result[key + '_games'] = len(sample) if logs is not None else None
+        result[key + '_games'] = len(sample) if known else None
         result[key + '_5v5'] = average([number(r.get('icetime')) for r in matched]) if advanced is not None else None
-        result[key + '_5v5_games'] = len(matched) if advanced is not None and logs is not None else None
+        result[key + '_5v5_games'] = len(matched) if advanced is not None and known else None
     return result
 
 
@@ -76,9 +89,43 @@ def latest_sources(feeds):
     return list(unique.values())
 
 
+UNPLAYABLE = {'PPD', 'CNCL', 'CANCELLED', 'CANCELED'}
+
+
+def playable_game(game):
+    return isinstance(game, dict) and game.get('gameScheduleState') not in UNPLAYABLE
+
+
 class Dashboard:
     def __init__(self, providers: Providers):
         self.p = providers
+
+    async def next_game_date(self, date):
+        """Next Eastern date after `date` with a game that is not postponed or canceled."""
+        cursor = date
+        seen = set()
+        for _ in range(4):
+            if not isinstance(cursor, str) or cursor in seen:
+                return None
+            seen.add(cursor)
+            feed = await self.p.nhl(f'schedule/{cursor}', 600)
+            data = feed.data if isinstance(feed.data, dict) else None
+            if not data:
+                return None
+            for day in data.get('gameWeek') or []:
+                if not isinstance(day, dict):
+                    continue
+                day_date = day.get('date') or ''
+                games = day.get('games')
+                if not isinstance(day_date, str) or day_date <= date or not isinstance(games, list):
+                    continue
+                if any(playable_game(game) for game in games):
+                    return day_date
+            nxt = data.get('nextStartDate')
+            if not isinstance(nxt, str) or nxt <= date:
+                return None
+            cursor = nxt
+        return None
 
     async def slate(self, date):
         scores, goalies = await asyncio.gather(self.p.nhl(f'score/{date}', 600), self.p.goalies(date))
@@ -131,8 +178,10 @@ class Dashboard:
                                                               goalie_stats.data or [], mp_goalies.data or []),
                                         'signals': matchup_signals(game, tid, (schedule.data or {}).get('games', []) if not schedule.stale else [])}
                 comparisons[str(game['id'])] = comparison
+        next_date = None if any(playable_game(g) for g in games) else await self.next_game_date(date)
         return {'date': date, 'games': [game_info(g, goalies.data) for g in games],
-                'comparisons': comparisons, 'sources': latest_sources(sources), 'error': None}
+                'comparisons': comparisons, 'sources': latest_sources(sources), 'error': None,
+                'next_date': next_date}
 
     async def matchup(self, game_id, window):
         landing = await self.p.nhl(f'gamecenter/{game_id}/landing', 600)
@@ -192,7 +241,7 @@ class Dashboard:
             s = candidates[0] if len(candidates) == 1 else {}
             player['stats'] = {k: s.get(k) for k in ['gamesPlayed', 'goals', 'assists', 'points', 'shots', 'timeOnIcePerGame']}
         skater_players = [p for p in players if p['position'] != 'G']
-        usage = {}
+        usage, lineup_logs = {}, {}
         log_ids = [p['id'] for p in skater_players]
         log_results = await asyncio.gather(*(
             self.p.nhl(f'player/{pid}/game-log/{season}/2', 21600) for pid in log_ids))
@@ -207,6 +256,8 @@ class Dashboard:
             log_rows = feed.data.get('gameLog') if isinstance(feed.data, dict) and isinstance(feed.data.get('gameLog'), list) else None
             usage[str(player['id'])] = lineup_usage_windows(
                 log_rows, mp_by_player.get(player['id']) if mp_skaters.data is not None else None, cutoff, season)
+            games = skater_appearances(log_rows, cutoff, season)
+            lineup_logs[str(player['id'])] = None if games is None else appearance_series(games)
         goalie_players = [p for p in players if p['position'] == 'G']
         goalie_feed = Feed(None, 'NHL Stats', 'https://api.nhle.com/stats/rest/en/goalie/summary', error='Goalie roster unavailable')
         if goalie_players:
@@ -241,7 +292,7 @@ class Dashboard:
         return ({'team': team_info(raw_team), 'summary': team_summary(selected), 'advanced': advanced_summary(advanced),
                  'recent': logs, 'rest': rest_context((schedule.data or {}).get('games', []), game['gameDate']),
                  'starter': starter, 'goalies': goalie_players, 'roster': players, 'roster_source': roster.meta(),
-                 'lineup': lineup.data, 'lineup_usage': usage,
+                 'lineup': lineup.data, 'lineup_usage': usage, 'lineup_logs': lineup_logs,
                  'lineup_player_ids': {name: (resolve_player(name, skater_players) or {}).get('id')
                     for names in (lineup.data or {}).get('sections', {}).values() for name in names},
                  'lineup_source': lineup.meta(), 'injuries': team_injuries,

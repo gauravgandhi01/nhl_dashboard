@@ -1,5 +1,5 @@
 import { RefreshButton } from "./RefreshButton";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   ArrowDown,
@@ -11,6 +11,7 @@ import {
 import type { Source, Stats } from "./types";
 import { buildPeers, cellFormat, type Peers } from "./playerFormatting";
 import { usePlayerProps, PropsControls, PropsRefreshButton, PlayerPropPanel, type PropsState } from "./PlayerProps";
+import type { AppearanceLog } from "./lineCounts";
 import { todayEt } from "./dates";
 
 type Window = "last5" | "last10" | "season";
@@ -26,6 +27,7 @@ type Skater = {
   home: boolean;
   season_label: string;
   windows: Record<Window, Stats>;
+  log?: AppearanceLog | null;
   stats_source: Source;
   advanced_source: Source;
   roster_source: Source;
@@ -129,7 +131,10 @@ export function Players() {
   const [sort, setSort] = useState({ key: "points_pg", desc: true });
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const appliedPlayer = useRef<string | null>(null);
   const props = usePlayerProps(date);
+  const requestedPlayer = Number(params.get("player"));
+  const requestedId = Number.isInteger(requestedPlayer) && requestedPlayer > 0 ? requestedPlayer : null;
   const update = (key: string, value: string) => {
     if (!value) return;
     const next = new URLSearchParams(params);
@@ -161,6 +166,28 @@ export function Players() {
       .finally(() => { if (!controller.signal.aborted) setBusy(false); });
     return () => controller.abort();
   }, [date, revision]);
+  useEffect(() => {
+    const token = `${date}:${requestedId ?? ""}`;
+    if (appliedPlayer.current === token || !data || data.date !== date) return;
+    appliedPlayer.current = token;
+    if (requestedId == null) return;
+    const matches = data.players.filter((p) => p.id === requestedId);
+    if (!matches.length) return;
+    setTeam("all");
+    setPosition("all");
+    setSearch("");
+    const earliest = [...matches].sort((a, b) => a.game_id - b.game_id)[0];
+    setExpanded(`${earliest.game_id}-${earliest.id}`);
+  }, [data, date, requestedId]);
+  const choosePlayer = (id: number | null, key: string | null) => {
+    appliedPlayer.current = `${date}:${id ?? ""}`;
+    setExpanded(key);
+    const next = new URLSearchParams(params);
+    if (id == null) next.delete("player");
+    else next.set("player", String(id));
+    setParams(next, { replace: true });
+  };
+  const playerMissing = requestedId != null && data?.date === date && !data.players.some((p) => p.id === requestedId);
   const teams = [...new Set(data?.players.map((p) => p.team) || [])].sort();
   const peers = useMemo(() => buildPeers(data?.players || []), [data]);
   const rows = useMemo(
@@ -256,6 +283,11 @@ export function Players() {
         </div>
       </div>
       <PropsControls state={props} />
+      {playerMissing && (
+        <p className="player-missing warning" role="status">
+          This player is not on tonight&apos;s skater list.
+        </p>
+      )}
       {!data && !error ? (
         <div className="loading-label" role="status">
           <RefreshCw className="spin" size={14} />
@@ -334,7 +366,7 @@ export function Players() {
                           window={window}
                           expanded={expanded === key}
                           toggle={() =>
-                            setExpanded(expanded === key ? null : key)
+                            choosePlayer(expanded === key ? null : p.id, expanded === key ? null : key)
                           }
                           date={date}
                           format={format}
@@ -385,12 +417,16 @@ function PlayerRows({
   ) => string;
 }) {
   const s = p.windows[window];
+  const rowRef = useRef<HTMLTableRowElement>(null);
+  useEffect(() => {
+    if (expanded) rowRef.current?.scrollIntoView({ block: "center" });
+  }, [expanded]);
   const delayed = [p.stats_source, p.advanced_source, p.roster_source].filter(
     (s) => s.status !== "available",
   );
   return (
     <>
-      <tr>
+      <tr ref={rowRef}>
         <td>
           <button
             className="player-name"
@@ -512,7 +548,7 @@ function PlayerRows({
                   ))}
                 </tbody>
               </table>
-              <PlayerPropPanel state={props} gameId={p.game_id} playerId={p.id} />
+              <PlayerPropPanel state={props} gameId={p.game_id} playerId={p.id} log={p.log} />
             </div>
           </td>
         </tr>

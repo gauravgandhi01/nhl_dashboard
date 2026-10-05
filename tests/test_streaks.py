@@ -23,6 +23,9 @@ def test_last10_current_season_dedup_and_cutoff():
     assert result['value'] == 2 and result['sample_size'] == 2
     assert result['seasons'] == ['2026-27']
     assert result['end_date'] == '2026-11-02'
+    assert result['log']['points'][0] == 1
+    goalie = entries_for({**player(), 'kind': 'goalie'}, rows, True)
+    assert all('log' not in entry for entry in goalie.values())
 
 
 def test_active_streak_not_longest_historical_streak_or_limited_to_ten():

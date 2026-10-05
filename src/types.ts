@@ -1,3 +1,5 @@
+import type { AppearanceLog } from "./lineCounts";
+
 export type Source = {
   source: string;
   url: string;
@@ -71,6 +73,7 @@ export type Side = {
   } | null;
   // Keyed by NHL player ID, independent of provider display names.
   lineup_usage: Record<string, Stats>;
+  lineup_logs?: Record<string, AppearanceLog | null>;
   lineup_player_ids?: Record<string, number | null>;
   lineup_source: Source;
   injuries: {
@@ -89,6 +92,7 @@ export type SlateData = {
   comparisons?: Record<string, CardComparison>;
   sources: Source[];
   error: string | null;
+  next_date?: string | null;
 };
 export type CardSide = {
   ranks?: Record<string, { rank: number | null; eligible: number }>;

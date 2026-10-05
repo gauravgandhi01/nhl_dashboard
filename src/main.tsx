@@ -234,10 +234,12 @@ function StateMessage({
   title,
   detail,
   retry,
+  children,
 }: {
   title: string;
   detail?: string;
   retry?: () => void;
+  children?: React.ReactNode;
 }) {
   return (
     <div className="state-message">
@@ -249,6 +251,7 @@ function StateMessage({
           Retry
         </button>
       )}
+      {children}
     </div>
   );
 }
@@ -543,8 +546,11 @@ function CardStats({
   );
 }
 
+const postponedGame = (game: Game) =>
+  ["PPD", "CNCL", "CANCELLED", "CANCELED"].includes(game.schedule_state);
+
 function Slate() {
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const date = /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") || "")
     ? params.get("date")!
     : today();
@@ -553,19 +559,41 @@ function Slate() {
     slateUrl,
   );
   const [filter, setFilter] = useState("upcoming");
+  const [b2bOnly, setB2bOnly] = useState(false);
+  const [confirmedOnly, setConfirmedOnly] = useState(false);
   const odds = useMoneylines(date);
   const games = data?.games || [];
   useEffect(() => {
     setFilter("upcoming");
+    setB2bOnly(false);
+    setConfirmedOnly(false);
   }, [date]);
-  const filtered = games.filter(
+  const playable = games.filter((g) => !postponedGame(g));
+  const card = (game: Game) => data?.comparisons?.[game.id];
+  const hasBackToBack = (game: Game) =>
+    [card(game)?.away, card(game)?.home].some((side) =>
+      side?.signals?.some((signal) => signal.id === "back_to_back"),
+    );
+  const hasConfirmedStarter = (game: Game) =>
+    [card(game)?.away, card(game)?.home].some((side) => side?.goalie.basis === "Confirmed");
+  const statusCount = (key: string) =>
+    playable.filter((g) => (key === "final" ? isFinal(g) : key === "started" ? isStarted(g) : isUpcoming(g))).length;
+  const filtered = playable.filter(
     (g) =>
-      (filter === "final"
-        ? isFinal(g)
-        : filter === "started"
-          ? isStarted(g)
-          : isUpcoming(g)),
+      (filter === "final" ? isFinal(g) : filter === "started" ? isStarted(g) : isUpcoming(g)) &&
+      (!b2bOnly || hasBackToBack(g)) &&
+      (!confirmedOnly || hasConfirmedStarter(g)),
   );
+  const extraFilters = b2bOnly || confirmedOnly;
+  const clearFilters = () => {
+    setB2bOnly(false);
+    setConfirmedOnly(false);
+  };
+  const openDate = (value: string) => {
+    const next = new URLSearchParams(params);
+    next.set("date", value);
+    setParams(next);
+  };
   return (
     <>
       <div className="toolbar">
@@ -582,13 +610,7 @@ function Slate() {
               onClick={() => setFilter(key)}
             >
               {label}
-              <span className="count">
-                {key === "upcoming"
-                  ? games.filter(isUpcoming).length
-                  : key === "started"
-                    ? games.filter(isStarted).length
-                    : games.filter(isFinal).length}
-              </span>
+              <span className="count">{statusCount(key)}</span>
             </button>
           ))}
         </div>
@@ -601,6 +623,28 @@ function Slate() {
           </div>
         </div>
       </div>
+      <div className="slate-filters" aria-label="Slate filters">
+        <div className="slate-filter-toggles">
+          <button
+            type="button"
+            className={b2bOnly ? "selected" : ""}
+            aria-pressed={b2bOnly}
+            title="Show games where either team played the previous night. A missing flag is not a claim that the schedule was checked."
+            onClick={() => setB2bOnly((value) => !value)}
+          >
+            Back-to-back
+          </button>
+          <button
+            type="button"
+            className={confirmedOnly ? "selected" : ""}
+            aria-pressed={confirmedOnly}
+            title="Show games where at least one reported starter is confirmed."
+            onClick={() => setConfirmedOnly((value) => !value)}
+          >
+            Confirmed starter
+          </button>
+        </div>
+      </div>
       {loading ? (
         <Loading />
       ) : error || data?.error ? (
@@ -609,13 +653,25 @@ function Slate() {
           detail={error || data?.error || ""}
           retry={refresh}
         />
-      ) : games.length === 0 ? (
+      ) : playable.length === 0 ? (
         <StateMessage
           title="No games scheduled"
           detail="Choose another date."
-        />
+        >
+          {data?.next_date && (
+            <button className="text-button" onClick={() => openDate(data.next_date!)}>
+              Next games, {dateTitle(data.next_date)}
+            </button>
+          )}
+        </StateMessage>
       ) : filtered.length === 0 ? (
-        <StateMessage title="No matching games" />
+        <StateMessage title="No matching games">
+          {extraFilters && (
+            <button className="text-button" onClick={clearFilters}>
+              Clear filters
+            </button>
+          )}
+        </StateMessage>
       ) : (
         <div className="slate">
           {filtered.map((g) => (
@@ -1045,10 +1101,17 @@ function Roster({ side, season }: { side: Side; season: string }) {
   );
 }
 
-function LinePlayerHeading({ name, player }: { name: string; player?: Player }) {
+function LinePlayerHeading({ name, player, date }: { name: string; player?: Player; date: string }) {
+  const label = name.replace(/^(\S+)\s+/, (_, first: string) => first[0] + ". ");
   return (
     <div className="line-player-heading">
-      <strong title={name}>{name.replace(/^(\S+)\s+/, (_, first: string) => first[0] + ". ")}</strong>
+      <strong title={name}>
+        {player ? (
+          <Link className="player-link" to={`/players?date=${date}&player=${player.id}`} title={`${name}. Open on Players`}>
+            {label}
+          </Link>
+        ) : label}
+      </strong>
       <div className="line-scoring" role="group" aria-label="Season scoring totals" title="Season totals, all strengths">
         {[["goals", "G", "Goals"], ["assists", "A", "Assists"], ["points", "P", "Points"]].map(([key, label, full]) => (
           <span key={key} aria-label={`${full}: ${player?.stats?.[key] ?? "unavailable"}`}>
@@ -1060,7 +1123,7 @@ function LinePlayerHeading({ name, player }: { name: string; player?: Player }) 
   );
 }
 
-function Lineups({ side, props, gameId }: { side: Side; props: PropsState; gameId: number }) {
+function Lineups({ side, props, gameId, date }: { side: Side; props: PropsState; gameId: number; date: string }) {
   const sections = Object.entries(side.lineup?.sections || {}).filter(
     ([name, players]) => !["Injuries", "Goalies"].includes(name) && players.length > 0,
   );
@@ -1183,14 +1246,15 @@ function Lineups({ side, props, gameId }: { side: Side; props: PropsState; gameI
                     );
                     return (
                       <div className="line-player" key={p + i}>
-                        <LinePlayerHeading name={p} player={rosterById.get(side.lineup_player_ids?.[p] ?? -1)} />
+                        <LinePlayerHeading name={p} date={date} player={rosterById.get(side.lineup_player_ids?.[p] ?? -1)} />
                         {sharedReason ? <span className="line-usage-missing">{first}</span> : values.map((value, index) => (
                           <span key={index} className={typeof value === "string" ? "line-toi" : "line-usage-missing"}
                             {...(typeof value === "string" ? usageFormatting(p, usageWindows[index]) : {})}>
                             <b>{["S", "L10", "L5"][index]}</b> {value}
                           </span>
                         ))}
-                        <CompactProps state={props} gameId={gameId} playerId={side.lineup_player_ids?.[p]} overOnly />
+                        <CompactProps state={props} gameId={gameId} playerId={side.lineup_player_ids?.[p]} overOnly countsOnHover
+                          log={side.lineup_logs?.[String(side.lineup_player_ids?.[p] ?? "")]} />
                       </div>
                     );
                   })}
@@ -1221,9 +1285,9 @@ function Lineups({ side, props, gameId }: { side: Side; props: PropsState; gameI
           <div className="line-grid">
             {rosterSkaters.map((p) => (
               <div className="line-player" key={p.id}>
-                <LinePlayerHeading name={p.name} player={p} />
+                <LinePlayerHeading name={p.name} player={p} date={date} />
                 <span>{p.position}</span>
-                <CompactProps state={props} gameId={gameId} playerId={p.id} overOnly />
+                <CompactProps state={props} gameId={gameId} playerId={p.id} overOnly countsOnHover log={side.lineup_logs?.[String(p.id)]} />
               </div>
             ))}
           </div>
@@ -1236,7 +1300,13 @@ function Lineups({ side, props, gameId }: { side: Side; props: PropsState; gameI
       {side.injuries.map((p, i) => (
         <div className="injury" key={p.name + i}>
           <div>
-            <strong>{p.name}</strong>
+            <strong>
+              {p.player_id != null ? (
+                <Link className="player-link" to={`/players?date=${date}&player=${p.player_id}`} title={`${p.name}. Open on Players`}>
+                  {p.name}
+                </Link>
+              ) : p.name}
+            </strong>
             <span className="confirmation warning">{p.status}</span>
           </div>
           <p>{p.note}</p>
@@ -1429,8 +1499,8 @@ function Matchup() {
             <>
               <PropsControls state={props} gameId={data.game.id} />
               <div className="two-columns tab-content">
-                <Lineups side={data.away} props={props} gameId={data.game.id} />
-                <Lineups side={data.home} props={props} gameId={data.game.id} />
+                <Lineups side={data.away} props={props} gameId={data.game.id} date={data.game.date} />
+                <Lineups side={data.home} props={props} gameId={data.game.id} date={data.game.date} />
               </div>
             </>
           )}

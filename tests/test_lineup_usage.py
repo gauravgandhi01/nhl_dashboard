@@ -61,6 +61,8 @@ def test_team_usage_uses_nhl_ids_for_provider_aliases():
         assert set(team['lineup_usage']) == {'8484210'}
         assert team['lineup_usage']['8484210']['season'] == 980
         assert team['lineup_usage']['8484210']['l5_5v5'] == 800
+        assert team['lineup_logs']['8484210']['points'] == [None]
+        assert len(team['lineup_logs']['8484210']['shots']) == 1
     asyncio.run(run())
 
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { RefreshButton } from "./RefreshButton";
+import { countTitle, formatCount, lineWindows, type AppearanceLog } from "./lineCounts";
 
 export type Quote = {
   side: string;
@@ -276,14 +277,59 @@ const lineLabel = (line: PropLine) =>
       ? "First goal"
       : `${line.point}`;
 
+export function LineCounts({
+  log,
+  family,
+  point,
+  compact = false,
+  showCaption = false,
+}: {
+  log?: AppearanceLog | null;
+  family: string;
+  point: number | null;
+  compact?: boolean;
+  showCaption?: boolean;
+}) {
+  const result = lineWindows(log, family, point);
+  if (!result) return null;
+  if (result.empty) {
+    return (
+      <span className={`line-count-empty${compact ? " compact" : ""}`}>
+        No regular-season appearances
+      </span>
+    );
+  }
+  return (
+    <span className={`line-counts${compact ? " compact" : ""}`} aria-label="Appearances over this line">
+      {showCaption ? (
+        <span className="line-count-label">Over {result.spec.point} {result.spec.label}</span>
+      ) : !compact ? (
+        <span className="line-count-label">Appearances over this line</span>
+      ) : null}
+      {result.windows.map(({ label, count }) => (
+        <span
+          key={label}
+          className="line-count"
+          tabIndex={compact ? undefined : 0}
+          title={count ? countTitle(label, count, result.spec.point, result.spec.label) : undefined}
+        >
+          <b>{label}</b> {count?.games ? formatCount(count) : "--"}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 function MarketRow({
   player,
   family,
   label,
+  log,
 }: {
   player?: PropPlayer;
   family: string;
   label: string;
+  log?: AppearanceLog | null;
 }) {
   const lines = propLines(player, family);
   const [choice, setChoice] = useState("");
@@ -292,34 +338,39 @@ function MarketRow({
   const binary = selected?.point == null;
   const showUnder = family !== "first_goal";
   return (
-    <div className="prop-market-row">
-      <span className="prop-market-label">{label}</span>
-      {lines.length ? (
-        <div className="prop-line-buttons" aria-label={`${label} line`}>
-          {lines.map((l) => (
-            <button
-              key={l.id}
-              type="button"
-              className={l.id === selected.id ? "selected" : ""}
-              aria-pressed={l.id === selected.id}
-              onClick={() => setChoice(l.id)}
-            >
-              {lineLabel(l)}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <span className="prop-missing">Unavailable</span>
-      )}
-      <Price
-        quote={bestQuote(line, binary ? "yes" : "over")}
-        prefix={binary ? "Yes" : "O"}
-      />
-      {showUnder && (
+    <div className="prop-market" role="group" aria-label={label}>
+      <div className="prop-market-row">
+        <span className="prop-market-label">{label}</span>
+        {lines.length ? (
+          <div className="prop-line-buttons" aria-label={`${label} line`}>
+            {lines.map((l) => (
+              <button
+                key={l.id}
+                type="button"
+                className={l.id === selected.id ? "selected" : ""}
+                aria-pressed={l.id === selected.id}
+                onClick={() => setChoice(l.id)}
+              >
+                {lineLabel(l)}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <span className="prop-missing">Unavailable</span>
+        )}
         <Price
-          quote={bestQuote(line, binary ? "no" : "under")}
-          prefix={binary ? "No" : "U"}
+          quote={bestQuote(line, binary ? "yes" : "over")}
+          prefix={binary ? "Yes" : "O"}
         />
+        {showUnder && (
+          <Price
+            quote={bestQuote(line, binary ? "no" : "under")}
+            prefix={binary ? "No" : "U"}
+          />
+        )}
+      </div>
+      {lines.length > 0 && (
+        <LineCounts log={log} family={family} point={line?.point ?? null} />
       )}
     </div>
   );
@@ -329,10 +380,12 @@ export function PlayerPropPanel({
   state,
   gameId,
   playerId,
+  log,
 }: {
   state: PropsState;
   gameId: number;
   playerId: number;
+  log?: AppearanceLog | null;
 }) {
   const game = state.data?.games[String(gameId)];
   const player = game?.players[String(playerId)];
@@ -359,6 +412,7 @@ export function PlayerPropPanel({
           player={player}
           family={family}
           label={label}
+          log={log}
         />
       ))}
     </section>
@@ -372,6 +426,8 @@ export function CompactProps({
   family,
   showLabel = true,
   overOnly = false,
+  log,
+  countsOnHover = false,
 }: {
   state: PropsState;
   gameId: number;
@@ -379,6 +435,8 @@ export function CompactProps({
   family?: string;
   showLabel?: boolean;
   overOnly?: boolean;
+  log?: AppearanceLog | null;
+  countsOnHover?: boolean;
 }) {
   const game = state.data?.games[String(gameId)];
   const player = playerId != null ? game?.players[String(playerId)] : undefined;
@@ -409,7 +467,7 @@ export function CompactProps({
           !binary &&
           (f === "shots" || (f === "points" && line.point !== 0.5));
         return (
-          <div className="compact-prop-row" key={f}>
+          <div className={`compact-prop-row${countsOnHover ? " has-count-tip" : ""}`} key={f}>
             {showLabel && (
               <span className="compact-prop-label">
                 {label}
@@ -431,6 +489,7 @@ export function CompactProps({
             {under && (
               <Price quote={under} showBook={false} />
             )}
+            <LineCounts log={log} family={f} point={line?.point ?? null} compact showCaption={countsOnHover} />
           </div>
         );
       })}

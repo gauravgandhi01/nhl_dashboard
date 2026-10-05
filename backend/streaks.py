@@ -4,9 +4,9 @@ import json
 import time
 
 from .providers import TEAM_NAMES
-from .service import display_name, latest_sources, today_et
+from .service import appearance_series, display_name, latest_sources, today_et
 from .stats import number, season_label, season_for_date, in_season
-SNAPSHOT_VERSION = 3
+SNAPSHOT_VERSION = 4
 TOI_WINDOWS = {'last5': 5, 'last10': 10, 'season': None}
 TOI_BOARDS = {f'toi_{position}_{window}': (position, window, count)
               for window, count in TOI_WINDOWS.items() for position in ['forward', 'defense']}
@@ -108,6 +108,10 @@ def entries_for(player, rows, complete):
                         'seasons': [season_label(y * 10000 + y + 1) for y in seasons],
                         'recent': [{'date': r['gameDate'], 'value': r.get(field),
                                     'opponent': r.get('opponentAbbrev')} for r in sample[:5][::-1]]}
+    if player.get('kind') == 'skater':
+        series = appearance_series(rows)
+        for entry in entries.values():
+            entry['log'] = series
     return entries
 
 

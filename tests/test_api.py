@@ -50,6 +50,53 @@ def test_schema_failure_does_not_replace_good_cache(tmp_path):
     asyncio.run(scenario())
 
 
+def test_next_date_skips_postponed_days_and_stops_after_four_weeks():
+    class Fake:
+        calls = 0
+        fail = False
+        endless = False
+
+        async def nhl(self, path, *args):
+            self.calls += 1
+            if path.startswith('score/'):
+                return Feed({'games': []}, 'NHL', path)
+            if self.fail:
+                return Feed(None, 'NHL', path)
+            if self.endless:
+                from datetime import date as day, timedelta
+                start = day.fromisoformat(path.rsplit('/', 1)[-1])
+                return Feed({'gameWeek': [{'date': start.isoformat(), 'games': []}],
+                             'nextStartDate': (start + timedelta(days=7)).isoformat()}, 'NHL', path)
+            if path.endswith('2026-10-04'):
+                return Feed({'nextStartDate': '2026-10-11', 'gameWeek': [
+                    {'date': '2026-10-04', 'games': []},
+                    {'date': '2026-10-05', 'games': [{'gameScheduleState': 'PPD'}]},
+                    {'date': '2026-10-06', 'games': [{'gameScheduleState': 'CNCL'}]},
+                ]}, 'NHL', path)
+            return Feed({'gameWeek': [
+                {'date': '2026-10-11', 'games': []},
+                {'date': '2026-10-12', 'games': [{'gameScheduleState': 'OK'}]},
+            ]}, 'NHL', path)
+
+        async def goalies(self, *args):
+            return Feed([], 'Daily Faceoff', 'goalies')
+
+    async def scenario():
+        found = Fake()
+        assert await Dashboard(found).next_game_date('2026-10-04') == '2026-10-12'
+        assert found.calls == 2
+        slate = await Dashboard(found).slate('2026-10-04')
+        assert slate['games'] == [] and slate['next_date'] == '2026-10-12' and slate['error'] is None
+        failed = Fake()
+        failed.fail = True
+        assert await Dashboard(failed).next_game_date('2026-10-04') is None
+        capped = Fake()
+        capped.endless = True
+        assert await Dashboard(capped).next_game_date('2026-10-04') is None
+        assert capped.calls == 4
+    asyncio.run(scenario())
+
+
 def test_no_games_and_source_failure_are_distinct():
     class Fake:
         unavailable = False

@@ -7,11 +7,11 @@ from collections import defaultdict
 from datetime import datetime, timezone
 
 from .cache import Feed
-from .service import display_name, game_info, latest_sources, today_et
-from .stats import number, season_label, season_for_date, in_season
+from .service import appearance_series, display_name, game_info, latest_sources, skater_appearances, today_et
+from .stats import number, season_label
 
 PLAYERS_TTL = 3600
-SNAPSHOT_VERSION = 2
+SNAPSHOT_VERSION = 3
 
 
 def seconds(value):
@@ -31,13 +31,18 @@ def divide(value, denominator, scale=1):
     return value * scale / denominator if value is not None and denominator else None
 
 
+def appearance_log(logs, cutoff, season=None):
+    games = skater_appearances(logs, cutoff, season)
+    if games is None:
+        return None
+    return appearance_series(games)
+
+
 def player_windows(logs, advanced, cutoff, season=None):
-    season = season or season_for_date(cutoff)
     # Match by NHL player/game IDs; window membership always comes from NHL appearances.
-    games = sorted({r['gameId']: r for r in logs or []
-                    if in_season(r.get('gameId'), season) and r.get('gameDate', '9999') < cutoff and seconds(r.get('toi'))
-                    and str(r.get('gameId', ''))[4:6] == '02'}.values(),
-                   key=lambda r: (r['gameDate'], r['gameId']), reverse=True)
+    games = skater_appearances(logs, cutoff, season)
+    known = games is not None
+    games = games or []
     mp = defaultdict(list)
     for row in advanced or []:
         if row.get('situation') in [None, 'all']:
@@ -52,15 +57,15 @@ def player_windows(logs, advanced, cutoff, season=None):
         ice = total(matched, 'icetime')
         attempts = total(matched, 'I_F_shotAttempts')
         result[window] = {
-            **values, 'games': n if logs is not None else None,
+            **values, 'games': n if known else None,
             'points_pg': divide(values['points'], n), 'shots_pg': divide(values['shots'], n),
             'toi_pg': divide(sum(seconds(g['toi']) for g in sample) if n else None, n),
             'point_games_pct': divide(sum((number(g.get('points')) or 0) > 0 for g in sample), n, 100)
                 if values['points'] is not None else None,
-            'advanced_games': len(matched) if advanced is not None and logs is not None else None,
+            'advanced_games': len(matched) if advanced is not None and known else None,
             'advanced_minutes': divide(ice, 60),
-            'attempts': attempts if advanced is not None and logs is not None else None,
-            'attempts_pg': divide(attempts, len(matched)) if advanced is not None and logs is not None else None,
+            'attempts': attempts if advanced is not None and known else None,
+            'attempts_pg': divide(attempts, len(matched)) if advanced is not None and known else None,
             **{key: divide(total(matched, field), ice, 3600) for key, field in {
                 'attempts60': 'I_F_shotAttempts', 'points60': 'I_F_points', 'shots60': 'I_F_shotsOnGoal',
                 'ixg60': 'I_F_xGoals', 'hd60': 'I_F_highDangerShots'}.items()},
@@ -116,10 +121,11 @@ async def players_dashboard(p, date):
             if feed.data is not None and not isinstance(feed.data.get('gameLog'), list):
                 logs[pid] = Feed(None, feed.source, feed.url, feed.retrieved_at, feed.stale, 'Game log unavailable')
         sources.extend(logs.values())
-        summaries = {}
+        summaries, series = {}, {}
         for pid, feed in logs.items():
             rows = feed.data['gameLog'] if feed.data is not None else None
             summaries[pid] = player_windows(rows, by_id[pid] if advanced.data is not None else None, cutoff, season)
+            series[pid] = appearance_log(rows, cutoff, season)
             p.store.save_games('nhl_skater', stats_season, [{**r, 'playerId': pid} for r in rows or []], 'playerId')
         for game in games:
             if int(game['season']) != season:
@@ -136,6 +142,7 @@ async def players_dashboard(p, date):
                             'opponent': game[opponent + 'Team']['abbrev'], 'home': side == 'home',
                             'opponent_logo': game[opponent + 'Team'].get('darkLogo') or game[opponent + 'Team'].get('logo'),
                             'season_label': season_label(stats_season), 'windows': summaries[r['id']],
+                            'log': series[r['id']],
                             'stats_source': logs[r['id']].meta(), 'advanced_source': advanced.meta(),
                             'roster_source': roster.meta(),
                         })

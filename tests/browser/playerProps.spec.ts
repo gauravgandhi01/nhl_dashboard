@@ -346,7 +346,7 @@ test("missing configuration and provider errors remain explicit", async ({
   await expect(page.locator(".player-prop-panel")).toContainText("Unavailable");
   mode = "stale";
   await page.reload();
-  await page.locator(".player-name").first().click();
+  await expect(page).toHaveURL(new RegExp(`player=${p.id}`));
   await expect(page.locator(".player-prop-panel")).toContainText(
     "Quota exhausted",
   );

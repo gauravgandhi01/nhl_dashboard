@@ -6,7 +6,7 @@ from unittest.mock import Mock
 import pytest
 
 from backend.cache import Feed, Store
-from backend.players import player_windows, players_dashboard
+from backend.players import appearance_log, player_windows, players_dashboard
 from backend.providers import parse_mp_skaters
 
 
@@ -20,6 +20,21 @@ def advanced(rows):
     return [{'gameId': str(r['gameId']), 'icetime': 600, 'I_F_shotAttempts': 4,
              'I_F_points': 2, 'I_F_shotsOnGoal': 3, 'I_F_xGoals': .5, 'I_F_highDangerShots': 1}
             for r in rows]
+
+
+def test_appearance_log_matches_windows_and_keeps_missing_values():
+    rows = logs(3)
+    rows[1]['shots'] = None
+    rows.append({**rows[0], 'gameId': 2025030001, 'gameDate': '2025-11-20', 'shots': 9})
+    rows.append({**rows[0], 'gameId': 2025020099, 'gameDate': '2025-11-12', 'shots': 8})
+    series = appearance_log(rows, '2025-11-12')
+    windows = player_windows(rows, None, '2025-11-12')
+    assert series is not None
+    assert len(series['points']) == windows['season']['games'] == 3
+    assert series['points'] == [2, 2, 2]
+    assert series['shots'] == [3, None, 3]
+    assert appearance_log(None, '2025-11-12') is None
+    assert appearance_log([], '2025-11-12') == {'goals': [], 'assists': [], 'points': [], 'shots': []}
 
 
 def test_windows_appearances_cutoff_and_partial_coverage():
@@ -125,6 +140,7 @@ def test_service_current_season_ids_and_isolated_provider_failure():
     assert result['players'][0]['windows']['season']['attempts60'] is None
     assert result['players'][0]['opponent_logo'] is None
     assert result['players'][0]['advanced_source']['status'] == 'unavailable'
+    assert result['players'][0]['log'] == {'goals': [], 'assists': [], 'points': [], 'shots': []}
 
 
 @pytest.mark.parametrize('flag', ['no_games', 'postponed', 'unavailable'])

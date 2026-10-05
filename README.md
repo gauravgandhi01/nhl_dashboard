@@ -10,6 +10,16 @@ play. Ranks use full-league current-season data, including teams off the slate.
 Lower goals against ranks better; ties share a rank (1, 1, 3). Missing stats and
 teams without games are unranked; hover a rank for the number of teams with data.
 
+The slate keeps the Upcoming / Started / Final control. Back-to-back and
+confirmed-starter filters combine with it. Back-to-back matches either team’s
+existing flag; a missing flag does not match and is not a claim that the schedule
+was checked. Confirmed starter matches when at least one reported starter’s card
+basis is Confirmed. Postponed and canceled games stay off the slate. These
+filters reset when the date changes. A date with no playable
+game keeps the empty state and, when known, a button to the next date that has
+one. `next_date` comes from the NHL schedule week, skipping postponed-only days
+and looking at most four weeks ahead. A failed schedule read leaves the button off.
+
 ## Start
 
 From this folder:
@@ -297,8 +307,18 @@ or settlement conditions not captured by their listed price. No bets are placed.
 - `GET /api/player-props?date=YYYY-MM-DD&game_id=...` reads cached props; game ID optional.
 - `POST /api/player-props/refresh?date=YYYY-MM-DD&game_id=...` explicitly fetches props.
 
-There are no player-specific historical hit-rate calculations in this change;
-existing L5/L10/season form remains alongside the quotes.
+Expanded rows and on-slate skater streaks show how often the player went over
+the selected shots, points, assists, or goals line in last 5, last 10, and the
+season. Line tiles keep those counts off the card and show them when the odds
+are hovered or focused. Anytime goal and goals Over 0.5 use the
+same goals count. The figure is appearances over the line, with pushes separated
+on integer lines. It is a count of regular-season appearances before the selected
+date, not a probability. A missing stat drops that game from that stat only.
+First goalscorer has no count. Goalie rows and league-wide streaks do not show one.
+
+Projected line names, matched injury names, and skater streak names open that
+player’s expanded Players row. Goalie streak names stay plain text. An id that
+is not on the night’s skater list leaves the table unchanged and says so.
 
 Player prop provider names are matched to the current NHL rosters by normalized
 name. When a provider name is ambiguous or does not match the roster, its prices
