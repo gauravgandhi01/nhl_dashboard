@@ -1245,12 +1245,16 @@ function Lineups({ side, props, gameId, date }: { side: Side; props: PropsState;
                     return (
                       <div className="line-player" key={p + i}>
                         <LinePlayerHeading name={p} date={date} player={rosterById.get(side.lineup_player_ids?.[p] ?? -1)} />
-                        {sharedReason ? <span className="line-usage-missing">{first}</span> : values.map((value, index) => (
-                          <span key={index} className={typeof value === "string" ? "line-toi" : "line-usage-missing"}
-                            {...(typeof value === "string" ? usageFormatting(p, usageWindows[index]) : {})}>
-                            <b>{["S", "L10", "L5"][index]}</b> {value}
-                          </span>
-                        ))}
+                        {sharedReason ? <span className="line-usage-missing">{first}</span> : (
+                          <div className="line-usage">
+                            {values.map((value, index) => (
+                              <span key={index} className={typeof value === "string" ? "line-toi" : "line-usage-missing"}
+                                {...(typeof value === "string" ? usageFormatting(p, usageWindows[index]) : {})}>
+                                <b>{["S", "L10", "L5"][index]}</b> {value}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         <CompactProps state={props} gameId={gameId} playerId={side.lineup_player_ids?.[p]} overOnly countsOnHover
                           log={side.lineup_logs?.[String(side.lineup_player_ids?.[p] ?? "")]} />
                       </div>

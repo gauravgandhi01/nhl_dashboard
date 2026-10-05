@@ -70,6 +70,7 @@ test("lineup TOI follows NHL IDs across name variants and explains missing value
   for (const width of [1440, 375]) {
     await page.setViewportSize({ width, height: 1000 });
     await page.goto("/matchups/2026020002?date=2026-09-29&tab=lineups");
+    await page.evaluate(() => document.fonts.ready);
     const player = (name: string) => page.locator(".line-player").filter({ has: page.locator(`strong[title="${name}"]`) });
     const forward = player("Gabriel Perreault").first();
     const defense = player("Low Defender").first();
@@ -77,6 +78,14 @@ test("lineup TOI follows NHL IDs across name variants and explains missing value
     await expect(forward.locator(".line-scoring")).toContainText("G0A4P4");
     await expect(player("Unknown Skater").locator(".line-scoring")).toContainText("G--A--P--");
     await expect(player("Gabriel Perreault").nth(1).locator(".line-scoring")).toContainText("G0A4P4");
+    const usage = forward.locator(".line-usage");
+    const l10 = usage.locator(".line-toi").nth(1);
+    const cardBox = await forward.boundingBox();
+    const l10Box = await l10.boundingBox();
+    const l10Label = await l10.locator("b").boundingBox();
+    expect(await usage.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
+    expect(l10Box && l10Label && l10Label.x < l10Box.x + 12).toBeTruthy();
+    if ((cardBox?.width || 0) > 180) expect(l10Box!.height).toBeLessThan(18);
     await expect(forward.locator(".line-toi").nth(0)).toHaveCSS("background-color", "rgba(89, 190, 151, 0.26)");
     await expect(forward.locator(".line-toi").nth(2)).toHaveCSS("background-color", "rgba(222, 132, 145, 0.26)");
     await expect(defense.locator(".line-toi").nth(0)).toHaveCSS("background-color", "rgba(222, 132, 145, 0.26)");

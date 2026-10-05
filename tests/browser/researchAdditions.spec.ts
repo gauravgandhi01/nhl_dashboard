@@ -228,8 +228,16 @@ test("line, injury, and streak names open the player", async ({ page }) => {
   for (const width of [1440, 375]) {
     await page.setViewportSize({ width, height: 800 });
     await page.goto(`/matchups/1?date=${date}&tab=lineups`);
+    await page.evaluate(() => document.fonts.ready);
     const player = page.locator(".line-player").first();
     const pts = player.locator(".has-count-tip", { hasText: "PTS" });
+    const odds = player.locator(".compact-props");
+    const ptsBox = await pts.boundingBox();
+    const ptsLabel = await pts.locator(".compact-prop-label").boundingBox();
+    const cardBox = await player.boundingBox();
+    expect(await odds.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
+    expect(ptsBox && ptsLabel && ptsLabel.x <= ptsBox.x + 2).toBeTruthy();
+    if ((cardBox?.width || 0) > 180) expect(ptsBox!.height).toBeLessThan(20);
     const ptsLog = pts.locator(".line-log");
     await page.mouse.move(0, 0);
     await expect(ptsLog).toHaveCSS("opacity", "0");
