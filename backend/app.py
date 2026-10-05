@@ -21,6 +21,7 @@ from .odds_client import odds_configured
 from .player_props import PlayerProps
 from .stanley_cup import StanleyCup
 from .runtime_db import database_path
+from .retention import compact
 from .lineup_uploads import router as lineup_upload_router
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -73,6 +74,7 @@ async def lifespan(app):
     app.state.moneylines = Moneylines(providers)
     app.state.player_props = PlayerProps(providers)
     app.state.stanley_cup = StanleyCup(providers)
+    compact(store, vacuum=True)
     app.state.automatic_odds_refresh = None
     if automatic_odds_refresh_enabled():
         app.state.automatic_odds_refresh = asyncio.create_task(automatic_odds_refresh(app))

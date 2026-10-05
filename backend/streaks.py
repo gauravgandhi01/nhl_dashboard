@@ -162,8 +162,6 @@ class Streaks:
         if not isinstance(logs, list):
             return None, [feed]
         rows = normalize(logs, cutoff, season)
-        self.p.store.save_games('nhl_streak_' + player['kind'], season,
-                                [{**r, 'playerId': player['id']} for r in rows], 'playerId')
         # The season boundary ends the sample, even when the streak remains active.
         return entries_for(player, rows, True), [feed]
 
@@ -227,6 +225,8 @@ class Streaks:
             self.p.store.db.execute('INSERT OR REPLACE INTO streak_snapshots VALUES(?,?,?,?,NULL)',
                                     (cutoff, json.dumps(body), time.time(), now))
             self.p.store.db.commit()
+            from .retention import compact
+            compact(self.p.store, keep_cutoff=cutoff)
             progress['status'] = 'ready'
         except Exception:
             self.p.store.db.execute('''INSERT INTO streak_snapshots VALUES(?,NULL,0,?,?)

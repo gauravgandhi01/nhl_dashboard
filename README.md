@@ -105,8 +105,11 @@ Projected lines are latest publications, not promises for the selected game.
 No matching confirmation means starter unknown; inspecting a roster goalie does
 not change the reported starter. Future rest includes scheduled intervening games.
 
-SQLite (`data/dashboard.sqlite3`) holds original provider responses and normalized
-team/goalie game rows. Schedule/game details and goalie news cache for 10
+SQLite (`data/dashboard.sqlite3`) holds the current season's provider responses,
+normalized MoneyPuck rows, and first-period goalie extracts. Raw play-by-play is
+reduced to those extracts and is not kept. Prior seasons are not kept. Player
+snapshots older than one hour, and streak snapshots from before today, are removed
+and rebuilt from the retained season logs. Schedule/game details and goalie news cache for 10
 minutes, rosters/injuries for one hour, statistics for six hours. Provider failures
 back off for 10 minutes and retain dated last-good data. The source disclosure
 shows freshness and individual failures.

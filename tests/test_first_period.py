@@ -1,4 +1,6 @@
 import asyncio
+import hashlib
+import time
 from copy import deepcopy
 from pathlib import Path
 
@@ -110,13 +112,16 @@ class Fake:
     def __init__(self, store):
         self.store, self.calls, self.failure = store, [], False
         self.season = 20262027
+        self.pbp_store_body = True
     async def stats(self, report, season, *args, **kwargs):
         self.calls.append((report,season))
         rows = [] if season == 20262027 else goalie_rows() if report == 'goalie/summary' else pair()
         return Feed(None if self.failure else rows, 'NHL', report)
     async def goalies(self,*args): return Feed([], 'DFO', 'goalies')
-    async def nhl(self,path,*args):
+    async def nhl(self, path, *args, **kwargs):
         self.calls.append(path)
+        if 'play-by-play' in path:
+            self.pbp_store_body = kwargs.get('store_body', True)
         if path.startswith('score'):
             data={'games':[{'id':2026010001,'season':self.season,'gameDate':'2026-09-27','startTimeUTC':'2026-09-27T23:00:00Z',
                 'awayTeam':{'id':16,'abbrev':'CHI'},'homeTeam':{'id':13,'abbrev':'FLA'}}]}
@@ -130,6 +135,10 @@ def test_build_dedup_current_season_persistence_and_failure(tmp_path):
     async def scenario():
         store = Store(tmp_path/'first.sqlite3'); fake=Fake(store); service=FirstPeriod(fake)
         try:
+            url = 'gamecenter/2025020001/play-by-play'
+            store.db.execute('INSERT INTO responses VALUES(?,?,?,?,?,0,NULL)', (
+                hashlib.sha256(url.encode()).hexdigest(), url, 'NHL', b'raw-play-by-play', time.time()))
+            store.db.commit()
             fake.season = 20252026
             first = await service.view('2026-09-27')
             assert not first['previous_season'] and first['season_label']=='2025-26'
@@ -142,6 +151,12 @@ def test_build_dedup_current_season_persistence_and_failure(tmp_path):
             assert result['coverage']['goalie_games']==1
             assert result['matchups'][0]['away']['goalies'][0]['windows']['season']['ga_total']==2
             assert fake.calls.count('gamecenter/2025020001/play-by-play')==1
+            assert fake.pbp_store_body is False
+            assert store.db.execute('SELECT body FROM responses WHERE url=?', (url,)).fetchone() is None
+            assert service.saved(20252026)[2025020001]['body']['goalies']
+            held = fake.calls.count('gamecenter/2025020001/play-by-play')
+            service.ensure_build(20252026, [game()])
+            assert fake.calls.count('gamecenter/2025020001/play-by-play') == held
             store.db.execute('UPDATE first_period_games SET fetched=0,attempted=0');store.db.commit()
             fake.failure=True
             service.ensure_build(20252026,[game()]);await service.tasks[20252026]

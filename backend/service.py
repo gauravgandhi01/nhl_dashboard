@@ -226,7 +226,6 @@ class Dashboard:
                  **{k: pk_map.get(r['gameId'], {}).get(k) for k in ['ppGoalsAgainst', 'timesShorthanded']}}
                 for r in summary.data or [] if r.get('gameDate', '') <= today_et()
                 and (stat_schedule.data is None or game_map.get(r['gameId'], {}).get('gameState') in ['OFF', 'FINAL'])]
-        self.p.store.save_games('nhl_team', season, rows, 'teamId')
         selected = recent(rows, window)
         ids = {str(r['gameId']) for r in selected}
         advanced = [r for r in mp_teams.data or [] if ALIASES.get(r['team'], r['team']) == abbrev and r['gameId'] in ids]
@@ -267,7 +266,6 @@ class Dashboard:
             clause = ' and (' + ' or '.join(f"playerId={p['id']}" for p in goalie_players) + ')'
             goalie_feed = await self.p.stats('goalie/summary', season, clause)
         sources.append(goalie_feed)
-        self.p.store.save_games('nhl_goalie', season, goalie_feed.data or [], 'playerId')
         for goalie in goalie_players:
             samples = recent([r for r in goalie_feed.data or [] if r['playerId'] == goalie['id']
                               and r.get('gameDate', '') <= today_et() and (number(r.get('timeOnIce')) or 0) > 0

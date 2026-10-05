@@ -33,9 +33,6 @@ class FirstPeriod:
             feed = await self.p.stats('team/goalsbyperiod', season)
             rows = [r for r in feed.data or [] if in_season(r.get('gameId'), season)]
             games, rejected = team_games(rows, today_et())
-            self.p.store.save_games(f'nhl_first_period_v{VERSION}', season,
-                                    [{'gameId': g['gameId'], 'date': g['date'], **g[side]}
-                                     for g in games for side in ['away', 'home']], 'id')
             data = (feed, games, rejected)
             self.memo[season] = (time.monotonic(), data)
             return data
@@ -75,13 +72,15 @@ class FirstPeriod:
                 async with semaphore:
                     gid, now = game['gameId'], time.time()
                     try:
-                        pbp = await self.p.nhl(f'gamecenter/{gid}/play-by-play', self.ttl(game))
+                        pbp = await self.p.nhl(f'gamecenter/{gid}/play-by-play', self.ttl(game), store_body=False)
                         normalized = extract_goalies(game, pbp.data, by_game[gid])
                         body = {**normalized, 'sources': latest_sources([pbp, goalies])}
                         if pbp.stale or goalies.stale:
                             raise ValueError('Source is stale; retaining last verified period records')
                         self.p.store.db.execute('INSERT OR REPLACE INTO first_period_games VALUES(?,?,?,?,?,?,NULL)',
                                                 (season, gid, VERSION, json.dumps(body), now, now))
+                        self.p.store.db.commit()
+                        self.p.store.delete_response(pbp.url)
                     except (ValueError, TypeError, KeyError):
                         self.p.store.db.execute('''INSERT INTO first_period_games VALUES(?,?,?,NULL,0,?,?)
                             ON CONFLICT(season,game_id) DO UPDATE SET attempted=excluded.attempted,error=excluded.error''',

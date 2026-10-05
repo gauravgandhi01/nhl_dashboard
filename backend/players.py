@@ -126,7 +126,6 @@ async def players_dashboard(p, date):
             rows = feed.data['gameLog'] if feed.data is not None else None
             summaries[pid] = player_windows(rows, by_id[pid] if advanced.data is not None else None, cutoff, season)
             series[pid] = appearance_log(rows, cutoff, season)
-            p.store.save_games('nhl_skater', stats_season, [{**r, 'playerId': pid} for r in rows or []], 'playerId')
         for game in games:
             if int(game['season']) != season:
                 continue
@@ -154,4 +153,6 @@ async def players_dashboard(p, date):
         p.store.db.execute('INSERT OR REPLACE INTO player_dashboards VALUES(?,?,?,NULL)',
                            (date, json.dumps(result), now))
         p.store.db.commit()
+        from .retention import compact
+        compact(p.store)
     return result

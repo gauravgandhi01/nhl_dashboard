@@ -37,11 +37,9 @@ class Store:
             CREATE TABLE IF NOT EXISTS responses (
                 key TEXT PRIMARY KEY, url TEXT, source TEXT, body BLOB,
                 fetched REAL, failed_until REAL DEFAULT 0, error TEXT);
-            CREATE TABLE IF NOT EXISTS game_stats (
-                provider TEXT, season INTEGER, entity TEXT, game_id TEXT, body TEXT,
-                PRIMARY KEY(provider, season, entity, game_id));
         """)
         self.db.commit()
+        self.path = path
         self.locks: dict[str, asyncio.Lock] = {}
         self.limit = asyncio.Semaphore(4)
         self.client = httpx.AsyncClient(timeout=httpx.Timeout(45, connect=10), follow_redirects=True,
@@ -109,10 +107,11 @@ class Store:
             self.db.commit()
             return await cached(True, error)
 
-    def save_games(self, provider: str, season: int, rows: list[dict], entity_key: str):
-        self.db.executemany("INSERT OR REPLACE INTO game_stats VALUES(?,?,?,?,?)", [
-            (provider, season, str(r[entity_key]), str(r['gameId']), json.dumps(r)) for r in rows
-            if r.get(entity_key) is not None and r.get('gameId') is not None])
+    def delete_response(self, url: str | None):
+        if not url:
+            return
+        key = hashlib.sha256(url.encode()).hexdigest()
+        self.db.execute('DELETE FROM responses WHERE key=?', (key,))
         self.db.commit()
 
     def save_moneypuck(self, kind: str, season: int, rows: list[dict], entity_key: str):

@@ -205,8 +205,8 @@ class Providers:
         self.memo = {}
         self.locks = {}
 
-    async def nhl(self, path, ttl=600):
-        return await self.store.fetch(f'{WEB}/{path}', 'NHL', ttl, object_json)
+    async def nhl(self, path, ttl=600, *, store_body=True):
+        return await self.store.fetch(f'{WEB}/{path}', 'NHL', ttl, object_json, store_body=store_body)
 
     async def stats(self, report, season, extra='', is_game=True):
         params = {'isGame': str(is_game).lower(), 'cayenneExp': f'seasonId={season} and gameTypeId=2{extra}',
@@ -248,7 +248,6 @@ class Providers:
             self.memo[key] = (time.monotonic(), feed)
             if feed.data:
                 self.store.save_moneypuck(kind, season, feed.data, 'team' if kind == 'teams' else 'playerId')
-                self.store.save_games('moneypuck_' + kind, season, feed.data, 'team' if kind == 'teams' else 'playerId')
             elif cached:
                 feed = Feed(cached, 'MoneyPuck', url, datetime.fromtimestamp(fetched, timezone.utc).isoformat() if fetched else None,
                             True, feed.error or 'MoneyPuck refresh unavailable')
