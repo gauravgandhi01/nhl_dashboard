@@ -105,6 +105,7 @@ export type CardSide = {
     basis: string;
     stats: Stats;
     advanced_games: number;
+    ranks?: Record<string, { rank: number | null; eligible: number }>;
   };
 };
 export type CardComparison = {

@@ -2,7 +2,7 @@ import pytest
 
 from backend.providers import parse_goalies, parse_lineups, parse_mp_teams, starter_for
 from backend.stats import advanced_summary, season_for_date, goalie_summary, match_player, recent, rest_context, team_summary
-from backend.stats import card_goalie, card_team_stats, last_five
+from backend.stats import card_goalie, card_team_stats, goalie_league_ranks, last_five
 
 
 def test_weighted_special_teams_and_missing_data():
@@ -134,6 +134,37 @@ def test_card_scoring_rates_preserve_missing_values():
     assert stats['gf'] == 3.2
     assert stats['pp'] == 25
     assert stats['ga'] is None
+
+
+def test_goalie_ranks_include_every_goalie_with_playing_time():
+    rows = [
+        {'playerId': 1, 'gamesPlayed': 10, 'savePct': .900, 'goalsAgainstAverage': 3.0},
+        {'playerId': 2, 'gamesPlayed': 10, 'savePct': .910, 'goalsAgainstAverage': 2.5},
+        {'playerId': 3, 'gamesPlayed': 1, 'savePct': .930, 'goalsAgainstAverage': 2.0},
+        {'playerId': 4, 'gamesPlayed': 0, 'savePct': .990, 'goalsAgainstAverage': 0.5},
+        {'playerId': 5, 'gamesPlayed': 4, 'savePct': None, 'goalsAgainstAverage': 2.5},
+    ]
+    advanced = [
+        {'playerId': '1', 'xGoals': 4, 'goals': 3},
+        {'playerId': '1', 'xGoals': 1, 'goals': 0},
+        {'playerId': '3', 'xGoals': 2, 'goals': 2},
+    ]
+    ranks = goalie_league_ranks(rows, advanced)
+    assert ranks[1]['sv'] == {'rank': 3, 'eligible': 3}
+    assert ranks[3]['sv']['rank'] == 1
+    assert ranks[4]['sv'] == {'rank': None, 'eligible': 3}
+    assert ranks[5]['sv']['rank'] is None
+    assert [ranks[pid]['gaa']['rank'] for pid in [3, 2, 5, 1]] == [1, 2, 2, 4]
+    assert ranks[2]['gaa']['eligible'] == 4
+    assert ranks[1]['gsax'] == {'rank': 1, 'eligible': 2}
+    assert ranks[3]['gsax']['rank'] == 2
+    assert ranks[2]['gsax'] == {'rank': None, 'eligible': 2}
+    shown = card_goalie({'name': 'Goalie 1', 'status': 'Confirmed'},
+                        [{'id': 1, 'firstName': {'default': 'Goalie'}, 'lastName': {'default': '1'}}],
+                        rows, advanced, ranks)
+    assert shown['ranks']['sv']['rank'] == 3
+    assert shown['ranks']['gsax']['rank'] == 1
+    assert shown['stats']['gsax'] == 2
 
 
 def test_card_goalie_prefers_reported_starter_then_roster_leader():

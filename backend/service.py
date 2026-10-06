@@ -10,7 +10,8 @@ from .player_identity import resolve_player
 from .signals import matchup_signals
 from .providers import ALIASES, TEAM_NAMES, Providers, starter_for
 from .stats import (advanced_summary, in_season, season_for_date, goalie_summary, match_player, normalized_name,
-                    number, recent, rest_context, season_label, team_summary, card_team_stats, last_five, card_goalie, league_ranks)
+                    number, recent, rest_context, season_label, team_summary, card_team_stats, last_five, card_goalie,
+                    goalie_league_ranks, league_ranks)
 
 
 def today_et():
@@ -163,6 +164,7 @@ class Dashboard:
                     advanced_rows[abbrev].append(row)
             advanced_stats = {abbrev: advanced_summary(rows) for abbrev, rows in advanced_rows.items()}
             advanced_ranks = league_ranks(advanced_stats, ['xgf_pct'])
+            goalie_ranks = goalie_league_ranks(goalie_stats.data or [], mp_goalies.data or [])
             for game in games:
                 if int(game['season']) != season:
                     continue
@@ -178,7 +180,7 @@ class Dashboard:
                                                   **advanced_ranks.get(game[side + 'Team']['abbrev'], {})},
                                         'form': last_five((schedule.data or {}).get('games', []), tid),
                                         'goalie': card_goalie(starters[side], (roster.data or {}).get('goalies', []),
-                                                              goalie_stats.data or [], mp_goalies.data or []),
+                                                              goalie_stats.data or [], mp_goalies.data or [], goalie_ranks),
                                         'signals': matchup_signals(game, tid, (schedule.data or {}).get('games', []) if not schedule.stale else [])}
                 comparisons[str(game['id'])] = comparison
         next_date = None if any(playable_game(g) for g in games) else await self.next_game_date(date)

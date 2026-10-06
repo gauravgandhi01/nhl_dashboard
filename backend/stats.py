@@ -96,6 +96,35 @@ def league_ranks(teams, metrics, lower=()):
     return result
 
 
+def _player_id(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def goalie_league_ranks(rows, advanced):
+    """Rank every goalie with a game played. The pool is the season, not the two starters."""
+    by_id = {}
+    for row in rows or []:
+        pid = _player_id(row.get('playerId'))
+        if pid is not None:
+            by_id[pid] = row
+    samples = {}
+    for row in advanced or []:
+        pid = _player_id(row.get('playerId'))
+        if pid is not None:
+            samples.setdefault(pid, []).append(row)
+    stats = {}
+    for pid, row in by_id.items():
+        played = samples.get(pid, [])
+        xg, goals = total(played, 'xGoals'), total(played, 'goals')
+        stats[pid] = {'games': number(row.get('gamesPlayed')), 'sv': number(row.get('savePct')),
+                      'gaa': number(row.get('goalsAgainstAverage')),
+                      'gsax': xg - goals if xg is not None and goals is not None else None}
+    return league_ranks(stats, ['sv', 'gaa', 'gsax'], lower={'gaa'})
+
+
 def last_five(games, team_id):
     completed = [g for g in games if g.get('gameType') == 2 and g.get('gameState') in ['OFF', 'FINAL']]
     completed.sort(key=lambda g: (g.get('gameDate', ''), g['id']), reverse=True)
@@ -111,26 +140,27 @@ def last_five(games, team_id):
     return list(reversed(form))
 
 
-def card_goalie(starter, roster, rows, advanced):
+def card_goalie(starter, roster, rows, advanced, ranks=None):
     players = [{'id': p['id'], 'name': f"{p.get('firstName', {}).get('default', '')} {p.get('lastName', {}).get('default', '')}"}
                for p in roster]
     matched = match_player(starter.get('name'), players) if starter.get('name') else None
-    by_id = {r['playerId']: r for r in rows}
+    by_id = {_player_id(r.get('playerId')): r for r in rows}
+    by_id.pop(None, None)
     candidates = [p for p in players if p['id'] in by_id and (number(by_id[p['id']].get('gamesPlayed')) or 0) > 0]
     chosen = next((p for p in players if p['id'] == matched), None)
     if starter.get('name') and chosen is None:
-        return {'name': starter['name'], 'basis': starter['status'], 'stats': {}, 'advanced_games': 0}
+        return {'name': starter['name'], 'basis': starter['status'], 'stats': {}, 'advanced_games': 0, 'ranks': {}}
     if chosen is None:
         chosen = max(candidates, key=lambda p: number(by_id[p['id']].get('gamesPlayed')) or 0, default=None)
     if chosen is None:
-        return {'name': None, 'basis': 'Not announced', 'stats': {}, 'advanced_games': 0}
+        return {'name': None, 'basis': 'Not announced', 'stats': {}, 'advanced_games': 0, 'ranks': {}}
     row = by_id.get(chosen['id'], {})
-    samples = [r for r in advanced if str(r['playerId']) == str(chosen['id'])]
+    samples = [r for r in advanced if _player_id(r.get('playerId')) == chosen['id']]
     xg, goals = total(samples, 'xGoals'), total(samples, 'goals')
     return {'name': chosen['name'], 'basis': starter['status'] if matched else 'Roster leader',
             'stats': {'games': number(row.get('gamesPlayed')), 'sv': number(row.get('savePct')),
                       'gaa': number(row.get('goalsAgainstAverage')), 'gsax': xg - goals if xg is not None and goals is not None else None},
-            'advanced_games': len(samples)}
+            'advanced_games': len(samples), 'ranks': (ranks or {}).get(chosen['id'], {})}
 
 
 def season_for_date(value):

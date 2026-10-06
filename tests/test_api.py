@@ -147,12 +147,15 @@ def test_slate_card_goalie_includes_normalized_gsax():
                 return Feed([{'teamId': 1, 'gamesPlayed': 1}, {'teamId': 2, 'gamesPlayed': 1}], 'NHL Stats', report)
             if report == 'goalie/summary':
                 return Feed([{'playerId': 10, 'gamesPlayed': 5, 'savePct': .91, 'goalsAgainstAverage': 2.5},
-                             {'playerId': 20, 'gamesPlayed': 5, 'savePct': .9, 'goalsAgainstAverage': 2.8}], 'NHL Stats', report)
+                             {'playerId': 20, 'gamesPlayed': 5, 'savePct': .9, 'goalsAgainstAverage': 2.8},
+                             {'playerId': 30, 'gamesPlayed': 8, 'savePct': .95, 'goalsAgainstAverage': 1.8},
+                             {'playerId': 40, 'gamesPlayed': 0, 'savePct': .99, 'goalsAgainstAverage': 1.0}], 'NHL Stats', report)
             return Feed([], 'NHL Stats', report)
 
         async def mp(self, kind, *args):
             data = [{'playerId': '10', 'gameId': '1', 'xGoals': 3, 'goals': 1},
-                    {'playerId': '20', 'gameId': '1', 'xGoals': 2, 'goals': 3}] if kind == 'goalies' else []
+                    {'playerId': '20', 'gameId': '1', 'xGoals': 2, 'goals': 3},
+                    {'playerId': '30', 'gameId': '1', 'xGoals': 4, 'goals': 1}] if kind == 'goalies' else []
             return Feed(data, 'MoneyPuck', kind)
 
     async def scenario():
@@ -161,6 +164,10 @@ def test_slate_card_goalie_includes_normalized_gsax():
         assert card['away']['goalie']['stats']['gsax'] == 2
         assert card['away']['goalie']['advanced_games'] == 1
         assert card['home']['goalie']['stats']['gsax'] == -1
+        assert card['away']['goalie']['ranks']['sv'] == {'rank': 2, 'eligible': 3}
+        assert card['home']['goalie']['ranks']['gaa'] == {'rank': 3, 'eligible': 3}
+        assert card['away']['goalie']['ranks']['gsax'] == {'rank': 2, 'eligible': 3}
+        assert card['home']['goalie']['ranks']['gsax']['rank'] == 3
     asyncio.run(scenario())
 
 

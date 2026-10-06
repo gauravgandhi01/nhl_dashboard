@@ -279,6 +279,8 @@ function CardMetric({
   lower = false,
   neutral = false,
   ranks,
+  population = "teams",
+  populationNote = "all 32 NHL teams considered",
 }: {
   label: string;
   away: number | null | undefined;
@@ -288,6 +290,8 @@ function CardMetric({
   lower?: boolean;
   neutral?: boolean;
   ranks?: { away?: { rank: number | null; eligible: number }; home?: { rank: number | null; eligible: number } };
+  population?: string;
+  populationNote?: string;
 }) {
   const ranked = Boolean(ranks);
   const comparable =
@@ -313,7 +317,7 @@ function CardMetric({
   const homeRankClass = rankClass(home, ranks?.home);
   const rankBadge = (value: number | null | undefined, rank?: { rank: number | null; eligible: number }, className = "") => (
     <span className={`league-rank ${className}`} title={rank?.rank != null && value != null
-      ? `League rank ${rank.rank} among ${rank.eligible} teams with data this season; all 32 NHL teams considered. Ties share a rank. ${help}.`
+      ? `League rank ${rank.rank} among ${rank.eligible} ${population} with data this season; ${populationNote}. Ties share a rank. ${help}.`
       : "League rank unavailable"}>
       {rank?.rank != null && value != null ? rank.rank : "—"}
     </span>
@@ -519,18 +523,27 @@ function CardStats({
       />
       <CardMetric
         label="Save %"
+        ranks={{ away: a?.goalie.ranks?.sv, home: h?.goalie.ranks?.sv }}
+        population="goalies"
+        populationNote="every goalie with playing time this season"
         away={a?.goalie.stats.sv}
         home={h?.goalie.stats.sv}
         digits={3}
       />
       <CardMetric
         label="GAA"
+        ranks={{ away: a?.goalie.ranks?.gaa, home: h?.goalie.ranks?.gaa }}
+        population="goalies"
+        populationNote="every goalie with playing time this season"
         away={a?.goalie.stats.gaa}
         home={h?.goalie.stats.gaa}
         lower
       />
       <CardMetric
         label="GSAx"
+        ranks={{ away: a?.goalie.ranks?.gsax, home: h?.goalie.ranks?.gsax }}
+        population="goalies"
+        populationNote="every goalie with playing time this season"
         away={a?.goalie.stats.gsax}
         home={h?.goalie.stats.gsax}
       />

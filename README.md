@@ -4,11 +4,15 @@ Local daily slate and matchup research: comparison cards with season scoring,
 last-five form, and goalie statistics; season/last-10 team statistics, MoneyPuck
 5-on-5 metrics, goalie comparisons, current rosters, projected lines, and injuries.
 
-Slate cards show `#x` league ranks between each team stat and its label for
+Slate cards show league ranks between each stat and its label. Team ranks cover
 5-on-5 expected-goal share, goals for/against per game, shots per game, and power
-play. Ranks use full-league current-season data, including teams off the slate.
-Lower goals against ranks better; ties share a rank (1, 1, 3). Missing stats and
-teams without games are unranked; hover a rank for the number of teams with data.
+play, using every NHL team, including teams off the slate. Goalie ranks cover
+save percentage, goals-against average, and goals saved above expected, using
+every goalie with at least one game played this season, including goalies who
+are not in the game. Lower goals against and lower GAA rank better; ties share a
+rank (1, 1, 3). Missing stats, teams without games, and goalies without playing
+time are unranked. Colors follow those ranks. Appearances stay a sample count
+and are not colored. Hover a rank for how many teams or goalies have that stat.
 
 The slate keeps the Upcoming / Started / Final control. Back-to-back and
 confirmed-starter filters combine with it. Back-to-back matches either team’s
@@ -80,9 +84,9 @@ Before regular-season data exists, statistics remain empty. Last 10
 uses up to ten games from that season only. Goalies use their last 10 appearances across teams.
 Daily cards use reported starters when available. Otherwise they show the most-used
 goalie on the current roster in the displayed season, labeled "Roster leader";
-this is a comparison profile, not a predicted starter. Card colors compare like
-metrics: higher scoring/save rates and GSAx are green, lower GA/GAA are green;
-ties and missing values stay neutral. L5 excludes preseason and unfinished games
+this is a comparison profile, not a predicted starter. Team and goalie colors
+follow the season ranks above, not the other side of the matchup. Ties and
+missing values stay neutral. L5 excludes preseason and unfinished games
 and runs oldest to newest, with up to five results from the displayed season.
 
 Matchup flags are team-specific and show their reason on hover/focus:
