@@ -49,10 +49,31 @@ test("moneylines auto-load paired prices and fit mobile", async ({
     await expect(page.getByRole("button", { name: "Load moneylines" })).toHaveCount(0);
     const firstCard = page.locator(".game-card").first();
     await expect(firstCard.locator(".team-moneyline")).toHaveCount(2);
-    await expect(firstCard.locator(".card-record")).toHaveText(["3-1-0", "2-1-1"]);
+    await expect(firstCard.locator(".card-record")).toHaveText(["3-1-0 (6)", "2-1-1 (5)"]);
     await expect(firstCard.locator(".card-season")).toHaveCount(0);
     await expect(firstCard.locator(".card-matchup")).not.toContainText(game.away.abbrev);
-    await expect(firstCard.locator(".card-team .logo").first()).toHaveCSS("width", "40px");
+    await expect(firstCard.locator(".card-team .logo").first()).toHaveCSS("width", "46px");
+    const boxes = await firstCard.locator(".card-away .logo, .team-moneyline, .card-home .logo, .card-record").evaluateAll((elements) => {
+      const box = (element: Element) => {
+        const rect = element.getBoundingClientRect();
+        return { x: rect.x, y: rect.y, right: rect.right, bottom: rect.bottom };
+      };
+      return {
+        awayLogo: box(elements.find((element) => element.matches(".card-away .logo"))!),
+        homeLogo: box(elements.find((element) => element.matches(".card-home .logo"))!),
+        awayPrice: box(elements.filter((element) => element.matches(".team-moneyline"))[0]),
+        homePrice: box(elements.filter((element) => element.matches(".team-moneyline"))[1]),
+        awayRecord: box(elements.filter((element) => element.matches(".card-record"))[0]),
+        homeRecord: box(elements.filter((element) => element.matches(".card-record"))[1]),
+      };
+    });
+    expect(boxes.awayPrice.x).toBeGreaterThanOrEqual(boxes.awayLogo.right - 1);
+    expect(boxes.homePrice.right).toBeLessThanOrEqual(boxes.homeLogo.x + 1);
+    expect(boxes.awayPrice.y).toBeLessThan(boxes.awayLogo.bottom);
+    expect(boxes.awayPrice.bottom).toBeGreaterThan(boxes.awayLogo.y);
+    expect(boxes.homePrice.y).toBeLessThan(boxes.homeLogo.bottom);
+    expect(boxes.awayRecord.y).toBeGreaterThanOrEqual(boxes.awayLogo.bottom - 1);
+    expect(boxes.homeRecord.y).toBeGreaterThanOrEqual(boxes.homeLogo.bottom - 1);
     await expect(firstCard.locator(".team-moneyline small").first()).toHaveAttribute("title", "FanDuel");
     await expect(firstCard.locator(".team-moneyline").first()).toContainText(
       "+125",

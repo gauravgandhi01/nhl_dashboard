@@ -1601,7 +1601,9 @@ tr:hover td {
   }
   .slate-toolbar .toolbar-right {
     width: auto;
+    max-width: 100%;
     justify-content: flex-end;
+    flex-wrap: wrap;
   }
   .toolbar .search {
     flex: 1;
@@ -2411,25 +2413,51 @@ tr:hover td {
 .refresh-button:focus-visible { outline: 2px solid #9ebdce; outline-offset: 2px; }
 .props-controls:empty { display: none; }
 
-.card-stats .card-matchup { grid-template-columns: minmax(0, 1fr) 50px minmax(0, 1fr); gap: 2px; }
+.card-stats .card-matchup {
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  align-items: start;
+  gap: 2px 6px;
+}
 .card-center-market {
   display: grid;
-  align-content: center;
+  align-content: start;
   justify-items: center;
   gap: 1px;
   min-width: 0;
 }
+.card-moneylines {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 46px;
+}
+.card-ml-slot { display: flex; min-width: 0; }
+.card-ml-slot:first-child { justify-content: flex-start; }
+.card-ml-slot:last-child { justify-content: flex-end; }
+.card-moneylines .team-moneyline {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  margin: 0;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.card-moneylines .team-moneyline small { font-size: 8px; }
 .card-center-market .eyebrow {
   font-size: 8px;
 }
 .card-center-market .card-total {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 1px;
-  margin: 15px 0 0;
+  grid-template-columns: max-content max-content;
+  justify-content: center;
+  gap: 1px 4px;
+  margin: 0;
   padding: 0;
   border: 0;
   font-size: 9px;
+  max-width: 100%;
 }
 .card-center-market .total-line strong {
   font-size: 9px;
@@ -2450,22 +2478,25 @@ tr:hover td {
   font-size: 7px;
   line-height: 1.05;
 }
-.card-matchup > .card-team { gap: 1px 4px; }
-.card-matchup > .card-away { grid-template-columns: minmax(0, 1fr) 46px; }
-.card-matchup > .card-home { grid-template-columns: 46px minmax(0, 1fr); }
-.card-matchup > .card-away .logo { grid-column: 2; grid-row: 1; }
-.card-matchup > .card-away .card-record { grid-column: 1; grid-row: 1; text-align: right; }
-.card-matchup > .card-home .logo { grid-column: 1; grid-row: 1; }
-.card-matchup > .card-home .card-record { grid-column: 2; grid-row: 1; text-align: left; }
+.card-matchup > .card-team {
+  grid-template-columns: max-content;
+  justify-items: center;
+  align-content: start;
+  gap: 2px;
+}
 .card-team .logo {
   width: 46px;
   height: 46px;
-  transform: scale(1.16);
-  transform-origin: center;
 }
-.card-record { overflow: hidden; text-overflow: ellipsis; font: 8px var(--mono); color: var(--muted); white-space: nowrap; }
-.card-team .team-moneyline { display: flex; align-items: baseline; justify-content: center; gap: 3px; margin: 0 0 3px; font-size: 9px; }
-.card-team .team-moneyline small { font-size: 6px; }
+.card-record {
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 8px var(--mono);
+  color: var(--muted);
+  white-space: nowrap;
+  text-align: center;
+}
 
 .line-player-heading { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 3px 6px; }
 .line-player-heading > strong { flex: 1 1 70px; min-width: 0; }

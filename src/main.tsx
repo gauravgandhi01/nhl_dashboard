@@ -436,16 +436,22 @@ function CardStats({
         <div className="card-team card-away" role="group" aria-label={game.away.name} title={game.away.name}>
           <Logo team={game.away} />
           <span className="card-record" title="Team record (W–L–OT) and points">{cardRecord(game.away.record)}</span>
-          <TeamMoneyline game={game} odds={odds} side="away" />
         </div>
         <span className="card-center-market">
-          <span className="eyebrow">AT</span>
+          <span className="card-moneylines">
+            <span className="card-ml-slot">
+              <TeamMoneyline game={game} odds={odds} side="away" />
+            </span>
+            <span className="eyebrow">AT</span>
+            <span className="card-ml-slot">
+              <TeamMoneyline game={game} odds={odds} side="home" />
+            </span>
+          </span>
           <GameTotal game={game} odds={odds} />
         </span>
         <div className="card-team card-home" role="group" aria-label={game.home.name} title={game.home.name}>
           <Logo team={game.home} />
           <span className="card-record" title="Team record (W–L–OT) and points">{cardRecord(game.home.record)}</span>
-          <TeamMoneyline game={game} odds={odds} side="home" />
         </div>
       </div>
       <CardMetric
