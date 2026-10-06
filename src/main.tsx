@@ -1277,7 +1277,7 @@ function Lineups({ side, props, gameId, date }: { side: Side; props: PropsState;
                             ))}
                           </div>
                         )}
-                        <CompactProps state={props} gameId={gameId} playerId={side.lineup_player_ids?.[p]} overOnly countsOnHover
+                        <CompactProps state={props} gameId={gameId} playerId={side.lineup_player_ids?.[p]} overOnly countsOnHover showSnapshot={false}
                           log={side.lineup_logs?.[String(side.lineup_player_ids?.[p] ?? "")]} />
                       </div>
                     );
@@ -1312,7 +1312,7 @@ function Lineups({ side, props, gameId, date }: { side: Side; props: PropsState;
               <div className="line-player" key={p.id}>
                 <LinePlayerHeading name={p.name} player={p} date={date} />
                 <span>{p.position}</span>
-                <CompactProps state={props} gameId={gameId} playerId={p.id} overOnly countsOnHover log={side.lineup_logs?.[String(p.id)]} />
+                <CompactProps state={props} gameId={gameId} playerId={p.id} overOnly countsOnHover showSnapshot={false} log={side.lineup_logs?.[String(p.id)]} />
               </div>
             ))}
           </div>

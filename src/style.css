@@ -2335,7 +2335,6 @@ tr:hover td {
   .line-player .compact-prop-row { flex-direction: column; align-items: flex-start; gap: 1px; }
   .line-player .compact-prop-label { white-space: normal; }
 }
-.line-player .prop-snapshot { grid-column: 1 / -1; white-space: normal; }
 .line-player .compact-props span { font-size: 9px; }
 .line-player { position: relative; container-type: inline-size; }
 .line-player .has-count-tip { cursor: help; }

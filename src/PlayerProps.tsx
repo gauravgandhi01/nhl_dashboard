@@ -456,6 +456,7 @@ export function CompactProps({
   overOnly = false,
   log,
   countsOnHover = false,
+  showSnapshot = true,
 }: {
   state: PropsState;
   gameId: number;
@@ -465,6 +466,7 @@ export function CompactProps({
   overOnly?: boolean;
   log?: AppearanceLog | null;
   countsOnHover?: boolean;
+  showSnapshot?: boolean;
 }) {
   const game = state.data?.games[String(gameId)];
   const player = playerId != null ? game?.players[String(playerId)] : undefined;
@@ -521,7 +523,7 @@ export function CompactProps({
           </div>
         );
       })}
-      {game && !game.eligible && (
+      {showSnapshot && game && !game.eligible && (
         <span className="prop-snapshot">Pregame snapshot</span>
       )}
     </div>

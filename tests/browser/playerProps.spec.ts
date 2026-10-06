@@ -229,6 +229,12 @@ test("shared player props render in expansion, lines, and only on-slate relevant
     await expect(matched).toContainText("+260");
     await expect(matched.locator(".prop-slash")).toHaveCount(0);
     await expect(matched.locator(".prop-quote")).toHaveCount(3);
+    await expect(page.locator(".line-player")).not.toContainText("Pregame snapshot");
+    response.games[p.game_id].eligible = false;
+    await page.reload();
+    await expect(matched).toContainText("+260");
+    await expect(page.locator(".line-player")).not.toContainText("Pregame snapshot");
+    response.games[p.game_id].eligible = true;
     await expect(matched.locator('.prop-quote[aria-label*="under"], .prop-quote[aria-label*="no "]')).toHaveCount(0);
     await expect(matched.locator(".prop-quote").first()).toHaveAttribute(
       "title",
