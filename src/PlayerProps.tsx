@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { RefreshButton } from "./RefreshButton";
 import { countTitle, formatCount, gameLogRows, lineWindows, type AppearanceLog } from "./lineCounts";
 
@@ -217,9 +218,11 @@ export function PropsRefreshButton({ state, gameId }: { state: PropsState; gameI
 export function PropsControls({
   state,
   gameId,
+  showAliases = true,
 }: {
   state: PropsState;
   gameId?: number;
+  showAliases?: boolean;
 }) {
   const games = Object.values(state.data?.games || {}).filter(
     (g) => gameId == null || g.game_id === gameId,
@@ -242,7 +245,7 @@ export function PropsControls({
           {message}
         </span>
       )}
-      {unmatched > 0 && (
+      {showAliases && unmatched > 0 && (
         <span
           className="warning"
           title={`Provider names without a unique match on this game's NHL rosters are excluded. Add aliases in config/player_aliases.json using provider name to NHL player ID. Names: ${unmatchedNames.join(", ")}`}
@@ -281,10 +284,43 @@ function Price({
 
 const lineLabel = (line: PropLine) =>
   line.market === "player_goal_scorer_anytime"
-    ? "ATG / O0.5"
+    ? "0.5"
     : line.point == null
-      ? "First goal"
+      ? ""
       : `${line.point}`;
+
+function WindowCells({
+  log,
+  family,
+  point,
+  active,
+}: {
+  log?: AppearanceLog | null;
+  family: string;
+  point: number | null;
+  active: boolean;
+}) {
+  const result = active ? lineWindows(log, family, point) : null;
+  return (["L5", "L10", "Season"] as const).map((label) => {
+    if (!result) return <span className="prop-count" key={label} />;
+    const count = result.empty ? null : result.windows.find((w) => w.label === label)?.count;
+    const text = count?.games ? formatCount(count) : "--";
+    return (
+      <span
+        className="prop-count"
+        key={label}
+        title={
+          count
+            ? countTitle(label, count, result.spec.point, result.spec.label)
+            : "No regular-season appearances"
+        }
+        tabIndex={0}
+      >
+        {text}
+      </span>
+    );
+  });
+}
 
 export function LineCounts({
   log,
@@ -365,41 +401,49 @@ function MarketRow({
   const line = selected;
   const binary = selected?.point == null;
   const showUnder = family !== "first_goal";
+  const index = selected ? lines.findIndex((l) => l.id === selected.id) : -1;
+  const caption = selected ? lineLabel(selected) : "";
+  const showLine = (next: number) => {
+    const line = lines[next];
+    if (line) setChoice(line.id);
+  };
   return (
     <div className="prop-market" role="group" aria-label={label}>
       <div className="prop-market-row">
         <span className="prop-market-label">{label}</span>
-        {lines.length ? (
-          <div className="prop-line-buttons" aria-label={`${label} line`}>
-            {lines.map((l) => (
-              <button
-                key={l.id}
-                type="button"
-                className={l.id === selected.id ? "selected" : ""}
-                aria-pressed={l.id === selected.id}
-                onClick={() => setChoice(l.id)}
-              >
-                {lineLabel(l)}
-              </button>
-            ))}
+        {!lines.length ? (
+          <span className="prop-missing">Unavailable</span>
+        ) : caption || lines.length > 1 ? (
+          <div className="prop-line-carousel" aria-label={`${label} line`}>
+            <button
+              type="button"
+              aria-label={`Previous ${label} line`}
+              disabled={index <= 0}
+              onClick={() => showLine(index - 1)}
+            >
+              <ChevronLeft size={12} />
+            </button>
+            <span className="prop-line-value" aria-live="polite">{caption}</span>
+            <button
+              type="button"
+              aria-label={`Next ${label} line`}
+              disabled={index >= lines.length - 1}
+              onClick={() => showLine(index + 1)}
+            >
+              <ChevronRight size={12} />
+            </button>
           </div>
         ) : (
-          <span className="prop-missing">Unavailable</span>
+          <span className="prop-line-carousel" />
         )}
-        <Price
-          quote={bestQuote(line, binary ? "yes" : "over")}
-          prefix={binary ? "Yes" : "O"}
-        />
-        {showUnder && (
-          <Price
-            quote={bestQuote(line, binary ? "no" : "under")}
-            prefix={binary ? "No" : "U"}
-          />
-        )}
+        <span className="prop-side over">
+          <Price quote={bestQuote(line, binary ? "yes" : "over")} />
+        </span>
+        <span className="prop-side under">
+          {showUnder && <Price quote={bestQuote(line, binary ? "no" : "under")} />}
+        </span>
+        <WindowCells log={log} family={family} point={line?.point ?? null} active={lines.length > 0} />
       </div>
-      {lines.length > 0 && (
-        <LineCounts log={log} family={family} point={line?.point ?? null} />
-      )}
     </div>
   );
 }
@@ -420,14 +464,22 @@ export function PlayerPropPanel({
   return (
     <section className="player-prop-panel" aria-label="Player props">
       <div className="prop-panel-heading">
-        <h3>Player odds</h3>
         <span>
           {game?.retrieved_at
             ? `${!game.eligible ? "Pregame snapshot / " : ""}${stamp(game.retrieved_at)}`
             : "Not loaded"}
         </span>
       </div>
-      <PropsControls state={state} gameId={gameId} />
+      <PropsControls state={state} gameId={gameId} showAliases={false} />
+      <div className="prop-market-head" role="row">
+        <span />
+        <span />
+        <span className="prop-side" role="columnheader"><span>O</span></span>
+        <span className="prop-side" role="columnheader"><span>U</span></span>
+        <span role="columnheader">L5</span>
+        <span role="columnheader">L10</span>
+        <span role="columnheader">Season</span>
+      </div>
       {[
         ["assists", "Assists"],
         ["scorer", "Goals"],

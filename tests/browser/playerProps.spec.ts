@@ -171,26 +171,56 @@ test("shared player props render in expansion, lines, and only on-slate relevant
       name: "Player props",
       exact: true,
     });
+    await expect(panel.getByRole("heading", { name: "Player odds" })).toHaveCount(0);
+    await expect(panel).not.toContainText("names need aliases");
+    await expect(page.locator(".props-controls .warning")).toHaveAttribute(
+      "title",
+      /Provider Alias/,
+    );
+    await expect(panel.locator(".prop-market-head")).toHaveText(/O\s*U\s*L5\s*L10\s*Season/);
+    const stampBox = await panel.locator(".prop-panel-heading span").boundingBox();
+    const labelBox = await panel.locator(".prop-market-label").first().boundingBox();
+    expect(Math.abs(stampBox!.x - labelBox!.x)).toBeLessThanOrEqual(2);
     await expect(panel.locator(".prop-market-row")).toHaveCount(5);
+    await expect(panel.locator(".prop-market-row .prop-count").first()).not.toContainText("L5");
     const points = panel
       .locator(".prop-market-row")
       .filter({ has: page.getByLabel("Points line", { exact: true }) });
+    const pointsLine = panel.getByLabel("Points line", { exact: true });
     await expect(points).toContainText("+130");
-    await panel
-      .getByLabel("Points line", { exact: true })
-      .selectOption("points:1.5");
-    await expect(points).toContainText("+240");
-    await panel
-      .getByLabel("Points line", { exact: true })
-      .selectOption("points:0.5");
-    await panel
-      .getByLabel("Points sportsbook", { exact: true })
-      .selectOption("fanduel");
-    await expect(points).toContainText("+120");
-    await expect(points).not.toContainText("+130");
-    await expect(panel.getByLabel("Goals line", { exact: true })).toHaveValue(
-      "scorer:player_goal_scorer_anytime",
+    const columns = await panel.locator(".prop-market-row").evaluateAll((rows) =>
+      rows.map((row) => ({
+        lines: Math.round(row.querySelector(".prop-line-carousel, .prop-missing")!.getBoundingClientRect().x),
+        counts: [...row.querySelectorAll(".prop-count")].map((el) => Math.round(el.getBoundingClientRect().x)),
+        over: Math.round(row.querySelector(".prop-side.over")!.getBoundingClientRect().x),
+        under: Math.round(row.querySelector(".prop-side.under")!.getBoundingClientRect().x),
+      })),
     );
+    const aligned = (values: number[]) => Math.max(...values) - Math.min(...values) <= 1;
+    expect(aligned(columns.map((row) => row.lines))).toBeTruthy();
+    expect(aligned(columns.map((row) => row.over))).toBeTruthy();
+    expect(aligned(columns.map((row) => row.under))).toBeTruthy();
+    for (const index of [0, 1, 2]) expect(aligned(columns.map((row) => row.counts[index]))).toBeTruthy();
+    const head = await panel.locator(".prop-market-head").evaluate((row) =>
+      [...row.querySelectorAll("[role=columnheader]")].map((el) => Math.round(el.getBoundingClientRect().x)),
+    );
+    expect(head).toHaveLength(5);
+    expect(Math.abs(head[0] - columns[0].over)).toBeLessThanOrEqual(1);
+    expect(Math.abs(head[1] - columns[0].under)).toBeLessThanOrEqual(1);
+    for (const index of [0, 1, 2]) expect(Math.abs(head[index + 2] - columns[0].counts[index])).toBeLessThanOrEqual(1);
+    expect(columns[0].lines).toBeLessThan(columns[0].over);
+    expect(columns[0].under).toBeLessThan(columns[0].counts[0]);
+    const row = await points.boundingBox();
+    expect(row!.height).toBeLessThan(24);
+    await expect(pointsLine).toContainText("0.5");
+    await pointsLine.getByRole("button", { name: "Next Points line" }).click();
+    await expect(pointsLine).toContainText("1.5");
+    await expect(points).toContainText("+240");
+    await pointsLine.getByRole("button", { name: "Previous Points line" }).click();
+    await expect(pointsLine).toContainText("0.5");
+    await expect(points).toContainText("+130");
+    await expect(panel.getByLabel("Goals line", { exact: true })).toContainText("0.5");
+    await expect(panel.getByText("First goal", { exact: true })).toHaveCount(0);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,

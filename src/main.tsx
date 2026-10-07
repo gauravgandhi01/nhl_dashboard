@@ -35,6 +35,7 @@ import type {
 import "./style.css";
 import { RefreshButton } from "./RefreshButton";
 import { Players } from "./Players";
+import { Goalies } from "./Goalies";
 import { FirstPeriod } from "./FirstPeriod";
 import { Streaks } from "./Streaks";
 import { StanleyCup } from "./StanleyCup";
@@ -1548,6 +1549,12 @@ function DashboardNav() {
         Players
       </Link>
       <Link
+        to={`/goalies?date=${date}`}
+        aria-current={location.pathname === "/goalies" ? "page" : undefined}
+      >
+        Goalies
+      </Link>
+      <Link
         to={`/first-period?date=${date}`}
         aria-current={
           location.pathname.startsWith("/first-period") ? "page" : undefined
@@ -1598,6 +1605,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Slate />} />
           <Route path="/players" element={<Players />} />
+          <Route path="/goalies" element={<Goalies />} />
           <Route path="/streaks" element={<Streaks />} />
           <Route path="/stanley-cup" element={<StanleyCup />} />
           <Route

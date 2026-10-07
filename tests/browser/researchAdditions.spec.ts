@@ -106,13 +106,13 @@ test("a player link expands that skater and shows appearance counts", async ({ p
     expect(box && box.y >= 0 && box.y < 700).toBeTruthy();
     const shotsGroup = page.getByRole("group", { name: "Shots on goal" });
     await expect(shotsGroup).toContainText("3/5");
-    await shotsGroup.getByRole("button", { name: "2", exact: true }).click();
+    await shotsGroup.getByRole("button", { name: "Next Shots on goal line" }).click();
     await expect(shotsGroup).toContainText("1/5 · 2 pushes");
     await expect(page.getByRole("group", { name: "First goalscorer" })).not.toContainText("L5");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   }
   await page.goto(`/players?date=${date}&player=404`);
-  await expect(page.getByText("This player is not on tonight's skater list.")).toBeVisible();
+  await expect(page.getByText("This player is not on the skater list.")).toBeVisible();
 });
 
 function team(abbrev: string) {
@@ -276,7 +276,8 @@ test("line, injury, and streak names open the player", async ({ page }) => {
   await expect(page.locator(".line-player-heading", { hasText: "H. Player" }).locator("a")).toHaveCount(0);
   await page.getByRole("link", { name: "A. Skater" }).click();
   await expect(page).toHaveURL(new RegExp(`/players\\?date=${date}&player=7`));
-  await expect(page.locator(".player-expanded")).toContainText("Alex Skater");
+  await expect(page.locator(".player-name[aria-expanded='true']")).toContainText("Alex Skater");
+  await expect(page.locator(".player-expanded strong")).toHaveCount(0);
   await page.goBack();
   await page.getByRole("link", { name: "Alex Skater" }).click();
   await expect(page).toHaveURL(new RegExp(`/players\\?date=${date}&player=7`));
@@ -317,5 +318,5 @@ test("line, injury, and streak names open the player", async ({ page }) => {
   await page.getByRole("button", { name: "Skaters" }).click();
   await page.getByRole("link", { name: "Alex Skater" }).click();
   await expect(page).toHaveURL(new RegExp(`/players\\?date=${date}&player=7`));
-  await expect(page.locator(".player-expanded")).toContainText("Appearances over this line");
+  await expect(page.locator(".player-expanded")).toContainText("4/5");
 });

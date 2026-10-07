@@ -21,10 +21,10 @@ type Skater = {
   position: string;
   team: string;
   logo: string;
-  game_id: number;
-  opponent: string;
+  game_id: number | null;
+  opponent: string | null;
   opponent_logo?: string | null;
-  home: boolean;
+  home: boolean | null;
   season_label: string;
   windows: Record<Window, Stats>;
   log?: AppearanceLog | null;
@@ -42,6 +42,10 @@ type Data = {
   periods: { season_label: string; previous_season: boolean }[];
   sources: Source[];
   error: string | null;
+  ready?: boolean;
+  partial?: boolean;
+  schedule_available?: boolean;
+  build?: { status: string; done: number; total: number };
 };
 const pageCache = new Map<string, Data>();
 const today = todayEt;
@@ -122,6 +126,7 @@ export function Players() {
       : params.get("window") === "last10"
         ? "last10"
         : "season";
+  const scope = params.get("scope") === "tonight" ? "tonight" : "league";
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
@@ -143,7 +148,11 @@ export function Players() {
   };
   useEffect(() => {
     const controller = new AbortController();
-    const cached = pageCache.get(date);
+    let timer: ReturnType<typeof setTimeout>;
+    let active = true;
+    let pending = false;
+    const key = `${scope}:${date}`;
+    const cached = pageCache.get(key);
     setData(cached || null);
     setError(null);
     setBusy(true);
@@ -151,24 +160,41 @@ export function Players() {
       setTeam("all");
       setExpanded(null);
     }
-    fetch(`/api/players?date=${date}`, { signal: controller.signal })
-      .then(async (r) => {
-        const body = await r.json();
-        if (!r.ok) throw new Error(body.detail || "Players unavailable");
-        if (!controller.signal.aborted) {
-          pageCache.set(date, body);
+    const load = () => {
+      clearTimeout(timer);
+      fetch(`/api/players?date=${date}&scope=${scope}`, { signal: controller.signal })
+        .then(async (r) => {
+          const body = await r.json();
+          if (!r.ok) throw new Error(body.detail || "Players unavailable");
+          if (!active) return;
+          if (body.ready !== false) pageCache.set(key, body);
           setData(body);
-        }
-      })
-      .catch((e) => {
-        if (!controller.signal.aborted) setError(e.message);
-      })
-      .finally(() => { if (!controller.signal.aborted) setBusy(false); });
-    return () => controller.abort();
-  }, [date, revision]);
+          setError(null);
+          pending = body.build?.status === "building";
+          if (pending && !document.hidden) timer = setTimeout(load, 3000);
+        })
+        .catch((e) => {
+          pending = false;
+          if (active && !controller.signal.aborted) setError(e.message);
+        })
+        .finally(() => { if (active) setBusy(false); });
+    };
+    const visibility = () => {
+      clearTimeout(timer);
+      if (!document.hidden && pending) load();
+    };
+    document.addEventListener("visibilitychange", visibility);
+    load();
+    return () => {
+      active = false;
+      clearTimeout(timer);
+      controller.abort();
+      document.removeEventListener("visibilitychange", visibility);
+    };
+  }, [date, revision, scope]);
   useEffect(() => {
     const token = `${date}:${requestedId ?? ""}`;
-    if (appliedPlayer.current === token || !data || data.date !== date) return;
+    if (appliedPlayer.current === token || !data || data.date !== date || data.ready === false) return;
     appliedPlayer.current = token;
     if (requestedId == null) return;
     const matches = data.players.filter((p) => p.id === requestedId);
@@ -176,7 +202,7 @@ export function Players() {
     setTeam("all");
     setPosition("all");
     setSearch("");
-    const earliest = [...matches].sort((a, b) => a.game_id - b.game_id)[0];
+    const earliest = [...matches].sort((a, b) => (a.game_id ?? Number.MAX_SAFE_INTEGER) - (b.game_id ?? Number.MAX_SAFE_INTEGER))[0];
     setExpanded(`${earliest.game_id}-${earliest.id}`);
   }, [data, date, requestedId]);
   const choosePlayer = (id: number | null, key: string | null) => {
@@ -187,15 +213,17 @@ export function Players() {
     else next.set("player", String(id));
     setParams(next, { replace: true });
   };
-  const playerMissing = requestedId != null && data?.date === date && !data.players.some((p) => p.id === requestedId);
+  const playerMissing = requestedId != null && data?.date === date && data.ready !== false && !data.players.some((p) => p.id === requestedId);
+  const peerLabel = scope === "league" ? "league" : "nightly";
   const teams = [...new Set(data?.players.map((p) => p.team) || [])].sort();
+  const teamValue = team === "all" || teams.includes(team) ? team : "all";
   const peers = useMemo(() => buildPeers(data?.players || []), [data]);
   const rows = useMemo(
     () =>
       (data?.players || [])
         .filter(
           (p) =>
-            (team === "all" || p.team === team) &&
+            (teamValue === "all" || p.team === teamValue) &&
             (position === "all" ||
               (position === "D" ? p.position === "D" : p.position !== "D")) &&
             `${p.name} ${p.team}`.toLowerCase().includes(search.toLowerCase()),
@@ -213,7 +241,7 @@ export function Players() {
             (sort.desc ? bv - av : av - bv) || a.name.localeCompare(b.name)
           );
         }),
-    [data, team, position, search, sort, window],
+    [data, teamValue, position, search, sort, window],
   );
   const format = (
     key: string,
@@ -227,6 +255,18 @@ export function Players() {
   return (
     <>
       <div className="toolbar player-toolbar">
+        <div className="segments" aria-label="Player list">
+          {([["league", "All players"], ["tonight", "On slate"]] as const).map(([key, label]) => (
+            <button
+              key={key}
+              aria-pressed={scope === key}
+              className={scope === key ? "selected" : ""}
+              onClick={() => update("scope", key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <div className="segments" aria-label="Player statistics window">
           {(
             [
@@ -257,7 +297,7 @@ export function Players() {
           </label>
           <select
             aria-label="Player team"
-            value={team}
+            value={teamValue}
             onChange={(e) => setTeam(e.target.value)}
           >
             <option value="all">All teams</option>
@@ -285,7 +325,7 @@ export function Players() {
       <PropsControls state={props} />
       {playerMissing && (
         <p className="player-missing warning" role="status">
-          This player is not on tonight&apos;s skater list.
+          This player is not on the skater list.
         </p>
       )}
       {!data && !error ? (
@@ -298,10 +338,31 @@ export function Players() {
           <h2>Players unavailable</h2>
           <p>{error || data?.error}</p>
         </div>
+      ) : data?.ready === false ? (
+        <div className="loading-label" role="status">
+          <RefreshCw className="spin" size={14} />
+          Building skater logs {data.build?.done ?? 0}/{data.build?.total || "--"}
+        </div>
       ) : (
         data && (
           <>
-            {!data.games.length ? (
+            {data.build?.status === "building" && (
+              <div className="loading-label" role="status">
+                <RefreshCw className="spin" size={14} />
+                Building skater logs {data.build.done}/{data.build.total || "--"}
+              </div>
+            )}
+            {scope === "league" && data.schedule_available === false && (
+              <p className="player-missing warning" role="status">
+                Schedule unavailable. Matchups are hidden.
+              </p>
+            )}
+            {data.partial && (
+              <p className="player-missing warning" role="status">
+                Some skater history is incomplete.
+              </p>
+            )}
+            {scope === "tonight" && !data.games.length ? (
               <div className="state-message">
                 <h2>No scheduled games</h2>
               </div>
@@ -336,7 +397,7 @@ export function Players() {
                           }
                         >
                           <button
-                            title={c.help}
+                            title={scope === "league" ? c.help.replaceAll("nightly", "league") : c.help}
                             onClick={() =>
                               setSort({
                                 key: c.key,
@@ -371,6 +432,7 @@ export function Players() {
                           date={date}
                           format={format}
                           peers={peers}
+                          peerLabel={peerLabel}
                           props={props}
                         />
                       );
@@ -401,6 +463,7 @@ function PlayerRows({
   date,
   format,
   peers,
+  peerLabel,
   props,
 }: {
   p: Skater;
@@ -409,6 +472,7 @@ function PlayerRows({
   toggle: () => void;
   date: string;
   peers: Peers;
+  peerLabel: string;
   props: PropsState;
   format: (
     key: string,
@@ -454,22 +518,26 @@ function PlayerRows({
           )}
         </td>
         <td>
-          <Link
-            className="player-matchup"
-            to={`/matchups/${p.game_id}?date=${date}`}
-            title={`${p.team} ${p.home ? "vs" : "@"} ${p.opponent}`}
-            aria-label={`${p.team} ${p.home ? "versus" : "at"} ${p.opponent}`}
-          >
-            <span className="venue-marker">{p.home ? "vs" : "@"}</span>
-            {p.opponent_logo ? (
-              <img className="logo" src={p.opponent_logo} alt="" />
-            ) : (
-              <span className="muted">{p.opponent}</span>
-            )}
-          </Link>
+          {p.game_id == null ? (
+            <span className="muted">—</span>
+          ) : (
+            <Link
+              className="player-matchup"
+              to={`/matchups/${p.game_id}?date=${date}`}
+              title={`${p.team} ${p.home ? "vs" : "@"} ${p.opponent}`}
+              aria-label={`${p.team} ${p.home ? "versus" : "at"} ${p.opponent}`}
+            >
+              <span className="venue-marker">{p.home ? "vs" : "@"}</span>
+              {p.opponent_logo ? (
+                <img className="logo" src={p.opponent_logo} alt="" />
+              ) : (
+                <span className="muted">{p.opponent}</span>
+              )}
+            </Link>
+          )}
         </td>
         {columns.map((c) => {
-          const color = cellFormat(p, window, c.key, peers);
+          const color = cellFormat(p, window, c.key, peers, peerLabel);
           return (
             <td
               key={c.key}
@@ -485,7 +553,6 @@ function PlayerRows({
         <tr className="player-expanded">
           <td colSpan={16}>
             <div>
-              <strong>{p.name}</strong>
               <table aria-label={`${p.name} form comparison`}>
                 <thead>
                   <tr>
@@ -528,7 +595,7 @@ function PlayerRows({
                         "points60",
                         "ixg60",
                       ].map((k) => (
-                        <td key={k} className={cellFormat(p, w, k, peers).className} title={cellFormat(p, w, k, peers).title || undefined}>
+                        <td key={k} className={cellFormat(p, w, k, peers, peerLabel).className} title={cellFormat(p, w, k, peers, peerLabel).title || undefined}>
                           {format(
                             k,
                             p.windows[w][k],
@@ -548,7 +615,9 @@ function PlayerRows({
                   ))}
                 </tbody>
               </table>
-              <PlayerPropPanel state={props} gameId={p.game_id} playerId={p.id} log={p.log} />
+              {p.game_id != null && (
+                <PlayerPropPanel state={props} gameId={p.game_id} playerId={p.id} log={p.log} />
+              )}
             </div>
           </td>
         </tr>

@@ -12,7 +12,8 @@ from fastapi.staticfiles import StaticFiles
 from .cache import Store
 from .providers import Providers
 from .service import Dashboard, today_et
-from .players import players_dashboard
+from .players import LeaguePlayers, players_dashboard
+from .goalies import goalies_dashboard
 from .first_period import FirstPeriod
 from .first_period_odds import FirstPeriodOdds
 from .streaks import Streaks
@@ -78,6 +79,7 @@ async def lifespan(app):
     app.state.first_period = FirstPeriod(providers)
     app.state.first_period_odds = FirstPeriodOdds(providers)
     app.state.streaks = Streaks(providers)
+    app.state.league_players = LeaguePlayers(providers)
     app.state.moneylines = Moneylines(providers)
     app.state.player_props = PlayerProps(providers)
     app.state.stanley_cup = StanleyCup(providers)
@@ -96,6 +98,7 @@ async def lifespan(app):
                 pass
         await app.state.first_period.close()
         await app.state.streaks.close()
+        await app.state.league_players.close()
         await store.close()
 
 
@@ -114,8 +117,16 @@ async def slate(date: Date | None = None):
 
 
 @app.get('/api/players')
-async def players(date: Date | None = None):
-    return await players_dashboard(app.state.dashboard.p, date.isoformat() if date else today_et())
+async def players(date: Date | None = None, scope: Literal['league', 'tonight'] = 'tonight'):
+    day = date.isoformat() if date else today_et()
+    if scope == 'league':
+        return await app.state.league_players.view(day)
+    return await players_dashboard(app.state.dashboard.p, day)
+
+
+@app.get('/api/goalies')
+async def goalies(date: Date | None = None):
+    return await goalies_dashboard(app.state.dashboard.p, date.isoformat() if date else today_et())
 
 
 @app.get('/api/odds/moneyline')

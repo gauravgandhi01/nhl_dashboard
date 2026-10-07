@@ -35,6 +35,7 @@ def compact(store, *, vacuum=False, keep_cutoff=None):
         'moneypuck_rows': _delete_where(store, 'moneypuck_rows', 'season != ?', (season,)),
         'first_period_games': _delete_where(store, 'first_period_games', 'season != ?', (season,)),
         'player_dashboards': _delete_player_dashboards(store, now),
+        'goalie_dashboards': _delete_goalie_dashboards(store, now),
         'streak_snapshots': _delete_where(
             store, 'streak_snapshots',
             'cutoff < ? AND cutoff != ?' if keep_cutoff else 'cutoff < ?',
@@ -76,6 +77,11 @@ def _delete_where(store, table, clause, params):
 def _delete_player_dashboards(store, now):
     from .players import PLAYERS_TTL
     return _delete_where(store, 'player_dashboards', 'fetched < ?', (now - PLAYERS_TTL,))
+
+
+def _delete_goalie_dashboards(store, now):
+    from .players import PLAYERS_TTL
+    return _delete_where(store, 'goalie_dashboards', 'fetched < ?', (now - PLAYERS_TTL,))
 
 
 def _delete_responses(store, season, cutoff, now):

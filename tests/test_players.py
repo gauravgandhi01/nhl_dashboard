@@ -6,7 +6,7 @@ from unittest.mock import Mock
 import pytest
 
 from backend.cache import Feed, Store
-from backend.players import appearance_log, player_windows, players_dashboard
+from backend.players import LeaguePlayers, appearance_log, ensure_player_table, player_windows, players_dashboard
 from backend.providers import parse_mp_skaters
 
 
@@ -196,4 +196,139 @@ def test_dashboard_snapshot_cache_reuses_built_payload(tmp_path):
         assert fake.score_calls == 2
         assert rebuilt['periods'][0]['season_label'] == '2026-27'
         await fake.store.close()
+    asyncio.run(scenario())
+
+
+def test_scope_migration_keeps_tonight_rows(tmp_path):
+    from backend.cache import Store
+    store = Store(tmp_path / 'migrate.sqlite3')
+    store.db.execute('DROP TABLE IF EXISTS player_dashboards')
+    store.db.execute('''CREATE TABLE player_dashboards (
+        date TEXT PRIMARY KEY, body TEXT, fetched REAL, error TEXT)''')
+    store.db.execute(
+        'INSERT INTO player_dashboards VALUES (?, ?, ?, NULL)',
+        ('2026-09-26', '{"version":3}', 1))
+    store.db.commit()
+    ensure_player_table(store.db)
+    assert store.db.execute('SELECT date, scope FROM player_dashboards').fetchall() == [('2026-09-26', 'tonight')]
+    asyncio.run(store.close())
+
+
+class LeagueFake:
+    def __init__(self, store, schedule=True, duplicate=False):
+        self.store = store
+        self.schedule = schedule
+        self.duplicate = duplicate
+        self.log_ids = []
+        self.score_calls = 0
+
+    async def nhl(self, path, *args, **kwargs):
+        if path.startswith('score'):
+            self.score_calls += 1
+            if not self.schedule:
+                return Feed(None, 'NHL', path, error='down')
+            return Feed({'games': [{
+                'id': 2026010001, 'season': 20262027, 'gameDate': '2026-09-26',
+                'startTimeUTC': '2026-09-26T23:00:00Z', 'gameScheduleState': 'OK',
+                'awayTeam': {'id': 1, 'abbrev': 'NJD', 'darkLogo': 'njd.svg'},
+                'homeTeam': {'id': 2, 'abbrev': 'NYI', 'darkLogo': 'nyi.svg'}}]}, 'NHL', path, '2026-09-26T00:00:00Z')
+        if path.startswith('roster/'):
+            team = path.split('/')[1]
+            forwards = []
+            if team == 'NJD':
+                forwards = [{'id': 1, 'firstName': {'default': 'Slate'}, 'lastName': {'default': 'Skater'}, 'positionCode': 'C'}]
+            elif team == 'BOS':
+                forwards = [
+                    {'id': 3, 'firstName': {'default': 'Idle'}, 'lastName': {'default': 'Skater'}, 'positionCode': 'D'},
+                    {'id': 9, 'firstName': {'default': 'Zero'}, 'lastName': {'default': 'Games'}, 'positionCode': 'C'}]
+            elif team == 'NYI' and self.duplicate:
+                forwards = [{'id': 1, 'firstName': {'default': 'Slate'}, 'lastName': {'default': 'Skater'}, 'positionCode': 'C'}]
+            return Feed({'forwards': forwards, 'defensemen': [], 'goalies': [{'id': 2, 'positionCode': 'G'}]},
+                        'NHL', path, '2026-09-26T00:00:00Z')
+        if path.startswith('player/'):
+            pid = int(path.split('/')[1])
+            self.log_ids.append(pid)
+            assert '/20262027/2' in path
+            played = [{'gameId': 2026020000 + i, 'gameDate': f'2026-09-{i:02}', 'toi': '10:00',
+                       'goals': 1, 'assists': 0, 'points': 1, 'shots': 2, 'powerPlayPoints': 0} for i in range(1, 6)]
+            return Feed({'gameLog': played}, 'NHL', path, '2026-09-26T00:00:00Z')
+        raise AssertionError(path)
+
+    async def stats(self, report, season, extra='', is_game=True):
+        assert (report, season, is_game) == ('skater/summary', 20262027, False)
+        return Feed([{'playerId': 1, 'gamesPlayed': 4}], 'NHL Stats', report, '2026-09-26T00:00:00Z')
+
+    async def mp(self, kind, season):
+        assert (kind, season) == ('skaters', 20262027)
+        return Feed(None, 'MoneyPuck', 'mp')
+
+
+def test_league_includes_idle_skaters_and_skips_goalies_and_idle_logs(tmp_path):
+    from backend.cache import Store
+
+    async def scenario():
+        store = Store(tmp_path / 'league.sqlite3')
+        fake = LeagueFake(store)
+        directory = LeaguePlayers(fake)
+        body = await directory.build('2026-09-26')
+        ids = {player['id'] for player in body['players']}
+        assert ids == {1, 3, 9}
+        assert 2 not in ids
+        slate = next(player for player in body['players'] if player['id'] == 1)
+        idle = next(player for player in body['players'] if player['id'] == 3)
+        zero = next(player for player in body['players'] if player['id'] == 9)
+        assert slate['game_id'] == 2026010001 and slate['opponent'] == 'NYI' and slate['home'] is False
+        assert slate['windows']['season']['games'] == 5
+        assert idle['game_id'] is None and idle['team'] == 'BOS'
+        assert zero['windows']['season']['games'] == 0
+        assert fake.log_ids == [1]
+        assert body['schedule_available'] is True
+        await directory.close()
+        await store.close()
+
+    asyncio.run(scenario())
+
+
+def test_league_survives_a_missing_schedule_and_skips_duplicate_roster_ids(tmp_path):
+    from backend.cache import Store
+
+    async def scenario():
+        store = Store(tmp_path / 'league-gap.sqlite3')
+        missing = LeagueFake(store, schedule=False)
+        directory = LeaguePlayers(missing)
+        body = await directory.build('2026-09-26')
+        assert body['schedule_available'] is False
+        assert {player['id'] for player in body['players']} == {1, 3, 9}
+        assert all(player['game_id'] is None for player in body['players'])
+        await directory.close()
+
+        duplicate = LeagueFake(store, duplicate=True)
+        directory = LeaguePlayers(duplicate)
+        body = await directory.build('2026-09-27')
+        assert 1 not in {player['id'] for player in body['players']}
+        assert body['ambiguous_players'] == 1
+        assert body['partial'] is True
+        await directory.close()
+        await store.close()
+
+    asyncio.run(scenario())
+
+
+def test_league_view_reuses_the_snapshot(tmp_path):
+    from backend.cache import Store
+
+    async def scenario():
+        store = Store(tmp_path / 'league-cache.sqlite3')
+        fake = LeagueFake(store)
+        directory = LeaguePlayers(fake)
+        first = await directory.view('2026-09-26')
+        assert first['ready'] is False and first['build']['status'] == 'building'
+        await directory.tasks['2026-09-26']
+        second = await directory.view('2026-09-26')
+        assert second['ready'] is True and second['cache_status'] == 'cached'
+        assert fake.score_calls == 1
+        assert len(second['players']) == 3
+        await directory.close()
+        await store.close()
+
     asyncio.run(scenario())

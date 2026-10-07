@@ -41,15 +41,19 @@ dependencies and the published MoneyPuck game dataset are downloaded.
 
 ## Data
 
-The **Players** tab (`/players?date=YYYY-MM-DD`) lists current-roster skaters on
-teams scheduled that night, excluding postponed/canceled games. It is not a
-confirmed lineup, particularly during preseason; goalies are intentionally omitted.
-Search, team/position filters, sortable columns, and Last 5 / Last 10 / Season
-controls are available. Expanding a player compares all three windows together.
+The **Players** tab (`/players?date=YYYY-MM-DD`) lists current-roster skaters.
+It opens on **All players**, every forward and defenseman on a current NHL roster.
+**On slate** keeps the previous list: skaters whose teams play that night, excluding
+postponed and canceled games. It is not a confirmed lineup, particularly during
+preseason; goalies are on the Goalies tab. A skater who is not playing has no
+matchup link and no odds. Search, team/position filters, sortable columns, and
+Last 5 / Last 10 / Season controls are available. Expanding a player compares all
+three windows together.
 Scoring totals, points/shots per game, average TOI, power-play points and point-game
 frequency come from official NHL regular-season appearance logs, across teams.
 Season is the default window. Season colors rank scoring, usage and advanced
-metrics against same-position-group nightly peers (forwards/defense, 5+ GP).
+metrics against same-position-group peers in the list on screen (forwards/defense, 5+ GP):
+the whole league on All players, and that night's skaters on On slate.
 Top/bottom quartiles are green/red; top/bottom deciles have stronger shading.
 Benchmarks do not change when filtering and split-squad duplicates count once.
 Recent colors compare with the player's season pace (counting stats normalized
@@ -66,8 +70,27 @@ data is never zero-filled, and stale/partial providers are marked beside players
 Windows end before the selected night (or today for future nights), never cross
 statistical seasons, and show smaller samples explicitly. Only the selected slate’s
 season is used (2026–27 for current slates); empty samples never fall back to an older season.
-Current rosters are not historical roster snapshots. The first Players load can
-take longer while the season ZIP and individual game logs populate SQLite.
+Current rosters are not historical roster snapshots. The first All players load
+builds in the background: one regular-season game log for each roster skater who
+has played, eight at a time, and the page checks every few seconds until that
+snapshot is ready. On slate stays a direct request. The season ZIP and game logs
+then stay in SQLite.
+
+The **Goalies** tab (`/goalies?date=YYYY-MM-DD`) lists current-roster goalies with
+at least one appearance and opens on the full league. On slate means the goalie's current team plays that
+night, not that the goalie is the announced starter. When one goalie on that team
+is Confirmed, On slate keeps that goalie and leaves off the other goalies from his
+team. A Confirmed or Likely tag
+appears only when Daily Faceoff names that goalie for the game. The name column
+includes the win-loss-overtime record for the selected window. Columns are
+appearances, save percentage, goals-against
+average, shutouts, MoneyPuck goals saved above expected, shots against, and saves.
+Last 5, Last 10, and Season use the same cutoff as skaters. Save percentage and
+goals saved above expected color higher values as better; goals-against average
+colors a lower number as better. Those colors use goalies in the current list with
+5+ appearances. There are no goalie odds. Rates come from the NHL goalie game
+summary (saves, shots, goals, and time on ice summed, not averaged) and the
+MoneyPuck goalie ZIP. A missing MoneyPuck game stays blank.
 
 - NHL Web/Stats: schedules, scores, regular-season statistics, and current rosters.
 - [MoneyPuck](https://moneypuck.com/data.htm): published team game CSV and goalie
@@ -405,9 +428,12 @@ The daily slate is designed to render from small NHL/Daily Faceoff/odds feeds
 plus normalized MoneyPuck rows when available; large MoneyPuck CSV/ZIP files are
 not stored as raw SQLite response blobs.
 
-The Players page stores a built dashboard snapshot by date for one hour. Browser
-navigation also reuses the current date's last payload in memory, so returning to
-the tab should not rebuild every skater game log.
+The Players page stores a built dashboard snapshot by date and list (all players
+or the night's slate) for one hour. The Goalies page stores one snapshot per date
+for one hour. The Stats button reloads that snapshot and does not skip the hour.
+Browser navigation also reuses the current date's last payload in memory, so
+returning to the tab should not rebuild every skater game log. The all-players
+list keeps polling only while its background build is still running.
 
 ## Development and Checks
 
@@ -425,7 +451,8 @@ to its actual URL. Install Chromium once with `npx playwright install chromium`.
 Use Node.js 22+ for npm commands. The project-local fallback binaries are under
 `.runtime/node_modules/node/bin` and `.runtime/node_modules/npm/bin`.
 
-Read-only API: `/api/slate?date=YYYY-MM-DD`, `/api/players?date=YYYY-MM-DD`,
+Read-only API: `/api/slate?date=YYYY-MM-DD`, `/api/players?date=YYYY-MM-DD&scope=league|tonight`,
+`/api/goalies?date=YYYY-MM-DD`,
 `/api/matchups/{gameId}?window=season|last10`, and `/api/health`.
 FastAPI's schema and interactive reference are available at `/docs`.
 
