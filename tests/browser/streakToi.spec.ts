@@ -42,11 +42,15 @@ test("average TOI boxes separate positions, format time, and preserve span and s
     await expect(forward.locator(".streak-value span")).toHaveText("2 GP");
     await expect(forward.locator(".streak-recent span")).toHaveText(["20:30", "21:31"]);
     await expect(forward.locator(".streak-odds")).toHaveCount(0);
-    await page.getByLabel("TOI span", { exact: true }).selectOption("last5");
+    await expect(page.locator(".streak-mode-toolbar").getByLabel("TOI span")).toHaveCount(0);
+    await expect(forward.getByLabel("TOI span", { exact: true })).toHaveValue("last10");
+    await expect(defense.getByLabel("TOI span", { exact: true })).toHaveValue("last10");
+    await forward.getByLabel("TOI span", { exact: true }).selectOption("last5");
     await expect(forward.locator(".streak-value strong")).toHaveText("25:00");
+    await expect(defense.getByLabel("TOI span", { exact: true })).toHaveValue("last5");
     await expect(page).toHaveURL(/toi_window=last5/);
     await expect(page.getByRole("region", { name: "Points", exact: true })).toContainText("Last 10 appearances");
-    await page.getByLabel("TOI span", { exact: true }).selectOption("season");
+    await forward.getByLabel("TOI span", { exact: true }).selectOption("season");
     await expect(forward.locator(".streak-value strong")).toHaveText("24:00");
     await page.getByRole("button", { name: "League-wide", exact: true }).click();
     await expect(forward).toBeVisible();

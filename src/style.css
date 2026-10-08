@@ -2064,8 +2064,9 @@ tr:hover td {
     font-size: 7px;
   }
 }
-.streak-toi-window { display: flex; align-items: center; gap: 7px; font-size: 10px; color: var(--muted); }
-.streak-toi-window select { background: #191a1c; color: #e4e5e7; border: 1px solid var(--border); border-radius: 4px; padding: 5px 7px; font-size: 11px; }
+.streak-toi-window { display: flex; align-items: center; gap: 7px; margin-top: 8px; font-size: 10px; color: var(--muted); }
+.streak-toi-window select { background: #222428; color: #e4e5e7; border: 1px solid var(--border); border-radius: 4px; padding: 5px 7px; font-size: 11px; }
+.streak-board-toi .streak-period { margin-top: 6px; }
 .streak-board-toi .streak-columns,
 .streak-board-toi .streak-row { grid-template-columns: minmax(0, 1fr) 58px 160px; }
 .streak-board-toi .streak-recent { flex-wrap: wrap; gap: 3px; }

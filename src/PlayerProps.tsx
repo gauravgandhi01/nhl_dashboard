@@ -508,6 +508,7 @@ export function CompactProps({
   overOnly = false,
   log,
   countsOnHover = false,
+  showCounts = true,
   showSnapshot = true,
 }: {
   state: PropsState;
@@ -518,6 +519,7 @@ export function CompactProps({
   overOnly?: boolean;
   log?: AppearanceLog | null;
   countsOnHover?: boolean;
+  showCounts?: boolean;
   showSnapshot?: boolean;
 }) {
   const game = state.data?.games[String(gameId)];
@@ -571,7 +573,9 @@ export function CompactProps({
             {under && (
               <Price quote={under} showBook={false} />
             )}
-            <LineCounts log={log} family={f} point={line?.point ?? null} compact showCaption={countsOnHover} />
+            {showCounts && (
+              <LineCounts log={log} family={f} point={line?.point ?? null} compact showCaption={countsOnHover} />
+            )}
           </div>
         );
       })}

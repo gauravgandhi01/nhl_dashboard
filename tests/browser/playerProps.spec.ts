@@ -259,11 +259,11 @@ test("shared player props render in expansion, lines, and only on-slate relevant
     await expect(matched).toContainText("+260");
     await expect(matched.locator(".prop-slash")).toHaveCount(0);
     await expect(matched.locator(".prop-quote")).toHaveCount(3);
-    await expect(page.locator(".line-player")).not.toContainText("Pregame snapshot");
+    await expect(page.locator(".line-player .prop-snapshot")).toHaveCount(0);
     response.games[p.game_id].eligible = false;
     await page.reload();
     await expect(matched).toContainText("+260");
-    await expect(page.locator(".line-player")).not.toContainText("Pregame snapshot");
+    await expect(page.locator(".line-player .prop-snapshot")).toHaveCount(0);
     response.games[p.game_id].eligible = true;
     await expect(matched.locator('.prop-quote[aria-label*="under"], .prop-quote[aria-label*="no "]')).toHaveCount(0);
     await expect(matched.locator(".prop-quote").first()).toHaveAttribute(
@@ -300,6 +300,12 @@ test("shared player props render in expansion, lines, and only on-slate relevant
     stale: false,
     recent: [],
     matchups: [{ game_id: p.game_id, opponent: "CAR", home: true }],
+    log: {
+      goals: [1, 0, 1, 0, 1],
+      assists: [1, 0, 0, 1, 0],
+      points: [2, 0, 1, 1, 1],
+      shots: [4, 2, 3, 1, 5],
+    },
   };
   await page.route("**/api/streaks?*", (route) =>
     route.fulfill({
@@ -326,6 +332,12 @@ test("shared player props render in expansion, lines, and only on-slate relevant
   );
   await page.goto(`/streaks?date=${date}&scope=tonight`);
   await expect(page.locator(".single-prop")).toHaveCount(3);
+  for (const cell of await page.locator(".streak-odds").all()) {
+    await expect(cell).not.toContainText("L5");
+    await expect(cell).not.toContainText("L10");
+    await expect(cell).not.toContainText("Season");
+    await expect(cell.locator(".line-counts, .line-count-empty")).toHaveCount(0);
+  }
   await expect(page.locator(".streak-board").nth(0)).toContainText("1.5");
   await expect(page.locator(".streak-board").nth(0)).toContainText("+240");
   await expect(page.locator(".streak-board").nth(0)).not.toContainText("PTS");

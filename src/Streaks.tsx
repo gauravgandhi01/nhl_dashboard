@@ -137,11 +137,15 @@ function Leaderboard({
   date,
   unavailable,
   props,
+  toiWindow,
+  onToiWindow,
 }: {
   board: Board;
   date: string;
   unavailable: boolean;
   props?: PropsState;
+  toiWindow?: string;
+  onToiWindow?: (value: string) => void;
 }) {
   const streak = board.id.endsWith("streak");
   const toi = board.unit === "seconds";
@@ -164,6 +168,16 @@ function Leaderboard({
         <h3>{board.title}</h3>
         <span className="eyebrow">TOP 10</span>
       </div>
+      {toi && toiWindow && onToiWindow && (
+        <label className="streak-toi-window">
+          TOI span
+          <select aria-label="TOI span" value={toiWindow} onChange={(event) => onToiWindow(event.target.value)}>
+            <option value="last5">Last 5</option>
+            <option value="last10">Last 10</option>
+            <option value="season">Season</option>
+          </select>
+        </label>
+      )}
       <p className="streak-period">{board.period}</p>
       <div className="streak-columns">
         <span>Player</span>
@@ -206,7 +220,7 @@ function Leaderboard({
                 {props && board.kind === "skater" && p.matchups.map(m => (
                   <CompactProps key={m.game_id} state={props} gameId={m.game_id} playerId={p.id}
                     family={board.id === "shots10" ? "shots" : ["goals10", "goal_streak"].includes(board.id) ? "scorer" : "points"}
-                    showLabel={false} log={p.log} />
+                    showLabel={false} showCounts={false} />
                 ))}
               </div>}
               <div
@@ -357,14 +371,6 @@ export function Streaks() {
                     </button>
                   ))}
                 </nav>
-                {kind === "skater" && <label className="streak-toi-window">
-                  TOI span
-                  <select aria-label="TOI span" value={toiWindow} onChange={event => update("toi_window", event.target.value)}>
-                    <option value="last5">Last 5</option>
-                    <option value="last10">Last 10</option>
-                    <option value="season">Season</option>
-                  </select>
-                </label>}
               </div>
               <div className="streak-grid">
                 {data.boards
@@ -375,6 +381,8 @@ export function Streaks() {
                       board={b}
                       date={date}
                       props={scope === "tonight" && kind === "skater" ? props : undefined}
+                      toiWindow={toiWindow}
+                      onToiWindow={(value) => update("toi_window", value)}
                       unavailable={
                         scope === "tonight" && !data.schedule_available
                       }

@@ -209,8 +209,8 @@ The **Streaks** tab (`/streaks?date=YYYY-MM-DD`) contains ten top-10 boards:
 points, goals and shots in the last ten appearances; active point and goal
 streaks; consecutive goalie wins; starts allowing 0-1 goals in the last ten starts;
 official shutouts in those starts; and separate average TOI boards for forwards
-and defensemen. **TOI span** selects Last 5, Last 10 (default), or Season for
-these two boards only. TOI/G is total all-strengths ice time divided by actual
+and defensemen. Each average-TOI board has a **TOI span** control for Last 5,
+Last 10 (default), or Season. Both boards share that span. TOI/G is total all-strengths ice time divided by actual
 appearances in that span, displayed as minutes:seconds with the sample GP and
 recent game TOI. These are averages, not cumulative minutes. All spans reuse
 the same season snapshot without extra history requests.
@@ -338,13 +338,14 @@ or settlement conditions not captured by their listed price. No bets are placed.
 - `GET /api/player-props?date=YYYY-MM-DD&game_id=...` reads cached props; game ID optional.
 - `POST /api/player-props/refresh?date=YYYY-MM-DD&game_id=...` explicitly fetches props.
 
-Expanded rows and on-slate skater streaks show how often the player went over
-the selected shots, points, assists, or goals line in last 5, last 10, and the
-season. Anytime goal and goals Over 0.5 use the same goals count. The figure is
-appearances over the line, with pushes separated on integer lines. It is a count
-of regular-season appearances before the selected date, not a probability. A
-missing stat drops that game from that count only. First goalscorer has no count.
-Goalie rows and league-wide streaks do not show one.
+Expanded rows show how often the player went over the selected shots, points,
+assists, or goals line in last 5, last 10, and the season. Anytime goal and
+goals Over 0.5 use the same goals count. The figure is appearances over the
+line, with pushes separated on integer lines. It is a count of regular-season
+appearances before the selected date, not a probability. A missing stat drops
+that game from that count only. First goalscorer has no count. On-slate skater
+streaks show the price only. Goalie rows and league-wide streaks do not show
+player odds.
 
 Line tiles keep those counts off the card. Hovering or focusing a price shows
 the newest regular-season games for that stat, up to ten, each with the opponent
