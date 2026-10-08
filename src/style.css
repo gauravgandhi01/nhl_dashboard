@@ -1758,7 +1758,7 @@ tr:hover td {
   border-block: 1px solid var(--border);
 }
 .players-table {
-  min-width: 1110px;
+  min-width: 1174px;
   table-layout: fixed;
 }
 .goalies-table {

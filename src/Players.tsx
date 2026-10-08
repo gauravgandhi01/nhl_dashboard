@@ -98,6 +98,11 @@ const columns = [
     help: "MoneyPuck individual shot attempts per matched appearance, including blocked and missed attempts",
   },
   {
+    key: "attempts60",
+    label: "iCF/60",
+    help: "MoneyPuck individual shot attempts per 60 minutes, including blocked and missed attempts",
+  },
+  {
     key: "shots60",
     label: "SOG/60",
     help: "MoneyPuck individual shots on goal per 60 minutes",
@@ -551,7 +556,7 @@ function PlayerRows({
       </tr>
       {expanded && (
         <tr className="player-expanded">
-          <td colSpan={16}>
+          <td colSpan={columns.length + 2}>
             <div>
               <table aria-label={`${p.name} form comparison`}>
                 <thead>
@@ -566,6 +571,7 @@ function PlayerRows({
                       "SOG/G",
                       "TOI/G",
                       "iCF/G",
+                      "iCF/60",
                       "P/60",
                       "ixG/60",
                     ].map((l) => (
@@ -592,6 +598,7 @@ function PlayerRows({
                         "shots_pg",
                         "toi_pg",
                         "attempts_pg",
+                        "attempts60",
                         "points60",
                         "ixg60",
                       ].map((k) => (

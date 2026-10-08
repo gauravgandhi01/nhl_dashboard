@@ -63,7 +63,8 @@ MoneyPuck metrics use their own coverage counts. Amber marks small samples or
 incomplete advanced coverage. Missing values and ties remain neutral. Cell
 tooltips identify the comparison; high ice time means more usage, not better play.
 
-Player iCF/60, SOG/60, P/60, ixG/60 and high-danger shots/60 use MoneyPuck's published
+iCF/G is MoneyPuck individual shot attempts per matched appearance. iCF/60,
+SOG/60, P/60, ixG/60 and high-danger shots/60 use MoneyPuck's published
 skater game ZIP, **all strengths**, with totals divided by total covered ice time.
 MP GP shows the actual matched-game coverage; hover for covered minutes. Missing
 data is never zero-filled, and stale/partial providers are marked beside players.

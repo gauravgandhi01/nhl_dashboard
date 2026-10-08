@@ -28,6 +28,7 @@ test("players windows, filters, sorting, expansion and navigation on desktop and
     await expect(
       page.getByRole("button", { name: "Season", exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "iCF/60", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "iCF/G", exact: true }).click();
     await expect(page.locator('th[aria-sort="descending"]')).toContainText(
       "iCF/G",
