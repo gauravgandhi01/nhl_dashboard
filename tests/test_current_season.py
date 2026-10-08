@@ -38,7 +38,7 @@ def test_matchup_and_slate_do_not_fall_back_or_fetch_career_history(unavailable)
             assert season == 20262027
             return Feed(None if unavailable else [], 'NHL', report)
 
-        async def mp(self, kind, season):
+        async def mp(self, kind, season, entities=None):
             assert season == 20262027
             return Feed(None if unavailable else [], 'MoneyPuck', kind)
 

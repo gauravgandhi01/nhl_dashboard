@@ -90,7 +90,7 @@ def test_matchup_routes_nhl_scoring_and_moneypuck_usage_to_correct_fields():
                      'points': 2, 'shots': 3, 'timeOnIcePerGame': 980}] if report == 'skater/summary' else []
             return Feed(rows, 'NHL Stats', report)
 
-        async def mp(self, kind, season):
+        async def mp(self, kind, season, entities=None):
             rows = [{'playerId': '8484210', 'gameId': '2026020001', 'situation': '5on5',
                      'icetime': 800, 'I_F_goals': 0, 'I_F_points': 1}] if kind == 'skaters' else []
             return Feed(rows, 'MoneyPuck', kind)

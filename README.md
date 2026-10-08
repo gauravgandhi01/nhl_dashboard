@@ -384,7 +384,10 @@ Optional build/runtime settings:
   build. If omitted, only the current season is attempted.
 - `NHL_MONEYPUCK_REFRESH_HOURS=24` controls how long normalized MoneyPuck rows
   are trusted before a runtime refresh attempt. Use `0` to trust seeded rows
-  indefinitely on small free instances; the Docker image defaults to `0`.
+  indefinitely and skip MoneyPuck downloads on the web service. The Docker image
+  defaults to `0`. MoneyPuck's team game file is one career CSV of about 127 MB;
+  a 512 MB instance should not download it. A non-zero refresh streams that file
+  to disk and keeps only the current season's 5-on-5 rows.
 - `NHL_DFO_TTL=120` controls the Daily Faceoff starting-goalie and projected-line
   caches in seconds. The default is two minutes so confirmed starters and line
   changes appear quickly. `NHL_DFO_GOALIES_TTL` is still accepted for backwards
@@ -425,8 +428,12 @@ insufficient odds quota without exposing the API key. A multi-market request can
 exceed the remaining quota even when the account still has some credits.
 
 The daily slate is designed to render from small NHL/Daily Faceoff/odds feeds
-plus normalized MoneyPuck rows when available; large MoneyPuck CSV/ZIP files are
-not stored as raw SQLite response blobs.
+plus normalized MoneyPuck rows when available. Large MoneyPuck CSV/ZIP files are
+not stored as raw SQLite response blobs, and they are not loaded into process
+memory. Team expected goals come from the current season only. Skater rows are
+read for the players on the page, not the whole league. Those game rows are
+published after games, typically overnight, so the seeded copy is enough between
+image builds.
 
 The Players page stores a built dashboard snapshot by date and list (all players
 or the night's slate) for one hour. The Goalies page stores one snapshot per date

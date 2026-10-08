@@ -315,7 +315,9 @@ def test_daily_faceoff_goalies_and_lineups_use_short_configurable_ttl(tmp_path, 
     asyncio.run(scenario())
 
 
-def test_moneypuck_rows_are_normalized_without_raw_blob(tmp_path):
+def test_moneypuck_rows_are_normalized_without_raw_blob(tmp_path, monkeypatch):
+    monkeypatch.setenv('NHL_MONEYPUCK_REFRESH_HOURS', '24')
+
     async def scenario():
         store = Store(tmp_path / 'mp.sqlite3')
         body = (
@@ -338,6 +340,56 @@ def test_moneypuck_rows_are_normalized_without_raw_blob(tmp_path):
         providers = Providers(store)
         cached = await providers.mp('teams', 20252026)
         assert cached.data == rows
+        await store.close()
+    asyncio.run(scenario())
+
+
+def test_disabled_moneypuck_refresh_does_not_download_the_career_file(tmp_path, monkeypatch):
+    monkeypatch.setenv('NHL_MONEYPUCK_REFRESH_HOURS', '0')
+
+    async def scenario():
+        store = Store(tmp_path / 'mp-seed.sqlite3')
+        await store.client.aclose()
+        store.client = httpx.AsyncClient(transport=httpx.MockTransport(
+            lambda request: (_ for _ in ()).throw(AssertionError('network should not be used'))))
+        feed = await Providers(store).mp('teams', 20262027)
+        assert feed.data is None
+        assert feed.error == 'MoneyPuck rows are not seeded'
+        store.save_moneypuck('skaters', 20262027, [
+            {'playerId': '1', 'gameId': '2026020001', 'situation': 'all', 'icetime': '10'},
+            {'playerId': '2', 'gameId': '2026020001', 'situation': 'all', 'icetime': '20'},
+        ], 'playerId')
+        providers = Providers(store)
+        one = await providers.mp('skaters', 20262027, entities=['1'])
+        assert [row['playerId'] for row in one.data] == ['1']
+        assert sum(1 for _ in store.db.execute('SELECT 1 FROM responses')) == 0
+        await store.close()
+    asyncio.run(scenario())
+
+
+def test_empty_moneypuck_extract_is_not_downloaded_again(tmp_path, monkeypatch):
+    monkeypatch.setenv('NHL_MONEYPUCK_REFRESH_HOURS', '24')
+    calls = []
+
+    def respond(request):
+        calls.append(str(request.url))
+        body = (
+            'team,gameId,gameDate,season,situation,playoffGame,iceTime,xGoalsFor,xGoalsAgainst,shotAttemptsFor,shotAttemptsAgainst\n'
+            'CAR,2025020001,2025-10-10,2025,5on5,0,3000,2.1,1.4,41,30\n'
+        ).encode()
+        return httpx.Response(200, content=body)
+
+    async def scenario():
+        store = Store(tmp_path / 'mp-empty.sqlite3')
+        await store.client.aclose()
+        store.client = httpx.AsyncClient(transport=httpx.MockTransport(respond))
+        providers = Providers(store)
+        first = await providers.mp('teams', 20262027)
+        assert first.data == []
+        providers.memo.clear()
+        second = await Providers(store).mp('teams', 20262027)
+        assert second.data == []
+        assert len(calls) == 1
         await store.close()
     asyncio.run(scenario())
 

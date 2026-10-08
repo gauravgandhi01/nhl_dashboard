@@ -64,21 +64,45 @@ def csv_rows(raw, required):
     return reader
 
 
+def _open_zip(raw):
+    if isinstance(raw, (bytes, bytearray)):
+        return zipfile.ZipFile(io.BytesIO(raw))
+    return zipfile.ZipFile(raw)
+
+
 def parse_mp_teams(raw, year):
+    """Keep one season of 5-on-5 regular-season rows.
+
+    `raw` may be bytes or a file path. The path form reads line by line so the
+    career file (every season, about 127 MB) is not decoded into a second copy.
+    """
     keep = {'team', 'gameId', 'gameDate', 'iceTime', 'xGoalsFor', 'xGoalsAgainst', 'shotAttemptsFor', 'shotAttemptsAgainst'}
-    return [{k: r[k] for k in keep} for r in csv_rows(raw, keep | {'season', 'situation', 'playoffGame'})
-            if r['season'] == str(year) and r['situation'] == '5on5' and r['playoffGame'] == '0']
+    owned = None
+    if isinstance(raw, (bytes, bytearray)):
+        stream = io.TextIOWrapper(io.BytesIO(raw), encoding='utf-8-sig', newline='')
+    else:
+        owned = open(raw, 'rb')
+        stream = io.TextIOWrapper(owned, encoding='utf-8-sig', newline='')
+    try:
+        reader = csv.DictReader(stream)
+        required = keep | {'season', 'situation', 'playoffGame'}
+        if not required.issubset(set(reader.fieldnames or [])):
+            raise ValueError('CSV schema changed')
+        return [{k: row[k] for k in keep} for row in reader
+                if row['season'] == str(year) and row['situation'] == '5on5' and row['playoffGame'] == '0']
+    finally:
+        stream.close()
 
 
 def parse_mp_goalies(raw):
     try:
-        archive = zipfile.ZipFile(io.BytesIO(raw))
-        names = [n for n in archive.namelist() if n.endswith('.csv')]
-        if not names:
-            raise ValueError('No CSV in archive')
-        rows = csv_rows(archive.read(names[0]), {'playerId', 'gameId', 'situation', 'xGoals', 'goals'})
-        return [{k: r.get(k) for k in ['playerId', 'gameId', 'gameDate', 'xGoals', 'goals']}
-                for r in rows if r['situation'] == 'all']
+        with _open_zip(raw) as archive:
+            names = [n for n in archive.namelist() if n.endswith('.csv')]
+            if not names:
+                raise ValueError('No CSV in archive')
+            rows = csv_rows(archive.read(names[0]), {'playerId', 'gameId', 'situation', 'xGoals', 'goals'})
+            return [{k: r.get(k) for k in ['playerId', 'gameId', 'gameDate', 'xGoals', 'goals']}
+                    for r in rows if r['situation'] == 'all']
     except zipfile.BadZipFile as exc:
         raise ValueError('Invalid archive') from exc
 
@@ -87,7 +111,7 @@ def parse_mp_skaters(raw):
     keep = {'playerId', 'gameId', 'icetime', 'I_F_shotAttempts', 'I_F_points',
             'I_F_shotsOnGoal', 'I_F_xGoals', 'I_F_highDangerShots', 'situation'}
     try:
-        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+        with _open_zip(raw) as archive:
             names = [n for n in archive.namelist() if n.endswith('.csv')]
             if len(names) != 1:
                 raise ValueError('Unexpected skater archive')
@@ -229,28 +253,49 @@ class Providers:
         return Feed(rows, feed.source, feed.url, min((f.retrieved_at for f in metas if f.retrieved_at), default=None),
                     any(f.stale for f in metas))
 
-    async def mp(self, kind, season):
+    async def mp(self, kind, season, entities=None):
+        """Normalized MoneyPuck rows for one season.
+
+        `entities` limits skater or goalie rows to those ids. Team files stay
+        small after filtering, so they are cached whole. The skater table is not:
+        a full season is tens of thousands of games, and a matchup only needs
+        the two rosters. Rows change after games are published, typically overnight.
+        """
         key = (kind, season)
         async with self.locks.setdefault(key, asyncio.Lock()):
-            existing = self.memo.get(key)
-            if existing and time.monotonic() - existing[0] < 600:
-                return existing[1]
+            if entities is None and kind != 'skaters':
+                existing = self.memo.get(key)
+                if existing and time.monotonic() - existing[0] < 600:
+                    return existing[1]
             year = season // 10000
             url = MP_TEAMS if kind == 'teams' else f'https://peter-tanner.com/moneypuck/downloads/seasonPlayersSummary/{kind}/{year}.zip'
-            cached, fetched = self.store.load_moneypuck(kind, season)
             refresh_hours = float(os.environ.get('NHL_MONEYPUCK_REFRESH_HOURS', '24'))
-            if cached and (refresh_hours <= 0 or not fetched or time.time() - fetched < refresh_hours * 3600):
-                feed = Feed(cached, 'MoneyPuck', url, datetime.fromtimestamp(fetched, timezone.utc).isoformat() if fetched else None)
-                self.memo[key] = (time.monotonic(), feed)
+            fetched_at = self.store.moneypuck_fetched_at(kind, season)
+            # A 512 MB service cannot download the career team file. Trust the seed.
+            if refresh_hours <= 0 and fetched_at is None:
+                return Feed(None, 'MoneyPuck', url, error='MoneyPuck rows are not seeded')
+            if fetched_at is not None and (refresh_hours <= 0 or time.time() - fetched_at < refresh_hours * 3600):
+                rows, fetched = self.store.load_moneypuck(kind, season, entities)
+                feed = Feed(rows, 'MoneyPuck', url,
+                            datetime.fromtimestamp(fetched or fetched_at, timezone.utc).isoformat())
+                if entities is None and kind != 'skaters':
+                    self.memo[key] = (time.monotonic(), feed)
                 return feed
             parser = (lambda raw: parse_mp_teams(raw, year)) if kind == 'teams' else parse_mp_skaters if kind == 'skaters' else parse_mp_goalies
-            feed = await self.store.fetch(url, 'MoneyPuck', 21600, parser, store_body=False)
-            self.memo[key] = (time.monotonic(), feed)
-            if feed.data:
-                self.store.save_moneypuck(kind, season, feed.data, 'team' if kind == 'teams' else 'playerId')
-            elif cached:
-                feed = Feed(cached, 'MoneyPuck', url, datetime.fromtimestamp(fetched, timezone.utc).isoformat() if fetched else None,
-                            True, feed.error or 'MoneyPuck refresh unavailable')
+            data, error = await self.store.stream_parse(url, 'MoneyPuck', parser)
+            if data is None:
+                rows, fetched = self.store.load_moneypuck(kind, season, entities)
+                if fetched is not None:
+                    return Feed(rows, 'MoneyPuck', url, datetime.fromtimestamp(fetched, timezone.utc).isoformat(),
+                                True, error or 'MoneyPuck refresh unavailable')
+                return Feed(None, 'MoneyPuck', url, error=error or 'MoneyPuck refresh unavailable')
+            if data:
+                self.store.save_moneypuck(kind, season, data, 'team' if kind == 'teams' else 'playerId')
+            else:
+                self.store.note_moneypuck_fetch(kind, season)
+            rows, fetched = self.store.load_moneypuck(kind, season, entities)
+            feed = Feed(rows, 'MoneyPuck', url, datetime.fromtimestamp(fetched or time.time(), timezone.utc).isoformat())
+            if entities is None and kind != 'skaters':
                 self.memo[key] = (time.monotonic(), feed)
             return feed
 

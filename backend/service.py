@@ -196,10 +196,17 @@ class Dashboard:
         season = int(game['season'])
         goalies, injuries = await asyncio.gather(self.p.goalies(game['gameDate']), self.p.injuries())
         stats_season = season
-        mp_teams, mp_goalies, mp_skaters, skater_totals = await asyncio.gather(
+        away_abbrev = game['awayTeam']['abbrev']
+        home_abbrev = game['homeTeam']['abbrev']
+        mp_teams, mp_goalies, skater_totals, away_roster, home_roster = await asyncio.gather(
             self.p.mp('teams', stats_season), self.p.mp('goalies', stats_season),
-            self.p.mp('skaters', stats_season),
-            self.p.stats('skater/summary', stats_season, is_game=False))
+            self.p.stats('skater/summary', stats_season, is_game=False),
+            self.p.nhl(f'roster/{away_abbrev}/current', 3600),
+            self.p.nhl(f'roster/{home_abbrev}/current', 3600))
+        skater_ids = [player['id'] for roster in (away_roster, home_roster)
+                      for group in ('forwards', 'defensemen')
+                      for player in (roster.data or {}).get(group, []) if player.get('id') is not None]
+        mp_skaters = await self.p.mp('skaters', stats_season, entities=skater_ids)
         # Roster totals are always season totals; the comparison window applies to teams and goalies.
         info = game_info(game, goalies.data)
         sides = await asyncio.gather(*[self.team(game, side, stats_season, window, mp_teams, mp_goalies, mp_skaters,

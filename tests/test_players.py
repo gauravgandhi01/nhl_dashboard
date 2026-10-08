@@ -136,7 +136,7 @@ class Fake:
     async def stats(self, *args, **kwargs):
         raise AssertionError('No league-wide request needed to select a season')
 
-    async def mp(self, kind, season):
+    async def mp(self, kind, season, entities=None):
         assert season == 20262027
         return Feed(None, 'MoneyPuck', 'mp')
 
@@ -258,7 +258,7 @@ class LeagueFake:
         assert (report, season, is_game) == ('skater/summary', 20262027, False)
         return Feed([{'playerId': 1, 'gamesPlayed': 4}], 'NHL Stats', report, '2026-09-26T00:00:00Z')
 
-    async def mp(self, kind, season):
+    async def mp(self, kind, season, entities=None):
         assert (kind, season) == ('skaters', 20262027)
         return Feed(None, 'MoneyPuck', 'mp')
 

@@ -136,17 +136,17 @@ async def players_dashboard(p, date):
     for season in sorted({int(g['season']) for g in games}):
         stats_season = season
         result['periods'].append({'season_label': season_label(season), 'previous_season': False})
-        advanced = await p.mp('skaters', stats_season)
-        sources.append(advanced)
-        by_id = defaultdict(list)
-        for row in advanced.data or []:
-            by_id[int(row['playerId'])].append(row)
         teams = {g[side]['abbrev'] for g in games if int(g['season']) == season for side in ['awayTeam', 'homeTeam']}
         rosters = dict(zip(sorted(teams), await asyncio.gather(*(
             p.nhl(f'roster/{team}/current', 3600) for team in sorted(teams)))))
         sources.extend(rosters.values())
         identities = {r['id'] for feed in rosters.values() for group in ['forwards', 'defensemen']
                       for r in (feed.data or {}).get(group, [])}
+        advanced = await p.mp('skaters', stats_season, entities=sorted(identities))
+        sources.append(advanced)
+        by_id = defaultdict(list)
+        for row in advanced.data or []:
+            by_id[int(row['playerId'])].append(row)
         ids = sorted(identities)
         logs = dict(zip(ids, await asyncio.gather(*(
             p.nhl(f'player/{pid}/game-log/{stats_season}/2', 21600) for pid in ids))))
@@ -322,12 +322,6 @@ class LeaguePlayers:
         if inventory.data is None:
             raise ValueError('Player inventory unavailable')
         played = {int(r['playerId']) for r in inventory.data if (number(r.get('gamesPlayed')) or 0) > 0}
-        advanced = await self.p.mp('skaters', season)
-        sources.append(advanced)
-        by_id = defaultdict(list)
-        if advanced.data is not None:
-            for row in advanced.data:
-                by_id[int(row['playerId'])].append(row)
         teams = sorted(TEAM_NAMES)
         roster_feeds = await asyncio.gather(*(self.p.nhl(f'roster/{abbrev}/current', 3600) for abbrev in teams))
         sources.extend(roster_feeds)
@@ -343,6 +337,13 @@ class LeaguePlayers:
                 ambiguous += 1
                 continue
             chosen.append((*candidates[0], pid in played))
+        advanced = await self.p.mp(
+            'skaters', season, entities=[player['id'] for _abbrev, player, _feed, _needs in chosen])
+        sources.append(advanced)
+        by_id = defaultdict(list)
+        if advanced.data is not None:
+            for row in advanced.data:
+                by_id[int(row['playerId'])].append(row)
         log_ids = [player['id'] for _abbrev, player, _feed, needs_log in chosen if needs_log]
         progress['total'] = len(log_ids)
         logs = {}
