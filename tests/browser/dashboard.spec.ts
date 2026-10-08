@@ -103,6 +103,16 @@ test("desktop slate, matchup controls, lineup, and back navigation", async ({
   await expect(
     page.locator(".game-card").first().locator(".card-form"),
   ).toHaveCount(2);
+  const formCells = page.locator(".game-card").first().locator(".card-form").first().locator("span:not(.muted)");
+  if ((await formCells.count()) >= 2) {
+    const [older, newer] = await Promise.all([
+      formCells.first().evaluate((el) => Number(getComputedStyle(el).opacity)),
+      formCells.last().evaluate((el) => Number(getComputedStyle(el).opacity)),
+    ]);
+    expect(newer).toBeGreaterThan(older);
+    await expect(formCells.last()).toHaveClass(/form-recent/);
+    await expect(formCells.first()).not.toHaveClass(/form-recent/);
+  }
   await page.screenshot({
     path: "test-results/slate-desktop.png",
     fullPage: true,

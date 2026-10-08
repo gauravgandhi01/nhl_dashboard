@@ -42,9 +42,9 @@ dependencies and the published MoneyPuck game dataset are downloaded.
 ## Data
 
 The **Players** tab (`/players?date=YYYY-MM-DD`) lists current-roster skaters.
-It opens on **All players**, every forward and defenseman on a current NHL roster.
-**On slate** keeps the previous list: skaters whose teams play that night, excluding
-postponed and canceled games. It is not a confirmed lineup, particularly during
+It opens on **On slate**: skaters whose current teams play that night, excluding
+postponed and canceled games. **All players** lists every forward and defenseman
+on a current NHL roster. On slate is not a confirmed lineup, particularly during
 preseason; goalies are on the Goalies tab. A skater who is not playing has no
 matchup link and no odds. Search, team/position filters, sortable columns, and
 Last 5 / Last 10 / Season controls are available. Expanding a player compares all
@@ -111,6 +111,7 @@ this is a comparison profile, not a predicted starter. Team and goalie colors
 follow the season ranks above, not the other side of the matchup. Ties and
 missing values stay neutral. L5 excludes preseason and unfinished games
 and runs oldest to newest, with up to five results from the displayed season.
+Older results are dimmer. The rightmost result is the most recent.
 
 Matchup flags are team-specific and show their reason on hover/focus:
 - **B2B:** a game on the preceding calendar night, using the selected matchup's

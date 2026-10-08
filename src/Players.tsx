@@ -126,7 +126,7 @@ export function Players() {
       : params.get("window") === "last10"
         ? "last10"
         : "season";
-  const scope = params.get("scope") === "tonight" ? "tonight" : "league";
+  const scope = params.get("scope") === "league" ? "league" : "tonight";
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);

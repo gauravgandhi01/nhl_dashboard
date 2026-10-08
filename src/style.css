@@ -652,6 +652,13 @@ main {
   color: var(--amber);
   background: #d3b37515;
 }
+.card-form > span:not(.muted):nth-last-child(2) { opacity: 0.88; }
+.card-form > span:not(.muted):nth-last-child(3) { opacity: 0.74; }
+.card-form > span:not(.muted):nth-last-child(4) { opacity: 0.6; }
+.card-form > span:not(.muted):nth-last-child(5) { opacity: 0.48; }
+.card-form > span.form-recent {
+  box-shadow: inset -2px 0 0 #9ec3dc99;
+}
 .card-goalie-heading {
   border-top: 1px solid var(--border);
   padding-top: 6px;

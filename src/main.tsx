@@ -341,27 +341,28 @@ function CardMetric({
 }
 
 function CardForm({ side }: { side?: CardSide }) {
+  const games = side?.form ?? [];
   return (
-    <div className="card-form" aria-label="Last five games, oldest to newest">
-      {side?.form.length ? (
-        side.form.map((g) => (
-          <span
-            key={g.date + g.opponent}
-            className={
-              g.result === "W"
-                ? "win"
-                : g.result === "OTL"
-                  ? "overtime"
-                  : "loss"
-            }
-            title={`${g.date} ${g.home ? "" : "at "}${g.opponent}: ${g.result}`}
-          >
-            <strong>{g.result === "OTL" ? "OT" : g.result}</strong>
-            <small>
-              {g.home ? g.opponent : <><b>@</b> {g.opponent}</>}
-            </small>
-          </span>
-        ))
+    <div className="card-form" aria-label="Last five games, oldest on the left and most recent on the right">
+      {games.length ? (
+        games.map((g, index) => {
+          const recent = index === games.length - 1;
+          return (
+            <span
+              key={g.date + g.opponent}
+              className={
+                (g.result === "W" ? "win" : g.result === "OTL" ? "overtime" : "loss") +
+                (recent ? " form-recent" : "")
+              }
+              title={`${g.date} ${g.home ? "" : "at "}${g.opponent}: ${g.result}${recent ? ". Most recent" : ""}`}
+            >
+              <strong>{g.result === "OTL" ? "OT" : g.result}</strong>
+              <small>
+                {g.home ? g.opponent : <><b>@</b> {g.opponent}</>}
+              </small>
+            </span>
+          );
+        })
       ) : (
         <span className="muted">--</span>
       )}
@@ -493,7 +494,7 @@ function CardStats({
       />
       <div className="card-metric card-form-row">
         <CardForm side={a} />
-        <span title="Last five completed regular-season games, oldest to newest">
+        <span title="Last five completed regular-season games. Left is older, right is most recent.">
           L5 form
         </span>
         <CardForm side={h} />

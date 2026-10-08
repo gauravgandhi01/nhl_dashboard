@@ -97,7 +97,9 @@ test("players empty dates and outages", async ({ page }) => {
     }),
   );
   await page.goto("/players?date=2026-09-27");
-  await expect(page.getByRole("button", { name: "All players", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "On slate", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("No scheduled games")).toBeVisible();
+  await page.getByRole("button", { name: "All players", exact: true }).click();
   await expect(page.getByText("Skater rosters unavailable.")).toBeVisible();
   await page.getByRole("button", { name: "On slate", exact: true }).click();
   await expect(page.getByText("No scheduled games")).toBeVisible();
@@ -109,7 +111,7 @@ test("players empty dates and outages", async ({ page }) => {
   await expect(page.getByText("Source unavailable")).toBeVisible();
 });
 
-test("all players is the default and on slate hides skaters who are not playing", async ({ page }) => {
+test("on slate is the default and hides skaters who are not playing", async ({ page }) => {
   const source = { source: "NHL", url: "", retrieved_at: null, status: "available" as const };
   const stats = {
     games: 10, goals: 4, assists: 6, points: 10, points_pg: 1, shots: 30, shots_pg: 3,
@@ -138,13 +140,16 @@ test("all players is the default and on slate hides skaters who are not playing"
   for (const width of [1440, 375]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/players?date=2026-10-06");
-    await expect(page.getByRole("button", { name: "All players", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "On slate", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "Idle Skater" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Slate Skater" })).toBeVisible();
+    await page.getByRole("button", { name: "All players", exact: true }).click();
+    await expect(page).toHaveURL(/scope=league/);
     await expect(page.getByRole("button", { name: "Idle Skater" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Slate Skater" })).toBeVisible();
     await page.getByRole("button", { name: "On slate", exact: true }).click();
     await expect(page).toHaveURL(/scope=tonight/);
     await expect(page.getByRole("button", { name: "Idle Skater" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Slate Skater" })).toBeVisible();
     await page.getByRole("button", { name: "All players", exact: true }).click();
     await expect(page.getByRole("button", { name: "Idle Skater" })).toBeVisible();
     const idleRow = page.locator("tr", { has: page.getByRole("button", { name: "Idle Skater" }) });
