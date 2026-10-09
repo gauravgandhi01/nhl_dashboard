@@ -612,11 +612,13 @@ main {
 }
 .card-form > span {
   display: grid;
+  grid-row: 1;
   grid-template-rows: 1fr 1fr;
   align-items: center;
   justify-content: center;
   min-width: 0;
-  padding: 2px 0;
+  padding: 4px 0;
+  row-gap: 3px;
   font-size: 8px;
   line-height: 1;
   border-radius: 2px;
@@ -628,12 +630,12 @@ main {
 }
 .card-form > span strong {
   font-weight: 600;
+  padding: 0;
+  color: inherit;
 }
 .card-form > span small {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  column-gap: 2px;
+  white-space: nowrap;
+  font-size: 7px;
   color: #c3c7cd;
 }
 .card-form > span small b {
@@ -652,13 +654,11 @@ main {
   color: var(--amber);
   background: #d3b37515;
 }
-.card-form > span:not(.muted):nth-last-child(2) { opacity: 0.88; }
-.card-form > span:not(.muted):nth-last-child(3) { opacity: 0.74; }
-.card-form > span:not(.muted):nth-last-child(4) { opacity: 0.6; }
-.card-form > span:not(.muted):nth-last-child(5) { opacity: 0.48; }
-.card-form > span.form-recent {
-  opacity: 1;
+.card-form.away > span.form-recent {
   box-shadow: inset -2px 0 0 #9ec3dc99;
+}
+.card-form.home > span.form-recent {
+  box-shadow: inset 2px 0 0 #9ec3dc99;
 }
 .card-goalie-heading {
   border-top: 1px solid var(--border);

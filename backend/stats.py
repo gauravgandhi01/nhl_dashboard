@@ -136,7 +136,9 @@ def last_five(games, team_id):
         if gf is None or ga is None:
             continue
         result = 'W' if gf > ga else 'OTL' if game.get('gameOutcome', {}).get('lastPeriodType') in ['OT', 'SO'] else 'L'
-        form.append({'result': result, 'date': game['gameDate'], 'opponent': game[theirs]['abbrev'], 'home': ours == 'homeTeam'})
+        form.append({'game_id': game['id'], 'result': result, 'date': game['gameDate'],
+                     'goals_for': gf, 'goals_against': ga,
+                     'opponent': game[theirs]['abbrev'], 'home': ours == 'homeTeam', 'starting_goalie': None})
     return list(reversed(form))
 
 

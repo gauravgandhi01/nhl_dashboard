@@ -340,17 +340,19 @@ function CardMetric({
   );
 }
 
-function CardForm({ side }: { side?: CardSide }) {
-  const source = side?.form ?? [];
-  const middle = Math.floor(source.length / 2);
-  const games = source.length > 2
-    ? [...source.slice(0, middle), source[source.length - 1], ...source.slice(middle, -1)]
-    : source;
+function CardForm({ side, placement }: { side?: CardSide; placement: "away" | "home" }) {
+  // The API provides oldest-to-newest form; mirror the home strip around the card's center.
+  const source = (side?.form ?? []).slice(-5);
+  const games = placement === "away" ? source : [...source].reverse();
   return (
-    <div className="card-form" aria-label="Last five games, most recent in the center">
+    <div className={`card-form ${placement}`} aria-label={`${placement === "away" ? "Away" : "Home"} team last five games, newest nearest the matchup center`}>
       {games.length ? (
         games.map((g, index) => {
-          const recent = index === middle;
+          const age = placement === "away" ? games.length - 1 - index : index;
+          const recent = age === 0;
+          const date = g.date.slice(5).replace("-", "/");
+          const score = g.goals_for != null && g.goals_against != null
+            ? `Final: ${g.goals_for}–${g.goals_against}` : "Final score unavailable";
           return (
             <span
               key={g.date + g.opponent}
@@ -358,17 +360,18 @@ function CardForm({ side }: { side?: CardSide }) {
                 (g.result === "W" ? "win" : g.result === "OTL" ? "overtime" : "loss") +
                 (recent ? " form-recent" : "")
               }
-              title={`${g.date} ${g.home ? "" : "at "}${g.opponent}: ${g.result}${recent ? ". Most recent" : ""}`}
+              style={{ opacity: 1 - age * 0.12, gridColumn: placement === "away" ? 5 - age : age + 1 }}
+              title={`${date} ${g.home ? "vs " : "at "}${g.opponent}: ${g.result}${recent ? ". Most recent" : ""}\n${score}\n${g.starting_goalie ? `Starting goalie: ${g.starting_goalie}` : "Starter unavailable"}`}
             >
               <strong>{g.result === "OTL" ? "OT" : g.result}</strong>
               <small>
-                {g.home ? g.opponent : <><b>@</b> {g.opponent}</>}
+                {g.home ? g.opponent : <><b>@</b>{g.opponent}</>}
               </small>
             </span>
           );
         })
       ) : (
-        <span className="muted">--</span>
+        <span className="muted" style={{ gridColumn: placement === "away" ? 5 : 1 }}>--</span>
       )}
     </div>
   );
@@ -497,11 +500,11 @@ function CardStats({
         suffix="%"
       />
       <div className="card-metric card-form-row">
-        <CardForm side={a} />
-        <span title="Last five completed regular-season games. The center game is most recent for both teams.">
+        <CardForm side={a} placement="away" />
+        <span title="Last five completed regular-season games. Both teams' newest games meet at the center; older games flow toward the outside edges.">
           L5 form
         </span>
-        <CardForm side={h} />
+        <CardForm side={h} placement="home" />
       </div>
       <div className="card-goalie-heading">
         <span>GOALTENDING</span>

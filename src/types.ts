@@ -99,7 +99,7 @@ export type CardSide = {
   signals?: { id: string; label: string; detail: string }[];
   summary: Stats;
   advanced: Stats;
-  form: { result: string; date: string; opponent: string; home?: boolean }[];
+  form: { game_id?: number; result: string; date: string; opponent: string; home?: boolean; starting_goalie?: string | null; goals_for?: number | null; goals_against?: number | null }[];
   goalie: {
     name: string | null;
     basis: string;
