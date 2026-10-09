@@ -14,10 +14,10 @@ export function buildPeers(players: Profile[]): Peers {
   const unique = new Map(players.map(p => [`${p.season_label}:${p.id}`, p]));
   for (const p of unique.values()) {
     const s = p.windows.season;
-    if ((s.games ?? 0) < 5) continue;
+    if ((s.games ?? 0) < 1) continue;
     for (const key of metrics) {
       const value = s[key];
-      if (value == null || (advanced.has(key) && (s.advanced_games ?? 0) < 5)) continue;
+      if (value == null || (advanced.has(key) && (s.advanced_games ?? 0) < 1)) continue;
       const id = group(p, key);
       const values = peers.get(id) || [];
       values.push(value);
@@ -38,19 +38,19 @@ export function cellFormat(p: Profile, window: Window, key: string, peers: Peers
     title: `MoneyPuck coverage: ${value}/${s.games ?? "unknown"} appearances; ${s.advanced_minutes?.toFixed(1) ?? "unknown"} minutes`,
   };
   if (!metrics.includes(key)) return neutral;
-  if ((s.games ?? 0) < (window === "season" ? 5 : 3) || (advanced.has(key) && (s.advanced_games ?? 0) < (window === "season" ? 5 : 3)))
+  if ((s.games ?? 0) < 1 || (advanced.has(key) && (s.advanced_games ?? 0) < 1))
     return { ...neutral, title: "Sample too small for performance coloring" };
   if (window === "season") {
     const values = peers.get(group(p, key)) || [];
-    if (values.length < 5) return neutral;
+    if (!values.length) return neutral;
     const rank = (values.filter(v => v < value).length + values.filter(v => v === value).length / 2) / values.length;
     return {
       className: rank >= .9 ? "form-up form-strong" : rank >= .75 ? "form-up" : rank <= .1 ? "form-down form-strong" : rank <= .25 ? "form-down" : "",
-      title: `${Math.round(rank * 100)}th percentile among ${values.length} ${peerLabel} ${p.position === "D" ? "defensemen" : "forwards"} with 5+ ${advanced.has(key) ? "MoneyPuck " : ""}GP; higher value, not overall player quality`,
+      title: `${Math.round(rank * 100)}th percentile among ${values.length} ${peerLabel} ${p.position === "D" ? "defensemen" : "forwards"} with recorded ${advanced.has(key) ? "MoneyPuck " : ""}GP; higher value, not overall player quality`,
     };
   }
   const baseline = base[key];
-  if (baseline == null || (base.games ?? 0) < 5 || (advanced.has(key) && (base.advanced_games ?? 0) < 5)) return neutral;
+  if (baseline == null || (base.games ?? 0) < 1 || (advanced.has(key) && (base.advanced_games ?? 0) < 1)) return neutral;
   const current = totals.has(key) ? value / s.games! : value;
   const reference = totals.has(key) ? baseline / base.games! : baseline;
   const change = reference ? (current - reference) / reference : current > 0 ? 1 : 0;

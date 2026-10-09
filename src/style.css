@@ -657,6 +657,7 @@ main {
 .card-form > span:not(.muted):nth-last-child(4) { opacity: 0.6; }
 .card-form > span:not(.muted):nth-last-child(5) { opacity: 0.48; }
 .card-form > span.form-recent {
+  opacity: 1;
   box-shadow: inset -2px 0 0 #9ec3dc99;
 }
 .card-goalie-heading {
@@ -2394,13 +2395,15 @@ tr:hover td {
 .prop-panel-heading > span { font-size: 10px; color: var(--muted); }
 .prop-market { padding: 0; }
 .prop-market-head,
-.prop-market-row { display: grid; grid-template-columns: 9.2em 6.4em 6.2em 6.2em 4.2em 4.6em 6.2em; align-items: center; column-gap: 4px; justify-content: start; min-width: 0; min-height: 0; font-size: 11px; line-height: 1; }
+.prop-market-row { display: grid; grid-template-columns: 9.2em 6.4em 59px 83px 3.4em 3.4em 4.8em; align-items: center; column-gap: 6px; justify-content: start; min-width: 0; min-height: 0; font-size: 11px; line-height: 1; }
+.prop-market-head > :nth-child(4),
+.prop-market-row > .under { padding-right: 24px; }
 .prop-market-head { color: var(--muted); padding-bottom: 1px; }
 .prop-market-head > span { font-size: 9px; }
 .prop-market-head > *,
 .prop-market-row > * { min-width: 0; }
 .prop-market-row { padding: 0; }
-.prop-market + .prop-market { margin-top: 1px; }
+.prop-market + .prop-market { margin-top: 5px; }
 .prop-market-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prop-count { min-width: 0; overflow: hidden; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; text-overflow: ellipsis; }
 .prop-count:focus-visible { outline: 1px solid #9ebdce; outline-offset: 2px; }

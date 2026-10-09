@@ -305,6 +305,10 @@ function WindowCells({
     if (!result) return <span className="prop-count" key={label} />;
     const count = result.empty ? null : result.windows.find((w) => w.label === label)?.count;
     const text = count?.games ? formatCount(count) : "--";
+    const percentage = count?.games ? count.over / count.games : null;
+    const color = percentage == null
+      ? undefined
+      : `hsl(${Math.round(percentage * 120)}, 62%, 68%)`;
     return (
       <span
         className="prop-count"
@@ -315,6 +319,7 @@ function WindowCells({
             : "No regular-season appearances"
         }
         tabIndex={0}
+        style={color ? { color } : undefined}
       >
         {text}
       </span>

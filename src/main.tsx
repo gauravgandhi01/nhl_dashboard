@@ -341,12 +341,16 @@ function CardMetric({
 }
 
 function CardForm({ side }: { side?: CardSide }) {
-  const games = side?.form ?? [];
+  const source = side?.form ?? [];
+  const middle = Math.floor(source.length / 2);
+  const games = source.length > 2
+    ? [...source.slice(0, middle), source[source.length - 1], ...source.slice(middle, -1)]
+    : source;
   return (
-    <div className="card-form" aria-label="Last five games, oldest on the left and most recent on the right">
+    <div className="card-form" aria-label="Last five games, most recent in the center">
       {games.length ? (
         games.map((g, index) => {
-          const recent = index === games.length - 1;
+          const recent = index === middle;
           return (
             <span
               key={g.date + g.opponent}
@@ -494,7 +498,7 @@ function CardStats({
       />
       <div className="card-metric card-form-row">
         <CardForm side={a} />
-        <span title="Last five completed regular-season games. Left is older, right is most recent.">
+        <span title="Last five completed regular-season games. The center game is most recent for both teams.">
           L5 form
         </span>
         <CardForm side={h} />
