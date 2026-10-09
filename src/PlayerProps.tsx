@@ -57,7 +57,7 @@ export function oddsTone(price: number) {
   return "odds-long";
 }
 const shortBook: Record<string, string> = {
-  ballybet: "Bally",
+  ballybet: "BAL",
   betonlineag: "BOL",
   draftkings: "DK",
   fanatics: "FAN",
