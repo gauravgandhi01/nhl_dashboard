@@ -147,7 +147,11 @@ shows freshness and individual failures.
 
 The **First Period** tab (`/first-period?date=YYYY-MM-DD`) provides comparison
 cards, dedicated matchup URLs, goalie inspection, head-to-head scores and sortable
-league team rankings. Only Season (default), Last 5 and Last 10 are supported.
+league team and goalie rankings. The goalie table sits beside the team table and
+lists goalies with at least one verified first-period appearance, ordered by
+goals against per appearance. Combined goals per game, L5, L10, and allow-1+
+frequency hide when a ranking panel is narrower than 560px. Only Season (default),
+Last 5 and Last 10 are supported.
 The statistical baseline is completed regular-season games before the selected
 date, capped before today for future slates, within that slate’s season only.
 Teams and goalies with no appearances retain empty samples. The separate league-trends
@@ -165,13 +169,18 @@ unverified relief appearances are not invented. Known ambiguous goalie events
 exclude the affected team's goalie sample. Windows refer to verified appearances;
 coverage warnings remain visible while records are missing or rebuilding.
 
-Goalie rank requires 5+ verified 1P appearances and uses season GA/appearance or
-weighted SV%. League Allow 1+% is pooled from each goalie's selected appearance
-window, not an average of individual percentages. Team rankings default to season
-2+ count with competition ties. Cards compare opposing rates; recent form tables
-compare against the player's/team's season baseline. Amber identifies elevated
-goals allowed, small samples and incomplete coverage. Ranking frequency colors
-mark 65%+ green and below 45% red; these are observed rates, not predictions.
+Goalie GA/appearance, weighted SV%, and allow-1+ frequency are ranked among
+goalies with at least one verified first-period appearance. Ties share a rank.
+A goalie with no appearances stays unranked, and save percentage stays unranked
+when that goalie faced no shots. Those three rates are colored from the league
+rank for the displayed window on the card and in the goalie form table. They are
+not colored by the opposing goalie. GP under 5 stays an amber small-sample mark.
+League Allow 1+% is pooled from each goalie's selected appearance window, not an
+average of individual percentages. Team rankings default to season 2+ count with
+competition ties. Team cards use league rank; recent team form tables compare
+against the team's season baseline. Amber identifies elevated goals allowed,
+small samples and incomplete coverage. Ranking frequency colors mark 65%+ green
+and below 45% red; these are observed rates, not predictions.
 
 SQLite stores versioned normalized first-period records. One background job per
 season builds goalie history while team data remains usable. New/missing games

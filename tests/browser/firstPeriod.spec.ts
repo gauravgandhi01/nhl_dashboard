@@ -25,14 +25,47 @@ test("first-period cards, windows, goalie inspection, rankings and desktop/mobil
       "2+ goal frequency",
     );
     await expect(page.locator(".fp-card").first()).toContainText("1P save %");
-    await expect(page.locator(".fp-card").first()).toContainText(
-      "Roster leader",
+    for (const label of ["1P GA / appearance", "1P save %", "Allowed 1+ frequency"]) {
+      const row = page.locator(".fp-card").first().locator(".card-metric", { hasText: label });
+      await expect(row.locator(".league-rank")).toHaveCount(2);
+      await expect(row.locator(".better, .worse")).toHaveCount(0);
+    }
+    await expect(
+      page.locator(".fp-card").first().getByLabel("Roster leader").first(),
+    ).toBeVisible();
+    await expect(page.locator(".fp-team-rankings tbody tr")).toHaveCount(data.rankings.length);
+    await expect(page.getByRole("heading", { name: "League goalie rankings" })).toBeVisible();
+    await expect(page.locator(".fp-goalie-rankings tbody tr")).toHaveCount(
+      (data.goalie_rankings ?? []).length,
     );
-    await expect(page.locator(".fp-rankings tbody tr")).toHaveCount(data.rankings.length);
-    await page.getByRole("button", { name: "L5 2+ %", exact: true }).click();
-    await expect(page.locator('th[aria-sort="descending"]')).toContainText(
-      "L5",
-    );
+    const teamHeading = await page.getByRole("heading", { name: "League team rankings" }).boundingBox();
+    const goalieHeading = await page.getByRole("heading", { name: "League goalie rankings" }).boundingBox();
+    if (width === 1440) {
+      expect(goalieHeading!.x).toBeGreaterThan(teamHeading!.x + 200);
+      expect(Math.abs(goalieHeading!.y - teamHeading!.y)).toBeLessThan(8);
+    } else {
+      expect(goalieHeading!.y).toBeGreaterThan(teamHeading!.y + 24);
+    }
+    for (const panel of [".fp-team-rankings", ".fp-goalie-rankings"]) {
+      const scroller = page.locator(`${panel} .table-scroll`);
+      if (await scroller.count()) {
+        expect(
+          await scroller.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
+        ).toBeTruthy();
+      }
+    }
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    ).toBeTruthy();
+    const l5 = page.getByRole("button", { name: "L5 2+ %", exact: true });
+    if (width === 1440) {
+      await l5.click();
+      await expect(page.locator(".fp-team-rankings th[aria-sort='descending']")).toContainText("L5");
+    } else {
+      await expect(l5).toBeHidden();
+      await page.getByRole("button", { name: "2+ %", exact: true }).click();
+      await expect(page.locator(".fp-team-rankings th[aria-sort='descending']")).toContainText("2+ %");
+    }
     await page.getByRole("button", { name: "Last 5", exact: true }).click();
     await expect(page).toHaveURL(/window=last5/);
     await expect(page.locator(".fp-card").first()).toBeVisible();
@@ -47,6 +80,13 @@ test("first-period cards, windows, goalie inspection, rankings and desktop/mobil
       page.getByRole("heading", { name: "Head-to-head first periods" }),
     ).toBeVisible();
     await expect(page.locator(".fp-details .fp-form")).toHaveCount(4);
+    await expect(page.getByText("5+ 1P GP")).toHaveCount(0);
+    await expect(
+      page.getByText(/1\+ 1P GP|no verified 1P appearances/).first(),
+    ).toBeVisible();
+    await expect(
+      page.locator(".fp-details section").nth(2).locator("td[title*='1+ GP']").first(),
+    ).toBeVisible();
     const report = await page.locator(".fp-starter").first().innerText();
     const selector = page.locator(".goalie-picker select").first();
     if ((await selector.locator("option").count()) > 1)

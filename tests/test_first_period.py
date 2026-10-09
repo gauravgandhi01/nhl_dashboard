@@ -8,7 +8,7 @@ import pytest
 
 from backend.cache import Feed, Store
 from backend.first_period import FirstPeriod
-from backend.first_period_stats import team_games, extract_goalies, windows
+from backend.first_period_stats import team_games, extract_goalies, windows, goalie_ranks
 
 
 def pair(gid=2025020001, date='2025-10-07', a=1, h=2):
@@ -55,6 +55,34 @@ def test_team_windows_small_samples_and_counts():
     assert w['last5']['games'] == 5 and w['last10']['games'] == 10
     assert windows(rows[:2])['last10']['games'] == 2
     assert windows([])['season']['hit_pct'] is None
+
+
+def window_row(games, ga_pg, sv, allow_pct):
+    played = {'games': games, 'ga_pg': ga_pg, 'sv': sv, 'allow_pct': allow_pct}
+    return {'season': played, 'last5': played, 'last10': played}
+
+
+def test_goalie_ranks_use_one_appearance_not_the_opponent():
+    rows = {
+        1: window_row(1, 2.0, .9, 80),
+        2: window_row(6, 1.0, .8, 50),
+        3: window_row(1, 1.0, None, 50),
+        4: window_row(0, None, None, None),
+    }
+    rows[1]['last5'] = {'games': 1, 'ga_pg': 0.0, 'sv': .5, 'allow_pct': 0}
+    ranks = goalie_ranks(rows)
+    assert ranks[1]['season']['ga_pg'] == {'rank': 3, 'eligible': 3}
+    assert ranks[2]['season']['ga_pg'] == {'rank': 1, 'eligible': 3}
+    assert ranks[3]['season']['ga_pg'] == {'rank': 1, 'eligible': 3}
+    assert ranks[4]['season']['ga_pg'] == {'rank': None, 'eligible': 3}
+    assert ranks[1]['season']['sv'] == {'rank': 1, 'eligible': 2}
+    assert ranks[2]['season']['sv'] == {'rank': 2, 'eligible': 2}
+    assert ranks[3]['season']['sv'] == {'rank': None, 'eligible': 2}
+    assert ranks[1]['season']['allow_pct']['rank'] == 3
+    assert ranks[2]['season']['allow_pct']['rank'] == 1
+    assert ranks[4]['last5']['sv']['rank'] is None
+    assert ranks[1]['last5']['ga_pg'] == {'rank': 1, 'eligible': 3}
+    assert ranks[1]['last5']['sv'] == {'rank': 2, 'eligible': 2}
 
 
 def test_exact_goalie_totals_and_weighted_percentages():
@@ -150,6 +178,18 @@ def test_build_dedup_current_season_persistence_and_failure(tmp_path):
             result = await service.view('2026-09-27')
             assert result['coverage']['goalie_games']==1
             assert result['matchups'][0]['away']['goalies'][0]['windows']['season']['ga_total']==2
+            away_rank = result['matchups'][0]['away']['goalies'][0]['rank']['season']
+            home_rank = result['matchups'][0]['home']['goalies'][0]['rank']['season']
+            assert away_rank['ga_pg'] == {'rank': 2, 'eligible': 2}
+            assert home_rank['ga_pg'] == {'rank': 1, 'eligible': 2}
+            assert away_rank['sv'] == {'rank': 2, 'eligible': 2}
+            assert home_rank['sv'] == {'rank': 1, 'eligible': 2}
+            assert away_rank['allow_pct']['rank'] == 1 and home_rank['allow_pct']['rank'] == 1
+            by_id = {goalie['id']: goalie for goalie in result['goalie_rankings']}
+            assert set(by_id) == {1, 2}
+            assert by_id[1]['abbrev'] == 'CHI' and by_id[1]['playing'] is True
+            assert by_id[2]['abbrev'] == 'FLA' and by_id[2]['windows']['season']['games'] == 1
+            assert [goalie['id'] for goalie in result['goalie_rankings']] == [2, 1]
             assert fake.calls.count('gamecenter/2025020001/play-by-play')==1
             assert fake.pbp_store_body is False
             assert store.db.execute('SELECT body FROM responses WHERE url=?', (url,)).fetchone() is None
@@ -177,6 +217,7 @@ def test_empty_current_season_never_loads_previous_season(tmp_path):
             assert all(call[1] == 20262027 for call in fake.calls if isinstance(call, tuple))
             assert not any(isinstance(call, str) and 'play-by-play' in call for call in fake.calls)
             assert result['matchups'][0]['away']['windows']['season']['games'] == 0
+            assert result['goalie_rankings'] == []
         finally:
             await service.close(); await store.close()
     asyncio.run(scenario())

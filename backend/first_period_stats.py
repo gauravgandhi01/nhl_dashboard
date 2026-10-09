@@ -5,6 +5,7 @@ from .providers import TEAM_NAMES, ALIASES
 from .stats import number, normalized_name
 
 WINDOWS = {'season': None, 'last5': 5, 'last10': 10}
+GOALIE_RANK_METRICS = (('ga_pg', True), ('sv', False), ('allow_pct', True))
 VERSION = 1
 
 
@@ -139,3 +140,35 @@ def summarize(rows, goalie=False):
 def windows(rows, goalie=False):
     ordered = sorted(rows, key=lambda r: (r['date'], r['gameId']), reverse=True)
     return {key: summarize(ordered[:count] if count else ordered, goalie) for key, count in WINDOWS.items()}
+
+
+def goalie_ranks(goalie_windows):
+    """Rank each window among goalies with at least one verified appearance.
+
+    Goals against per appearance and allow-1+ frequency are lower-is-better.
+    Save percentage is higher-is-better and stays unranked when no shots were faced.
+    Ties share a rank. A goalie with no appearances in that window is unranked.
+    """
+    ranks = {}
+    for window in WINDOWS:
+        pool = [pid for pid, rows in goalie_windows.items() if (rows[window].get('games') or 0) >= 1]
+        for metric, lower in GOALIE_RANK_METRICS:
+            values = {pid: goalie_windows[pid][window][metric] for pid in pool
+                      if goalie_windows[pid][window].get(metric) is not None}
+            eligible = len(values)
+            for pid, value in values.items():
+                rank = 1 + sum((other < value if lower else other > value) for other in values.values())
+                ranks.setdefault(pid, {}).setdefault(window, {})[metric] = {'rank': rank, 'eligible': eligible}
+            for pid in goalie_windows:
+                ranks.setdefault(pid, {}).setdefault(window, {}).setdefault(
+                    metric, {'rank': None, 'eligible': eligible})
+    return ranks
+
+
+def blank_goalie_ranks(sample=None):
+    """Rank shell for a goalie with no saved appearances. Eligible counts match the league pool."""
+    if not sample:
+        return {window: {metric: {'rank': None, 'eligible': 0} for metric, _lower in GOALIE_RANK_METRICS}
+                for window in WINDOWS}
+    return {window: {metric: {'rank': None, 'eligible': sample[window][metric]['eligible']}
+                     for metric, _lower in GOALIE_RANK_METRICS} for window in WINDOWS}

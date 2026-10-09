@@ -6,7 +6,8 @@ import time
 from collections import defaultdict
 from datetime import date as Date, timedelta
 
-from .first_period_stats import VERSION, team_games, extract_goalies, windows, summarize, WINDOWS
+from .first_period_stats import (VERSION, team_games, extract_goalies, windows, summarize, WINDOWS,
+                                 goalie_ranks, blank_goalie_ranks)
 from .service import today_et, game_info, display_name, latest_sources
 from .stats import season_label, match_player, in_season
 
@@ -145,13 +146,8 @@ class FirstPeriod:
                 goalie_rows[p['playerId']].append(p)
                 names[p['playerId']] = p['name']
         goalie_windows = {pid: windows(rows, True) for pid, rows in goalie_rows.items()}
-        qualified = [pid for pid, w in goalie_windows.items() if w['season']['games'] >= 5]
-        ranks = {}
-        for pid in qualified:
-            s = goalie_windows[pid]['season']
-            ranks[pid] = {'ga': 1 + sum(goalie_windows[q]['season']['ga_pg'] < s['ga_pg'] for q in qualified),
-                          'sv': None if s['sv'] is None else 1 + sum((goalie_windows[q]['season']['sv'] or 0) > s['sv'] for q in qualified),
-                          'qualified': len(qualified)}
+        ranks = goalie_ranks(goalie_windows)
+        unranked = blank_goalie_ranks(next(iter(ranks.values()), None))
         league_goalies = {key: summarize([p for rows in goalie_rows.values()
                                           for p in sorted(rows, key=lambda r: (r['date'], r['gameId']), reverse=True)[:count]], True)
                           for key, count in WINDOWS.items()}
@@ -173,7 +169,7 @@ class FirstPeriod:
                 roster = roster_map.get(t['abbrev'], [])
                 starter_id = match_player(t['starter']['name'], roster)
                 choices = [{**p, 'windows': goalie_windows.get(p['id'], windows([], True)),
-                            'rank': ranks.get(p['id'])} for p in roster]
+                            'rank': ranks.get(p['id'], unranked)} for p in roster]
                 choices.sort(key=lambda p: (-p['windows']['season']['games'], p['name']))
                 selected = starter_id or (choices[0]['id'] if choices else None)
                 sides[side] = {'team': t, 'windows': team_windows.get(t['id'], windows([])),
@@ -186,10 +182,21 @@ class FirstPeriod:
         ranked = sorted(teams.values(), key=lambda t: (-(team_windows[t['id']]['season']['hits'] or 0), t['abbrev']))
         rankings = [{**t, 'rank': 1 + sum((team_windows[o['id']]['season']['hits'] or 0) > (team_windows[t['id']]['season']['hits'] or 0) for o in ranked),
                      'windows': team_windows[t['id']], 'playing': t['abbrev'] in abbreviations} for t in ranked]
+        playing_goalies = {p['id'] for roster in roster_map.values() for p in roster}
+        goalie_rankings = []
+        for pid, sample in goalie_windows.items():
+            if (sample['season'].get('games') or 0) < 1:
+                continue
+            latest = max(goalie_rows[pid], key=lambda row: (row['date'], row['gameId']))
+            team = teams.get(latest['teamId'], {})
+            goalie_rankings.append({'id': pid, 'name': names.get(pid, str(pid)),
+                                    'abbrev': team.get('abbrev') or '', 'windows': sample,
+                                    'rank': ranks[pid], 'playing': pid in playing_goalies})
+        goalie_rankings.sort(key=lambda goalie: (goalie['windows']['season']['ga_pg'], goalie['name'], goalie['id']))
         progress = self.progress.get(stats_season, {'status': 'ready', 'done': 0, 'total': 0, 'error': None})
         return {'date': date, 'window': window, 'season': stats_season, 'season_label': season_label(stats_season),
                 'previous_season': False, 'as_of': cutoff, 'matchups': comparisons,
-                'rankings': rankings, 'league_goalies': league_goalies, 'build': dict(progress),
+                'rankings': rankings, 'goalie_rankings': goalie_rankings, 'league_goalies': league_goalies, 'build': dict(progress),
                 'coverage': {'games': len(games), 'goalie_games': covered, 'incomplete_games': incomplete,
                              'stale_games': stale, 'rejected_team_games': rejected},
                 'sources': [*latest_sources(sources), *period_sources.values()],

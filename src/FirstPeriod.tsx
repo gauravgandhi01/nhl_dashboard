@@ -13,11 +13,13 @@ import { todayEt } from "./dates";
 
 type Window = "season" | "last5" | "last10";
 type Windows = Record<Window, Stats>;
+type MetricRank = { rank: number | null; eligible: number };
+type GoalieRanks = Record<Window, { ga_pg: MetricRank; sv: MetricRank; allow_pct: MetricRank }>;
 type Goalie = {
   id: number;
   name: string;
   windows: Windows;
-  rank: { ga: number; sv: number | null; qualified: number } | null;
+  rank: GoalieRanks | null;
 };
 type Side = {
   team: Team;
@@ -51,6 +53,14 @@ type Data = {
     abbrev: string;
     rank: number;
     windows: Windows;
+    playing: boolean;
+  }[];
+  goalie_rankings: {
+    id: number;
+    name: string;
+    abbrev: string;
+    windows: Windows;
+    rank: GoalieRanks;
     playing: boolean;
   }[];
   league_goalies: Windows;
@@ -112,6 +122,21 @@ const timestamp = (s: string | null) =>
       }) + " ET"
     : "Unavailable";
 const selected = (s: Side) => s.goalies.find((g) => g.id === s.selected_goalie);
+const GOALIE_RATE_KEYS = ["ga_pg", "sv", "allow_pct"] as const;
+type GoalieRate = (typeof GOALIE_RATE_KEYS)[number];
+const leagueRankClass = (rank: number | null | undefined, eligible?: number) => {
+  if (rank == null) return "";
+  const size = eligible ?? 32;
+  if (!size) return "";
+  const percentile = rank / size;
+  if (percentile <= 0.2) return "rank-elite";
+  if (percentile <= 0.4) return "rank-good";
+  if (percentile <= 0.6) return "rank-average";
+  if (percentile <= 0.8) return "rank-poor";
+  return "rank-bad";
+};
+const goalieRateHelp = (key: string) =>
+  key === "sv" ? "Higher save percentage is better." : "Lower is better.";
 const goalieStatusIcon = (status: string | null | undefined) =>
   status === "Confirmed" ? "✅" : status === "Likely" ? "⚠️" : "⛔️";
 const lastName = (name: string | null | undefined) => {
@@ -272,34 +297,32 @@ function ComparisonRow({
   h,
   awayRank,
   homeRank,
+  awayEligible,
+  homeEligible,
   rankTitle = "League rank",
   percent = false,
   digits = 2,
   risk = false,
   neutral = false,
+  ranked = false,
 }: {
   label: string;
   a: number | null | undefined;
   h: number | null | undefined;
   awayRank?: number;
   homeRank?: number;
+  awayEligible?: number;
+  homeEligible?: number;
   rankTitle?: string;
   percent?: boolean;
   digits?: number;
   risk?: boolean;
   neutral?: boolean;
+  ranked?: boolean;
 }) {
-  const rankClass = (rank: number | undefined) => {
-    if (rank == null) return "";
-    const percentile = rank / 32;
-    if (percentile <= 0.2) return "rank-elite";
-    if (percentile <= 0.4) return "rank-good";
-    if (percentile <= 0.6) return "rank-average";
-    if (percentile <= 0.8) return "rank-poor";
-    return "rank-bad";
-  };
-  const awayRankClass = rankClass(awayRank);
-  const homeRankClass = rankClass(homeRank);
+  const leagueMode = ranked || awayRank != null || homeRank != null;
+  const awayRankClass = leagueRankClass(awayRank, ranked ? awayEligible : undefined);
+  const homeRankClass = leagueRankClass(homeRank, ranked ? homeEligible : undefined);
   const style = (v: typeof a, other: typeof a) =>
     neutral && label.includes("GP") && v != null && v < 5
       ? "warning"
@@ -312,26 +335,32 @@ function ComparisonRow({
           : risk
             ? ""
             : "worse";
-  const awayClass = awayRankClass || style(a, h);
-  const homeClass = homeRankClass || style(h, a);
+  const awayClass = leagueMode ? awayRankClass : style(a, h);
+  const homeClass = leagueMode ? homeRankClass : style(h, a);
+  const badgeTitle = (rank?: number, eligible?: number) =>
+    rank != null
+      ? `League rank ${rank} of ${eligible ?? "—"}. ${rankTitle}`
+      : rankTitle;
   return (
-    <div className={`card-metric${awayRank != null || homeRank != null ? " card-metric-ranked fp-rank-row" : ""}`}>
+    <div className={`card-metric${leagueMode ? " card-metric-ranked fp-rank-row" : ""}`}>
       <strong className={awayClass}>{percent ? pct(a) : f(a, digits)}</strong>
-      {(awayRank != null || homeRank != null) && <span className={`league-rank ${awayRankClass}`} title={rankTitle}>{awayRank ?? "—"}</span>}
+      {leagueMode && <span className={`league-rank ${awayRankClass}`} title={badgeTitle(awayRank, awayEligible)}>{awayRank ?? "—"}</span>}
       <span
         title={
-          risk
-            ? "Higher goals allowed, not better performance"
-            : neutral
-              ? label
-            : awayRank != null || homeRank != null
-              ? "League-rank based conditional formatting"
-              : "Higher/lower than the opposing comparison value"
+          ranked
+            ? rankTitle
+            : risk
+              ? "Higher goals allowed, not better performance"
+              : neutral
+                ? label
+                : leagueMode
+                  ? "League-rank based conditional formatting"
+                  : "Higher/lower than the opposing comparison value"
         }
       >
         {label}
       </span>
-      {(awayRank != null || homeRank != null) && <span className={`league-rank ${homeRankClass}`} title={rankTitle}>{homeRank ?? "—"}</span>}
+      {leagueMode && <span className={`league-rank ${homeRankClass}`} title={badgeTitle(homeRank, homeEligible)}>{homeRank ?? "—"}</span>}
       <strong className={homeClass}>{percent ? pct(h) : f(h, digits)}</strong>
     </div>
   );
@@ -351,8 +380,22 @@ function PeriodCard({
 }) {
   const a = m.away.windows[window],
     h = m.home.windows[window];
-  const ag = selected(m.away)?.windows[window],
-    hg = selected(m.home)?.windows[window];
+  const awayGoalie = selected(m.away),
+    homeGoalie = selected(m.home);
+  const ag = awayGoalie?.windows[window],
+    hg = homeGoalie?.windows[window];
+  const goalieRank = (goalie: Goalie | undefined, metric: GoalieRate) =>
+    goalie?.rank?.[window]?.[metric];
+  const awayRates = {
+    ga_pg: goalieRank(awayGoalie, "ga_pg"),
+    sv: goalieRank(awayGoalie, "sv"),
+    allow_pct: goalieRank(awayGoalie, "allow_pct"),
+  };
+  const homeRates = {
+    ga_pg: goalieRank(homeGoalie, "ga_pg"),
+    sv: goalieRank(homeGoalie, "sv"),
+    allow_pct: goalieRank(homeGoalie, "allow_pct"),
+  };
   return (
     <Link
       className="game-card fp-card"
@@ -451,15 +494,36 @@ function PeriodCard({
           label="1P GA / appearance"
           a={ag?.ga_pg}
           h={hg?.ga_pg}
-          risk
+          awayRank={awayRates.ga_pg?.rank ?? undefined}
+          homeRank={homeRates.ga_pg?.rank ?? undefined}
+          awayEligible={awayRates.ga_pg?.eligible}
+          homeEligible={homeRates.ga_pg?.eligible}
+          ranked
+          rankTitle="League rank by first-period goals against per appearance among goalies with 1+ GP. Lower is better. Ties share a rank."
         />
-        <ComparisonRow label="1P save %" a={ag?.sv} h={hg?.sv} digits={3} />
+        <ComparisonRow
+          label="1P save %"
+          a={ag?.sv}
+          h={hg?.sv}
+          digits={3}
+          awayRank={awayRates.sv?.rank ?? undefined}
+          homeRank={homeRates.sv?.rank ?? undefined}
+          awayEligible={awayRates.sv?.eligible}
+          homeEligible={homeRates.sv?.eligible}
+          ranked
+          rankTitle="League rank by first-period save percentage among goalies with 1+ GP and a save percentage. Higher is better. Ties share a rank."
+        />
         <ComparisonRow
           label="Allowed 1+ frequency"
           a={ag?.allow_pct}
           h={hg?.allow_pct}
           percent
-          risk
+          awayRank={awayRates.allow_pct?.rank ?? undefined}
+          homeRank={homeRates.allow_pct?.rank ?? undefined}
+          awayEligible={awayRates.allow_pct?.eligible}
+          homeEligible={homeRates.allow_pct?.eligible}
+          ranked
+          rankTitle="League rank by first-period allow-1+ frequency among goalies with 1+ GP. Lower is better. Ties share a rank."
         />
         {!["PPD", "CNCL"].includes(m.game.schedule_state) && (
           <PriceLine
@@ -532,10 +596,12 @@ function FormTable({
   stats,
   goalie = false,
   league,
+  ranks,
 }: {
   stats: Windows;
   goalie?: boolean;
   league?: Windows;
+  ranks?: GoalieRanks | null;
 }) {
   const cols = goalie ? goalieCols : teamCols;
   return (
@@ -557,7 +623,12 @@ function FormTable({
               {cols.map(([k]) => {
                 const n = stats[w][k],
                   baseline = stats.season[k];
+                const metricRank =
+                  goalie && (GOALIE_RATE_KEYS as readonly string[]).includes(k)
+                    ? ranks?.[w]?.[k as GoalieRate]
+                    : undefined;
                 const comparable =
+                  !metricRank &&
                   w !== "season" &&
                   [
                     "gf_pg",
@@ -570,8 +641,9 @@ function FormTable({
                   n != null &&
                   baseline != null &&
                   (stats[w].games ?? 0) >= 3;
-                const cls =
-                  k === "games" && (n ?? 0) < 5
+                const cls = metricRank
+                  ? leagueRankClass(metricRank.rank, metricRank.eligible)
+                  : k === "games" && (n ?? 0) < 5
                     ? "warning"
                     : comparable && n! > baseline!
                       ? ["ga_pg", "allow_pct"].includes(k)
@@ -587,11 +659,15 @@ function FormTable({
                     className={cls}
                     key={k}
                     title={
-                      comparable
-                        ? `Season baseline: ${value(k, baseline)}`
-                        : k === "partial_games"
-                          ? "Multiple verified first-period goalies in the same game"
-                          : undefined
+                      metricRank
+                        ? metricRank.rank != null
+                          ? `League rank ${metricRank.rank} of ${metricRank.eligible} goalies with 1+ GP. ${goalieRateHelp(k)} Ties share a rank.`
+                          : `Unranked among goalies with 1+ GP. ${goalieRateHelp(k)}`
+                        : comparable
+                          ? `Season baseline: ${value(k, baseline)}`
+                          : k === "partial_games"
+                            ? "Multiple verified first-period goalies in the same game"
+                            : undefined
                     }
                   >
                     {value(k, n)}
@@ -606,6 +682,15 @@ function FormTable({
     </div>
   );
 }
+const rankPiece = (label: string, metric: MetricRank | undefined) =>
+  `${label} ${metric?.rank == null ? "--" : `${metric.rank}/${metric.eligible}`}`;
+const goalieRankNote = (goalie: Goalie | undefined) => {
+  const season = goalie?.rank?.season;
+  if ((goalie?.windows.season.games ?? 0) < 1 || !season) {
+    return "Unranked / no verified 1P appearances";
+  }
+  return `Season ranks among goalies with 1+ 1P GP: ${rankPiece("GA", season.ga_pg)} / ${rankPiece("SV", season.sv)} / ${rankPiece("Allow 1+", season.allow_pct)}`;
+};
 function GoalieDetail({ side, league }: { side: Side; league: Windows }) {
   const [choice, setChoice] = useState<number | null>(null);
   const goalie = side.goalies.find(
@@ -643,22 +728,22 @@ function GoalieDetail({ side, league }: { side: Side; league: Windows }) {
       </label>
       <p className="footnote">
         {choice == null ? side.goalie_basis : "Inspecting roster goalie"} /{" "}
-        {goalie?.rank
-          ? `Season GA rank ${goalie.rank.ga} / SV rank ${goalie.rank.sv == null ? "--" : goalie.rank.sv} of ${goalie.rank.qualified} (5+ 1P GP)`
-          : "Unranked / fewer than 5 verified 1P appearances"}
+        {goalieRankNote(goalie)}
       </p>
-      {goalie && <FormTable stats={goalie.windows} goalie league={league} />}
+      {goalie && (
+        <FormTable stats={goalie.windows} goalie league={league} ranks={goalie.rank} />
+      )}
     </section>
   );
 }
 function Rankings({ data, window }: { data: Data; window: Window }) {
   const [sort, setSort] = useState({ key: "season_hits", desc: true });
-  const keys: [string, string][] = [
-    ["season_hits", "Season 2+ count"],
-    ["hit_pct", "2+ %"],
-    ["combined_pg", "Combined/G"],
-    ["last5", "L5 2+ %"],
-    ["last10", "L10 2+ %"],
+  const keys: [string, string, boolean][] = [
+    ["season_hits", "Season 2+ count", false],
+    ["hit_pct", "2+ %", false],
+    ["combined_pg", "Combined/G", true],
+    ["last5", "L5 2+ %", true],
+    ["last10", "L10 2+ %", true],
   ];
   const metric = (r: Data["rankings"][number], key: string) =>
     key === "season_hits"
@@ -673,7 +758,7 @@ function Rankings({ data, window }: { data: Data; window: Window }) {
     return (sort.desc ? bv - av : av - bv) || a.abbrev.localeCompare(b.abbrev);
   });
   return (
-    <section className="fp-rankings">
+    <section className="fp-rankings fp-team-rankings">
       <div className="section-heading">
         <h2>League team rankings</h2>
         <span className="eyebrow">FIRST-PERIOD 2+ GOALS</span>
@@ -685,9 +770,10 @@ function Rankings({ data, window }: { data: Data; window: Window }) {
               <th>Season rank</th>
               <th>Team</th>
               <th>GP</th>
-              {keys.map(([key, label]) => (
+              {keys.map(([key, label, extra]) => (
                 <th
                   key={key}
+                  className={extra ? "fp-col-extra" : undefined}
                   aria-sort={
                     sort.key === key
                       ? sort.desc
@@ -738,22 +824,22 @@ function Rankings({ data, window }: { data: Data; window: Window }) {
                 >
                   {r.windows[window].games}
                 </td>
-                {keys.map(([key]) => {
+                {keys.map(([key, , extra]) => {
                   const n = metric(r, key);
+                  const tone =
+                    n != null &&
+                    key !== "season_hits" &&
+                    key !== "combined_pg"
+                      ? n >= 65
+                        ? "positive"
+                        : n < 45
+                          ? "fp-lower"
+                          : ""
+                      : "";
                   return (
                     <td
                       key={key}
-                      className={
-                        n != null &&
-                        key !== "season_hits" &&
-                        key !== "combined_pg"
-                          ? n >= 65
-                            ? "positive"
-                            : n < 45
-                              ? "fp-lower"
-                              : ""
-                          : ""
-                      }
+                      className={[extra ? "fp-col-extra" : "", tone].filter(Boolean).join(" ") || undefined}
                       title={
                         key === "last5" || key === "last10"
                           ? `${r.windows[key].hits ?? "--"}/${r.windows[key].games} games`
@@ -773,6 +859,123 @@ function Rankings({ data, window }: { data: Data; window: Window }) {
           </tbody>
         </table>
       </div>
+    </section>
+  );
+}
+function GoalieRankings({ data, window }: { data: Data; window: Window }) {
+  const [sort, setSort] = useState<{ key: GoalieRate; desc: boolean }>({
+    key: "ga_pg",
+    desc: false,
+  });
+  const columns: {
+    key: GoalieRate;
+    label: string;
+    extra?: boolean;
+    lower: boolean;
+    digits?: number;
+    percent?: boolean;
+  }[] = [
+    { key: "ga_pg", label: "GA/GP", lower: true },
+    { key: "sv", label: "SV%", lower: false, digits: 3 },
+    { key: "allow_pct", label: "Allow 1+%", extra: true, lower: true, percent: true },
+  ];
+  const rows = [...(data.goalie_rankings ?? [])].sort((a, b) => {
+    const av = a.windows[window][sort.key],
+      bv = b.windows[window][sort.key];
+    if (av == null || bv == null) return av == null ? (bv == null ? 0 : 1) : -1;
+    return (sort.desc ? bv - av : av - bv) || a.name.localeCompare(b.name) || a.id - b.id;
+  });
+  return (
+    <section className="fp-rankings fp-goalie-rankings">
+      <div className="section-heading">
+        <h2>League goalie rankings</h2>
+        <span className="eyebrow">1+ GP</span>
+      </div>
+      {rows.length ? (
+        <div className="table-scroll">
+          <table className="fp-form">
+            <thead>
+              <tr>
+                <th title="Goals-against rank for this window among goalies with 1+ GP. Ties share a rank.">
+                  Rank
+                </th>
+                <th>Goalie</th>
+                <th>GP</th>
+                {columns.map((column) => (
+                  <th
+                    key={column.key}
+                    className={column.extra ? "fp-col-extra" : undefined}
+                    aria-sort={
+                      sort.key === column.key
+                        ? sort.desc
+                          ? "descending"
+                          : "ascending"
+                        : "none"
+                    }
+                  >
+                    <button
+                      className="fp-sort"
+                      onClick={() =>
+                        setSort({
+                          key: column.key,
+                          desc: sort.key === column.key ? !sort.desc : !column.lower,
+                        })
+                      }
+                    >
+                      {column.label}
+                      {sort.key === column.key &&
+                        (sort.desc ? <ArrowDown size={11} /> : <ArrowUp size={11} />)}
+                    </button>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((goalie) => (
+                <tr key={goalie.id} className={goalie.playing ? "fp-playing" : ""}>
+                  <td>{goalie.rank?.[window]?.ga_pg.rank ?? "—"}</td>
+                  <td>
+                    <span className="player-matchup" title={goalie.abbrev ? `${goalie.name}, ${goalie.abbrev}` : goalie.name}>
+                      {goalie.abbrev && (
+                        <img
+                          className="logo"
+                          src={`https://assets.nhle.com/logos/nhl/svg/${goalie.abbrev}_light.svg`}
+                          alt=""
+                        />
+                      )}
+                      {lastName(goalie.name)}
+                    </span>
+                  </td>
+                  <td className={(goalie.windows[window].games ?? 0) < 5 ? "warning" : ""}>
+                    {goalie.windows[window].games}
+                  </td>
+                  {columns.map((column) => {
+                    const metric = goalie.rank?.[window]?.[column.key];
+                    const n = goalie.windows[window][column.key];
+                    return (
+                      <td
+                        key={column.key}
+                        className={[column.extra ? "fp-col-extra" : "", leagueRankClass(metric?.rank, metric?.eligible)]
+                          .filter(Boolean)
+                          .join(" ") || undefined}
+                        title={
+                          metric?.rank != null
+                            ? `League rank ${metric.rank} of ${metric.eligible} goalies with 1+ GP. ${goalieRateHelp(column.key)} Ties share a rank.`
+                            : `Unranked among goalies with 1+ GP. ${goalieRateHelp(column.key)}`
+                        }
+                      >
+                        {column.percent ? pct(n) : f(n, column.digits ?? 2)}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="empty-inline">No goalies with a verified first-period appearance.</p>
+      )}
     </section>
   );
 }
@@ -1050,7 +1253,10 @@ function PeriodContent({
                     <h2>No games scheduled</h2>
                   </div>
                 )}
-                <Rankings data={data} window={window} />
+                <div className="fp-rankings-grid">
+                  <Rankings data={data} window={window} />
+                  <GoalieRankings data={data} window={window} />
+                </div>
               </>
             )}
           </>
