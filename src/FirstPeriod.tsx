@@ -1069,7 +1069,7 @@ function PeriodContent({
       )}
       <header className="page-heading">
         <div>
-          <div className="eyebrow">{id ? "MATCHUP" : "DAILY SLATE"}</div>
+          {id && <div className="eyebrow">MATCHUP</div>}
           <h1>
             {id && match
               ? `${match.game.away.abbrev} at ${match.game.home.abbrev}`
@@ -1121,11 +1121,6 @@ function PeriodContent({
       ) : (
         data && (
           <>
-            <div className="data-context">
-              <span>
-                {data.season_label} regular season
-              </span>
-            </div>
             {(data.build.status === "building" || data.build.error) && (
               <div className="fp-coverage">
                 {data.build.status === "building" ? (
