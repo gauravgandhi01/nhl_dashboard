@@ -19,6 +19,7 @@ type RecentGame = {
   game_id: number;
   date: string;
   opponent: string | null;
+  opponent_logo?: string | null;
   home: boolean | null;
   goals: number | null;
   assists: number | null;
@@ -69,6 +70,10 @@ const clock = (n: number | null | undefined) =>
   n == null
     ? "--"
     : `${Math.floor(Math.round(n) / 60)}:${String(Math.round(n) % 60).padStart(2, "0")}`;
+const shortDate = (date: string) => {
+  const [, month, day] = date.split("-");
+  return month && day ? `${month}/${day}` : date;
+};
 const columns = [
   {
     key: "games",
@@ -590,8 +595,15 @@ function PlayerRows({
                     <tbody>
                       {p.recent_games.map(game => (
                         <tr key={game.game_id}>
-                          <td><time dateTime={game.date}>{game.date}</time></td>
-                          <td>{game.opponent ? `${game.home === true ? "vs " : game.home === false ? "@ " : ""}${game.opponent}` : "--"}</td>
+                          <td><time dateTime={game.date}>{shortDate(game.date)}</time></td>
+                          <td>
+                            {game.opponent ? (
+                              <span className="player-game-opponent" title={`${game.home === true ? "vs " : game.home === false ? "@ " : ""}${game.opponent}`}>
+                                <span>{game.home === true ? "vs" : game.home === false ? "@" : ""}</span>
+                                {game.opponent_logo ? <img className="logo" src={game.opponent_logo} alt={game.opponent} /> : <span>{game.opponent}</span>}
+                              </span>
+                            ) : "--"}
+                          </td>
                           <td>{numeric(game.goals, 0)}</td>
                           <td>{numeric(game.assists, 0)}</td>
                           <td>{numeric(game.points, 0)}</td>

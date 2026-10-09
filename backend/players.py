@@ -14,7 +14,7 @@ from .stats import number, season_for_date, season_label
 
 logger = logging.getLogger(__name__)
 PLAYERS_TTL = 3600
-SNAPSHOT_VERSION = 5
+SNAPSHOT_VERSION = 6
 ERROR_TTL = 600
 
 
@@ -90,6 +90,7 @@ def recent_games(logs, advanced, cutoff, season=None):
     return [{
         'game_id': game['gameId'], 'date': game['gameDate'],
         'opponent': game.get('opponentAbbrev') or None,
+        'opponent_logo': team_logo(game.get('opponentAbbrev')) if game.get('opponentAbbrev') else None,
         'home': True if game.get('homeRoad') == 'H' else False if game.get('homeRoad') == 'R' else None,
         **{key: number(game.get(key)) for key in ('goals', 'assists', 'points', 'shots')},
         'toi': seconds(game.get('toi')),

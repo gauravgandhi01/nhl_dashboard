@@ -1920,6 +1920,8 @@ tr:hover td {
   padding: 8px 10px;
   white-space: nowrap;
 }
+.player-game-opponent { display: inline-flex; align-items: center; gap: 4px; }
+.player-game-opponent .logo { width: 16px; height: 16px; object-fit: contain; }
 .player-expanded .player-game-log th {
   position: sticky;
   top: 0;
