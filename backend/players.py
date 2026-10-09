@@ -14,7 +14,7 @@ from .stats import number, season_for_date, season_label
 
 logger = logging.getLogger(__name__)
 PLAYERS_TTL = 3600
-SNAPSHOT_VERSION = 4
+SNAPSHOT_VERSION = 5
 ERROR_TTL = 600
 
 
@@ -70,6 +70,32 @@ def appearance_log(logs, cutoff, season=None):
     if games is None:
         return None
     return appearance_series(games)
+
+
+def recent_games(logs, advanced, cutoff, season=None):
+    """Last five NHL appearances enriched with this player's MoneyPuck rows."""
+    games = skater_appearances(logs, cutoff, season)
+    if games is None:
+        return None
+    matched = defaultdict(list)
+    for row in advanced or []:
+        if row.get('situation') in ('all', '5on5'):
+            matched[(str(row['gameId']), row['situation'])].append(row)
+
+    def metric(game_id, situation, field):
+        rows = matched[(str(game_id), situation)]
+        value = number(rows[0].get(field)) if len(rows) == 1 else None
+        return value if value is not None and value >= 0 else None
+
+    return [{
+        'game_id': game['gameId'], 'date': game['gameDate'],
+        'opponent': game.get('opponentAbbrev') or None,
+        'home': True if game.get('homeRoad') == 'H' else False if game.get('homeRoad') == 'R' else None,
+        **{key: number(game.get(key)) for key in ('goals', 'assists', 'points', 'shots')},
+        'toi': seconds(game.get('toi')),
+        'toi_5v5': metric(game['gameId'], '5on5', 'icetime'),
+        'shot_attempts': metric(game['gameId'], 'all', 'I_F_shotAttempts'),
+    } for game in games[:5]]
 
 
 def player_windows(logs, advanced, cutoff, season=None):
@@ -154,11 +180,12 @@ async def players_dashboard(p, date):
             if feed.data is not None and not isinstance(feed.data.get('gameLog'), list):
                 logs[pid] = Feed(None, feed.source, feed.url, feed.retrieved_at, feed.stale, 'Game log unavailable')
         sources.extend(logs.values())
-        summaries, series = {}, {}
+        summaries, series, recent = {}, {}, {}
         for pid, feed in logs.items():
             rows = feed.data['gameLog'] if feed.data is not None else None
             summaries[pid] = player_windows(rows, by_id[pid] if advanced.data is not None else None, cutoff, season)
             series[pid] = appearance_log(rows, cutoff, season)
+            recent[pid] = recent_games(rows, by_id[pid] if advanced.data is not None else None, cutoff, season)
         for game in games:
             if int(game['season']) != season:
                 continue
@@ -175,6 +202,7 @@ async def players_dashboard(p, date):
                             'opponent_logo': game[opponent + 'Team'].get('darkLogo') or game[opponent + 'Team'].get('logo'),
                             'season_label': season_label(stats_season), 'windows': summaries[r['id']],
                             'log': series[r['id']],
+                            'recent_games': recent[r['id']],
                             'stats_source': logs[r['id']].meta(), 'advanced_source': advanced.meta(),
                             'roster_source': roster.meta(),
                         })
@@ -378,6 +406,7 @@ class LeaguePlayers:
             windows = player_windows(
                 log_rows, by_id[player['id']] if advanced.data is not None else None, cutoff, season)
             series = appearance_log(log_rows, cutoff, season)
+            recent = recent_games(log_rows, by_id[player['id']] if advanced.data is not None else None, cutoff, season)
             slots = by_team.get(abbrev) or [None]
             for slot in slots:
                 rows.append({
@@ -390,6 +419,7 @@ class LeaguePlayers:
                     'home': slot['home'] if slot else None,
                     'opponent_logo': slot['opponent_logo'] if slot else None,
                     'season_label': season_label(season), 'windows': windows, 'log': series,
+                    'recent_games': recent,
                     'stats_source': (feed or inventory).meta(),
                     'advanced_source': advanced.meta(), 'roster_source': roster.meta(),
                 })

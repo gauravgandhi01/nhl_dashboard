@@ -15,6 +15,19 @@ import type { AppearanceLog } from "./lineCounts";
 import { todayEt } from "./dates";
 
 type Window = "last5" | "last10" | "season";
+type RecentGame = {
+  game_id: number;
+  date: string;
+  opponent: string | null;
+  home: boolean | null;
+  goals: number | null;
+  assists: number | null;
+  points: number | null;
+  toi: number | null;
+  toi_5v5: number | null;
+  shots: number | null;
+  shot_attempts: number | null;
+};
 type Skater = {
   id: number;
   name: string;
@@ -28,6 +41,7 @@ type Skater = {
   season_label: string;
   windows: Record<Window, Stats>;
   log?: AppearanceLog | null;
+  recent_games?: RecentGame[] | null;
   stats_source: Source;
   advanced_source: Source;
   roster_source: Source;
@@ -557,71 +571,40 @@ function PlayerRows({
       {expanded && (
         <tr className="player-expanded">
           <td colSpan={columns.length + 2}>
-            <div>
-              <table aria-label={`${p.name} form comparison`}>
-                <thead>
-                  <tr>
-                    <th>Window</th>
-                    {[
-                      "GP",
-                      "G",
-                      "A",
-                      "P",
-                      "P/G",
-                      "SOG/G",
-                      "TOI/G",
-                      "iCF/G",
-                      "iCF/60",
-                      "P/60",
-                      "ixG/60",
-                    ].map((l) => (
-                      <th key={l}>{l}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {(["last5", "last10", "season"] as const).map((w) => (
-                    <tr key={w}>
-                      <td>
-                        {w === "last5"
-                          ? "Last 5"
-                          : w === "last10"
-                            ? "Last 10"
-                            : "Season"}
-                      </td>
-                      {[
-                        "games",
-                        "goals",
-                        "assists",
-                        "points",
-                        "points_pg",
-                        "shots_pg",
-                        "toi_pg",
-                        "attempts_pg",
-                        "attempts60",
-                        "points60",
-                        "ixg60",
-                      ].map((k) => (
-                        <td key={k} className={cellFormat(p, w, k, peers, peerLabel).className} title={cellFormat(p, w, k, peers, peerLabel).title || undefined}>
-                          {format(
-                            k,
-                            p.windows[w][k],
-                            [
-                              "games",
-                              "goals",
-                              "assists",
-                              "points",
-                              "advanced_games",
-                            ].includes(k)
-                              ? 0
-                              : 2,
-                          )}
-                        </td>
+            <div className="player-details">
+              <div className="player-game-log-heading">Last 5 games</div>
+              {p.recent_games == null ? (
+                <p className="muted">Game log unavailable</p>
+              ) : p.recent_games.length === 0 ? (
+                <p className="muted">No appearances before this date.</p>
+              ) : (
+                <div className="player-game-log-scroll" role="region" aria-label={`${p.name} last five games`} tabIndex={0}>
+                  <table className="player-game-log" aria-label={`${p.name} game log`}>
+                    <thead>
+                      <tr>
+                        {["Date", "Opponent", "G", "A", "P", "TOI", "5v5 TOI", "Shots", "Shot Attempts"].map(label => (
+                          <th key={label} scope="col">{label}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {p.recent_games.map(game => (
+                        <tr key={game.game_id}>
+                          <td><time dateTime={game.date}>{game.date}</time></td>
+                          <td>{game.opponent ? `${game.home === true ? "vs " : game.home === false ? "@ " : ""}${game.opponent}` : "--"}</td>
+                          <td>{numeric(game.goals, 0)}</td>
+                          <td>{numeric(game.assists, 0)}</td>
+                          <td>{numeric(game.points, 0)}</td>
+                          <td>{clock(game.toi)}</td>
+                          <td>{clock(game.toi_5v5)}</td>
+                          <td>{numeric(game.shots, 0)}</td>
+                          <td>{numeric(game.shot_attempts, 0)}</td>
+                        </tr>
                       ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                    </tbody>
+                  </table>
+                </div>
+              )}
               {p.game_id != null && (
                 <PlayerPropPanel state={props} gameId={p.game_id} playerId={p.id} log={p.log} />
               )}

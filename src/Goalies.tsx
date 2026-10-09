@@ -43,6 +43,8 @@ const columns: { key: string; label: string; help: string; digits: number; lower
 const pageCache = new Map<string, Data>();
 const today = todayEt;
 const numeric = (n: number | null | undefined, digits = 2) => n == null ? "--" : n.toFixed(digits);
+const goalieStatusIcon = (status: string | null | undefined) =>
+  status === "Confirmed" ? "✅" : status === "Likely" ? "⚠️" : "⛔️";
 
 export function Goalies() {
   const [params, setParams] = useSearchParams();
@@ -203,10 +205,16 @@ export function Goalies() {
                               <ChevronRight size={12} className={open ? "expanded" : ""} />
                               {g.logo && <img className="logo player-team-logo" src={g.logo} alt="" />}
                               <span>{g.name} <span className="goalie-record">{record(stats)}</span></span>
+                              {g.starter_status && (
+                                <span
+                                  className="goalie-status-icon"
+                                  title={`Reported starter status: ${g.starter_status}`}
+                                  aria-hidden="true"
+                                >
+                                  {goalieStatusIcon(g.starter_status)}
+                                </span>
+                              )}
                             </button>
-                            {g.starter_status && (
-                              <span className={`confirmation ${g.starter_status.toLowerCase()}`}>{g.starter_status}</span>
-                            )}
                             {delayed.length > 0 && (
                               <span className="player-delay warning" title={delayed.map((s) => `${s.source}: ${s.status}`).join("; ")}>
                                 {delayed.some((s) => s.status === "stale") ? "Stale data" : "Partial data"}

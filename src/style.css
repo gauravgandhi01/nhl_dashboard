@@ -1887,6 +1887,44 @@ tr:hover td {
 .player-expanded table th {
   position: static;
 }
+.player-game-log-heading {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.player-expanded > td > .player-details {
+  width: min(900px, calc(100vw - 72px));
+}
+.player-game-log-scroll {
+  max-height: 145px;
+  overflow: auto;
+  scrollbar-width: thin;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.player-game-log-scroll:focus-visible {
+  outline: 2px solid var(--muted);
+  outline-offset: 2px;
+}
+.player-game-log {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+.player-game-log th,
+.player-game-log td {
+  height: 35px;
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+.player-expanded .player-game-log th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #202226;
+}
 .streak-section {
   margin: 22px 0;
 }

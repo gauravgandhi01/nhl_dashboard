@@ -38,7 +38,7 @@ test("players windows, filters, sorting, expansion and navigation on desktop and
     await expect(page.locator(".player-expanded")).toBeVisible();
     await expect(page.locator(".player-expanded strong")).toHaveCount(0);
     await expect(page.locator(".player-expanded")).toContainText("Last 5");
-    await expect(page.locator(".player-expanded")).toContainText("Last 10");
+    await expect(page.locator(".player-expanded")).not.toContainText("Window");
     await page.getByLabel("Player position", { exact: true }).selectOption("D");
     await expect(page.locator(".player-name").first()).toBeVisible();
     await expect(

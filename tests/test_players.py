@@ -6,7 +6,7 @@ from unittest.mock import Mock
 import pytest
 
 from backend.cache import Feed, Store
-from backend.players import LeaguePlayers, appearance_log, ensure_player_table, player_windows, players_dashboard
+from backend.players import LeaguePlayers, appearance_log, ensure_player_table, player_windows, players_dashboard, recent_games
 from backend.providers import parse_mp_skaters
 
 
@@ -23,6 +23,49 @@ def advanced(rows):
 
 
 EMPTY_LOG = {'goals': [], 'assists': [], 'points': [], 'shots': [], 'opponents': [], 'home': []}
+
+
+def test_recent_games_order_limit_and_appearance_cutoff():
+    rows = logs(12)
+    rows += [dict(rows[0]), {**rows[-1], 'gameId': 2025030001},
+             {**rows[-1], 'gameId': 2024020001},
+             {**rows[-1], 'gameId': 2025020099, 'gameDate': '2025-11-11', 'toi': '0:00'}]
+    result = recent_games(rows, None, '2025-11-12', 20252026)
+    assert [g['game_id'] for g in result] == [2025020011, 2025020010, 2025020009, 2025020008, 2025020007]
+    assert [g['date'] for g in result] == [f'2025-11-{i:02}' for i in range(11, 6, -1)]
+    assert result[0]['toi'] == 600
+    assert result[0]['shot_attempts'] is None
+    assert result[0]['toi_5v5'] is None
+    assert len(recent_games(logs(2), [], '2025-11-12')) == 2
+    assert recent_games([], [], '2025-11-12') == []
+    assert recent_games(None, [], '2025-11-12') is None
+
+
+def test_recent_games_strength_matching_missing_and_zero_values():
+    rows = logs(3)
+    rows[2].update(goals=0, assists=0, points=0, shots=0, toi='12:34', opponentAbbrev='BOS', homeRoad='R')
+    rows[1].update(shots=None, opponentAbbrev='MTL', homeRoad='H')
+    mp = [
+        {'gameId': str(rows[2]['gameId']), 'situation': 'all', 'icetime': 754, 'I_F_shotAttempts': 0},
+        {'gameId': rows[2]['gameId'], 'situation': '5on5', 'icetime': 0, 'I_F_shotAttempts': 9},
+        {'gameId': rows[1]['gameId'], 'situation': '5on5', 'icetime': 501},
+        {'gameId': rows[0]['gameId'], 'situation': 'all', 'I_F_shotAttempts': 7},
+        {'gameId': 2025020099, 'situation': 'all', 'I_F_shotAttempts': 100},
+    ]
+    result = recent_games(rows, mp, '2025-11-12')
+    assert result[0] == {'game_id': 2025020003, 'date': '2025-11-03', 'opponent': 'BOS', 'home': False,
+                         'goals': 0, 'assists': 0, 'points': 0, 'shots': 0, 'toi': 754,
+                         'toi_5v5': 0, 'shot_attempts': 0}
+    assert result[1]['home'] is True
+    assert result[1]['shots'] is None
+    assert result[1]['toi_5v5'] == 501
+    assert result[1]['shot_attempts'] is None
+    assert result[2]['shot_attempts'] == 7
+    assert result[2]['opponent'] is None and result[2]['home'] is None
+    duplicate = recent_games(rows, mp + mp[:2], '2025-11-12')
+    assert len(duplicate) == 3
+    assert duplicate[0]['toi_5v5'] is None and duplicate[0]['shot_attempts'] is None
+    assert duplicate[1] == result[1]
 
 
 def test_appearance_log_matches_windows_and_keeps_missing_values():
@@ -151,6 +194,7 @@ def test_service_current_season_ids_and_isolated_provider_failure():
     assert result['players'][0]['opponent_logo'] is None
     assert result['players'][0]['advanced_source']['status'] == 'unavailable'
     assert result['players'][0]['log'] == EMPTY_LOG
+    assert result['players'][0]['recent_games'] == []
 
 
 @pytest.mark.parametrize('flag', ['no_games', 'postponed', 'unavailable'])
@@ -263,6 +307,34 @@ class LeagueFake:
         return Feed(None, 'MoneyPuck', 'mp')
 
 
+@pytest.mark.parametrize('scope', ['tonight', 'league'])
+def test_recent_games_api_matches_player_and_game(tmp_path, scope):
+    class GameLogFake(LeagueFake):
+        async def mp(self, kind, season, entities=None):
+            return Feed([
+                {'playerId': pid, 'gameId': '2026020005', 'situation': situation,
+                 'icetime': ice, 'I_F_shotAttempts': attempts}
+                for pid, ice, attempts in [(1, 480, 4), (3, 900, 10)]
+                for situation in ['all', '5on5']
+            ], 'MoneyPuck', 'mp')
+
+    async def scenario():
+        store = Store(tmp_path / f'{scope}.sqlite3')
+        fake = GameLogFake(store)
+        directory = LeaguePlayers(fake)
+        body = await (players_dashboard(fake, '2026-09-26') if scope == 'tonight'
+                      else directory.build('2026-09-26'))
+        player = next(p for p in body['players'] if p['id'] == 1)
+        assert player['recent_games'][0]['toi_5v5'] == 480
+        assert player['recent_games'][0]['shot_attempts'] == 4
+        assert player['recent_games'][1]['toi_5v5'] is None
+        assert len(player['log']['points']) == 5
+        await directory.close()
+        await store.close()
+
+    asyncio.run(scenario())
+
+
 def test_league_includes_idle_skaters_and_skips_goalies_and_idle_logs(tmp_path):
     from backend.cache import Store
 
@@ -279,8 +351,11 @@ def test_league_includes_idle_skaters_and_skips_goalies_and_idle_logs(tmp_path):
         zero = next(player for player in body['players'] if player['id'] == 9)
         assert slate['game_id'] == 2026010001 and slate['opponent'] == 'NYI' and slate['home'] is False
         assert slate['windows']['season']['games'] == 5
+        assert len(slate['recent_games']) == 5
+        assert slate['recent_games'][0]['game_id'] == 2026020005
         assert idle['game_id'] is None and idle['team'] == 'BOS'
         assert zero['windows']['season']['games'] == 0
+        assert zero['recent_games'] == []
         assert fake.log_ids == [1]
         assert body['schedule_available'] is True
         await directory.close()

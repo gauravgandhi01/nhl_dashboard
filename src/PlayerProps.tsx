@@ -57,15 +57,15 @@ export function oddsTone(price: number) {
   return "odds-long";
 }
 const shortBook: Record<string, string> = {
-  ballybet: "BAL",
-  betonlineag: "BOL",
+  ballybet: "BA",
+  betonlineag: "BO",
   draftkings: "DK",
-  fanatics: "FAN",
+  fanatics: "FN",
   fanduel: "FD",
-  kalshi: "KAL",
+  kalshi: "KL",
   novig: "NV",
   prophetx: "PX",
-  williamhill_us: "CZR",
+  williamhill_us: "CZ",
 };
 const stamp = (s: string | null) =>
   s
