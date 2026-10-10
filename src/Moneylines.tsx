@@ -1,3 +1,4 @@
+import { formatTimestamp } from "./dates";
 import { useEffect, useRef, useState } from "react";
 import { RefreshButton } from "./RefreshButton";
 import type { Game } from "./types";
@@ -32,17 +33,7 @@ type Odds = {
   totals_loaded?: boolean;
   usage?: { remaining: string | null } | null;
 };
-const stamp = (s: string | null) =>
-  s
-    ? new Date(s).toLocaleString("en-US", {
-        timeZone: "America/New_York",
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      }) + " ET"
-    : "Unknown";
+const stamp = (value: string | null) => formatTimestamp(value, "Unknown");
 const american = (n: number) => (n > 0 ? `+${n}` : String(n));
 const oddsNotConfigured =
   "Odds not configured: add api_keys to the workspace keys.json file.";

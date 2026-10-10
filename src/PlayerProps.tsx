@@ -1,3 +1,4 @@
+import { formatTimestamp } from "./dates";
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { RefreshButton } from "./RefreshButton";
@@ -67,16 +68,7 @@ const shortBook: Record<string, string> = {
   prophetx: "PX",
   williamhill_us: "CZ",
 };
-const stamp = (s: string | null) =>
-  s
-    ? new Date(s).toLocaleString("en-US", {
-        timeZone: "America/New_York",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      }) + " ET"
-    : "time unavailable";
+const stamp = (value: string | null) => formatTimestamp(value, "time unavailable");
 const old = (q: Quote) =>
   !q.updated_at ||
   !Number.isFinite(Date.parse(q.updated_at)) ||

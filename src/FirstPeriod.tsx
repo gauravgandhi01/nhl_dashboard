@@ -9,7 +9,7 @@ import {
   ArrowUp,
 } from "lucide-react";
 import type { Game, Source, Stats, Starter, Team } from "./types";
-import { todayEt } from "./dates";
+import { todayEt, formatDate, formatTimestamp } from "./dates";
 
 type Window = "season" | "last5" | "last10";
 type Windows = Record<Window, Stats>;
@@ -111,16 +111,7 @@ const oddsMessage = (odds: Odds | null, error: string | null) => {
   if (odds.status === "stale") return "Odds cached";
   return null;
 };
-const timestamp = (s: string | null) =>
-  s
-    ? new Date(s).toLocaleString("en-US", {
-        timeZone: "America/New_York",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      }) + " ET"
-    : "Unavailable";
+const timestamp = (value: string | null) => formatTimestamp(value, "Unavailable");
 const selected = (s: Side) => s.goalies.find((g) => g.id === s.selected_goalie);
 const GOALIE_RATE_KEYS = ["ga_pg", "sv", "allow_pct"] as const;
 type GoalieRate = (typeof GOALIE_RATE_KEYS)[number];
@@ -1198,7 +1189,7 @@ function PeriodContent({
                         <tbody>
                           {match.h2h.recent.map((g) => (
                             <tr key={g.gameId}>
-                              <td>{g.date}</td>
+                              <td>{formatDate(g.date)}</td>
                               <td>{g.away.abbrev}</td>
                               <td>{g.home.abbrev}</td>
                               <td>

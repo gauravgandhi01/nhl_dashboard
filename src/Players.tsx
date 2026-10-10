@@ -12,7 +12,7 @@ import type { Source, Stats } from "./types";
 import { buildPeers, cellFormat, type Peers } from "./playerFormatting";
 import { usePlayerProps, PropsControls, PropsRefreshButton, PlayerPropPanel, type PropsState } from "./PlayerProps";
 import type { AppearanceLog } from "./lineCounts";
-import { todayEt } from "./dates";
+import { todayEt, formatDate } from "./dates";
 
 type Window = "last5" | "last10" | "season";
 type RecentGame = {
@@ -70,10 +70,6 @@ const clock = (n: number | null | undefined) =>
   n == null
     ? "--"
     : `${Math.floor(Math.round(n) / 60)}:${String(Math.round(n) % 60).padStart(2, "0")}`;
-const shortDate = (date: string) => {
-  const [, month, day] = date.split("-");
-  return month && day ? `${month}/${day}` : date;
-};
 const columns = [
   {
     key: "games",
@@ -595,7 +591,7 @@ function PlayerRows({
                     <tbody>
                       {p.recent_games.map(game => (
                         <tr key={game.game_id}>
-                          <td><time dateTime={game.date}>{shortDate(game.date)}</time></td>
+                          <td><time dateTime={game.date}>{formatDate(game.date)}</time></td>
                           <td>
                             {game.opponent ? (
                               <span className="player-game-opponent" title={`${game.home === true ? "vs " : game.home === false ? "@ " : ""}${game.opponent}`}>

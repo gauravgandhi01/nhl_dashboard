@@ -41,7 +41,7 @@ import { Streaks } from "./Streaks";
 import { StanleyCup } from "./StanleyCup";
 import { usePlayerProps, PropsControls, PropsRefreshButton, CompactProps, type PropsState } from "./PlayerProps";
 import { useMoneylines, MoneylineControls, TeamMoneyline, GameTotal } from "./Moneylines";
-import { et, todayEt } from "./dates";
+import { et, todayEt, formatDate, formatTimestamp } from "./dates";
 
 const today = todayEt;
 const time = (value: string) =>
@@ -50,22 +50,7 @@ const time = (value: string) =>
     hour: "numeric",
     minute: "2-digit",
   });
-const dateTitle = (date: string) =>
-  new Date(date + "T12:00:00").toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-const stamp = (value: string | null) =>
-  value
-    ? new Date(value).toLocaleString("en-US", {
-        timeZone: et,
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      }) + " ET"
-    : "Not available";
+const stamp = (value: string | null) => formatTimestamp(value, "Not available");
 const shift = (date: string, days: number) => {
   const d = new Date(date + "T12:00:00Z");
   d.setUTCDate(d.getUTCDate() + days);
@@ -199,11 +184,13 @@ function TopbarDateControls() {
       </IconButton>
       <label className="date-input compact-date-input">
         <CalendarDays size={13} />
+        <span className="date-display" aria-hidden="true">{formatDate(date)}</span>
         <input
           type="date"
           aria-label="Game date"
           min={today()}
           value={date}
+          onClick={(event) => event.currentTarget.showPicker?.()}
           onChange={(e) => changeDate(e.target.value)}
         />
       </label>
@@ -350,7 +337,7 @@ function CardForm({ side, placement }: { side?: CardSide; placement: "away" | "h
         games.map((g, index) => {
           const age = placement === "away" ? games.length - 1 - index : index;
           const recent = age === 0;
-          const date = g.date.slice(5).replace("-", "/");
+          const date = formatDate(g.date);
           const score = g.goals_for != null && g.goals_against != null
             ? `Final: ${g.goals_for}–${g.goals_against}` : "Final score unavailable";
           return (
@@ -686,7 +673,7 @@ function Slate() {
         >
           {data?.next_date && (
             <button className="text-button" onClick={() => openDate(data.next_date!)}>
-              Next games, {dateTitle(data.next_date)}
+              Next games, {formatDate(data.next_date)}
             </button>
           )}
         </StateMessage>
@@ -956,7 +943,7 @@ function RecentGames({ side }: { side: Side }) {
               <span
                 key={g.gameId}
                 className={g.result === "W" ? "win" : "loss"}
-                title={`${g.gameDate} vs ${g.opponentTeamAbbrev}`}
+                title={`${formatDate(g.gameDate)} vs ${g.opponentTeamAbbrev}`}
               >
                 {g.result === "OTL" ? "OT" : g.result}
               </span>
@@ -977,10 +964,7 @@ function RecentGames({ side }: { side: Side }) {
             {side.recent.map((g) => (
               <tr key={g.gameId}>
                 <td>
-                  {new Date(g.gameDate + "T12:00:00").toLocaleDateString(
-                    "en-US",
-                    { month: "short", day: "numeric" },
-                  )}
+                  {formatDate(g.gameDate)}
                 </td>
                 <td>
                   <span className="muted">
@@ -1401,7 +1385,7 @@ function Matchup() {
       ) : (
         <>
           <div className="matchup-meta">
-            <span>{dateTitle(data.game.date)}</span>
+            <span>{formatDate(data.game.date)}</span>
             <span className="divider">/</span>
             <GameStatus game={data.game} />
             <span className="divider">/</span>

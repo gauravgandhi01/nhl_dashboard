@@ -1,3 +1,4 @@
+import { formatTimestamp } from "./dates";
 import React, { useEffect, useState } from "react";
 import type { Source } from "./types";
 
@@ -31,21 +32,11 @@ type CupData = {
   sources: Source[];
 };
 
-const et = "America/New_York";
 const record = (team: CupTeam) =>
   team.wins == null ? "--" : `${team.wins}-${team.losses}-${team.ot_losses}`;
 const num = (value: number | null, digits = 1, suffix = "") =>
   value == null ? "--" : `${value.toFixed(digits)}${suffix}`;
-const stamp = (value: string | null) =>
-  value
-    ? new Date(value).toLocaleString("en-US", {
-        timeZone: et,
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      }) + " ET"
-    : "Not loaded";
+const stamp = (value: string | null) => formatTimestamp(value, "Not loaded");
 
 type SortKey =
   | "name"

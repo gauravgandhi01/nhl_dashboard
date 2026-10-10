@@ -43,12 +43,12 @@ for (const width of [1440, 375]) {
       ]);
       await expect(table.locator("tbody tr")).toHaveCount(5);
       await expect(table.locator("tbody tr").first().locator("td")).toHaveText([
-        "2026-10-05", "@ BOS", "0", "1", "1", "12:34", "8:21", "0", "0",
+        "10/05", /@\s*BOS/, "0", "1", "1", "12:34", "8:21", "0", "0",
       ]);
       await expect(table.locator("tbody tr").nth(1).locator("td")).toHaveText([
-        "2026-10-04", "vs MTL", "0", "1", "1", "12:34", "--", "0", "--",
+        "10/04", /vs\s*MTL/, "0", "1", "1", "12:34", "--", "0", "--",
       ]);
-      await expect(table.locator("tbody tr").last()).toContainText("2026-10-01");
+      await expect(table.locator("tbody tr").last()).toContainText("10/01");
       await expect(page.locator(".player-expanded")).not.toContainText("Window");
       await expect(page.getByRole("region", { name: "Player props", exact: true })).toBeVisible();
       expect(await scroll.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);

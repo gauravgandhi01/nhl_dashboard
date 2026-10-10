@@ -13,7 +13,7 @@ import {
 import type { Source } from "./types";
 import { usePlayerProps, PropsControls, PropsRefreshButton, CompactProps, type PropsState } from "./PlayerProps";
 import type { AppearanceLog } from "./lineCounts";
-import { todayEt } from "./dates";
+import { todayEt, formatDate } from "./dates";
 
 type Entry = {
   id: number;
@@ -71,11 +71,6 @@ const formatTOI = (value: number) => {
   const rounded = Math.round(value);
   return `${Math.floor(rounded / 60)}:${String(rounded % 60).padStart(2, "0")}`;
 };
-const shortDate = (date: string) =>
-  new Date(date + "T12:00:00").toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
 
 function useStreaks(url: string) {
   const [data, setData] = useState<Data | null>(null),
@@ -225,7 +220,7 @@ function Leaderboard({
               </div>}
               <div
                 className="streak-value"
-                title={`${p.start_date} through ${p.end_date}; ${p.seasons.join(", ")}${p.lower_bound ? "; earlier history is incomplete" : ""}`}
+                title={`${formatDate(p.start_date)} through ${formatDate(p.end_date)}; ${p.seasons.join(", ")}${p.lower_bound ? "; earlier history is incomplete" : ""}`}
               >
                 <strong>
                   {toi ? formatTOI(p.value) : p.value}
@@ -253,7 +248,7 @@ function Leaderboard({
                     <span
                       key={r.date + i}
                       className={toi ? "streak-toi-time" : good ? "streak-hit" : "streak-miss"}
-                      title={`${r.date} vs ${r.opponent || "--"}: ${r.value ?? "--"}${board.id === "low_ga10" ? " goals allowed" : ""}`}
+                      title={`${formatDate(r.date)} vs ${r.opponent || "--"}: ${r.value ?? "--"}${board.id === "low_ga10" ? " goals allowed" : ""}`}
                     >
                       {r.value ?? "--"}
                     </span>
