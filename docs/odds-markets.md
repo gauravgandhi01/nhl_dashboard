@@ -1,3 +1,35 @@
+# Current refresh policy (October 30, 2026)
+
+Moneylines and game totals refresh every 30 minutes when automatic odds are enabled.
+Player props and first-period odds refresh at 11:00, 15:00, and 18:00 Eastern,
+only for unstarted games. Existing snapshots satisfy a slot after process restarts.
+First goalscorer is retired; player props request nine markets across nine books.
+Other markets, alternates, and bookmaker coverage are unchanged.
+
+Alt+Shift+O opens the hidden admin panel. Set `NHL_ODDS_ADMIN_TOKEN` on the server;
+the token is required for both budget inspection and refresh. It never enters
+frontend assets or browser storage and clears when the panel closes. This path
+works with public manual refresh disabled. Five-minute deduplication, ten-minute
+failure backoff, and the daily budget still apply. The selected date is used.
+
+The shared client checks all configured keys using free `/sports` calls at most
+once per key per day and records quota response headers. Selection considers
+request cost and balance, rotates ties, and tries other eligible keys on rejection.
+Small remaining balances can be combined by splitting markets/bookmaker groups
+into single-credit calls, then merging results. All feeds, including Stanley Cup
+odds, use this client. SQLite stores hashed identifiers, balances, cooldowns,
+and a charged-request ledger; no raw keys or authenticated URLs are persisted.
+
+The default daily cap allocates 90% of the pooled monthly allowance over the
+month and tightens when remaining credits fall behind that pace. The monthly
+allowance comes from used + remaining headers (500/key until known). Daily
+accounting is UTC. `NHL_ODDS_DAILY_BUDGET` overrides this cap. The cap includes
+manual refreshes. Keep SQLite on persistent storage to retain the daily ledger
+across Render instance replacements. Each process has its own async request lock;
+run one backend worker/instance with this SQLite design.
+
+The research below describes earlier probes and may include retired markets.
+
 # NHL Odds: Observed Coverage and Integration
 
 ## Implemented Player Integration
@@ -5,7 +37,7 @@
 The Players expansion, Lines tiles, and On-slate skater Streaks now share cached
 props keyed by NHL game and player IDs. The dedicated book allowlist is
 `ballybet,betonlineag,draftkings,fanatics,fanduel,kalshi,novig,prophetx,williamhill_us`.
-Only explicit load actions request paid odds. See the README's Shared Player Props
+Paid odds refresh through the automatic schedule or explicit authorized load actions. See the README's Shared Player Props
 section for selection rules, matching safeguards, aliases, and endpoints.
 Anytime Yes and goals Over 0.5 are one displayed market (likewise No/Under 0.5),
 including alternate 0.5-goal offers. Best prices compete across both feeds in all
@@ -222,7 +254,8 @@ never labels mixed markets as equivalent. Bookmaker settlement rules still apply
 `GET /api/odds/moneyline?date=YYYY-MM-DD` reads SQLite only.
 `POST /api/odds/moneyline/refresh?date=YYYY-MM-DD` explicitly fetches eligible
 pregame prices for that Eastern date. No live or historical prices are requested.
-The one-hour cache deduplicates non-forced refreshes and preserves last-good data on errors;
+The 30-minute cache deduplicates automatic refreshes and preserves last-good data on errors;
+forced manual refreshes also share a five-minute cooldown;
 failed attempts back off for 10 minutes. First-period and moneyline requests share
 a credential-safe transport, request lock, and quota cooldown.
 

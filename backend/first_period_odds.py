@@ -8,8 +8,9 @@ import httpx
 
 from .providers import TEAM_NAMES
 from .stats import normalized_name, number
-from .odds_client import odds_client, odds_configured
+from .odds_client import OddsError, odds_client, odds_configured
 from .odds_config import configured_bookmakers, market_params, odds_scope
+from .odds_policy import refresh_due
 
 BASE = 'https://api.the-odds-api.com/v4/sports/icehockey_nhl'
 SOURCE = 'https://the-odds-api.com/liveapi/guides/v4/'
@@ -75,13 +76,13 @@ class FirstPeriodOdds:
                           else 'not_configured' if not configured else 'unavailable' if row and row[3] else 'not_loaded',
                 'error': row[3] if row else None}
 
-    async def refresh(self, date, force=False):
+    async def refresh(self, date, force=False, refresh_after=None):
         async with self.lock:
             cached = self.cached(date)
-            if not cached['configured'] or (cached['status'] == 'available' and not force):
+            if not cached['configured']:
                 return cached
-            row = self.p.store.db.execute('SELECT attempted FROM first_period_odds WHERE date=?', (date,)).fetchone()
-            if row and time.time() - row[0] < 600 and not force:
+            row = self.p.store.db.execute('SELECT body,fetched,attempted,error FROM first_period_odds WHERE date=?', (date,)).fetchone()
+            if not refresh_due(row, 6 * 3600, force=force, refresh_after=refresh_after):
                 return cached
             now = time.time()
             try:
@@ -129,9 +130,9 @@ class FirstPeriodOdds:
                             prices[str(gid)] = price
                 self.p.store.db.execute('INSERT OR REPLACE INTO first_period_odds VALUES(?,?,?,?,NULL)',
                                         (date, json.dumps({'prices': prices, 'odds_scope': odds_scope()}), now, now))
-            except (httpx.HTTPError, ValueError, KeyError, TypeError):
+            except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
                 # Never stringify HTTP exceptions: their URLs contain the API key.
-                error = 'Odds quota exhausted' if time.time() < self.exhausted_until else 'Odds unavailable; check configuration or provider availability'
+                error = str(exc) if isinstance(exc, OddsError) else 'Odds quota exhausted' if time.time() < self.exhausted_until else 'Odds unavailable; check configuration or provider availability'
                 self.p.store.db.execute('''INSERT INTO first_period_odds VALUES(?,NULL,0,?,?)
                     ON CONFLICT(date) DO UPDATE SET attempted=excluded.attempted,error=excluded.error''', (date, now, error))
             self.p.store.db.commit()

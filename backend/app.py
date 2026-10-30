@@ -1,11 +1,13 @@
 from contextlib import asynccontextmanager
 from datetime import date as Date
 import asyncio
+import hmac
+import logging
 import os
 from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -18,7 +20,8 @@ from .first_period import FirstPeriod
 from .first_period_odds import FirstPeriodOdds
 from .streaks import Streaks
 from .moneyline import Moneylines
-from .odds_client import odds_configured
+from .odds_client import odds_client, odds_configured
+from .odds_policy import expensive_refresh_after
 from .player_props import PlayerProps
 from .stanley_cup import StanleyCup
 from .runtime_db import database_path
@@ -28,6 +31,7 @@ from .lineup_uploads import router as lineup_upload_router
 ROOT = Path(__file__).resolve().parents[1]
 FALSE_VALUES = {'0', 'false', 'no', 'off', 'disabled'}
 TRUE_VALUES = {'1', 'true', 'yes', 'on', 'enabled'}
+logger = logging.getLogger(__name__)
 
 
 def manual_odds_refresh_enabled():
@@ -47,23 +51,29 @@ def odds_refresh_payload(payload):
     return {**payload, 'manual_refresh_enabled': manual_odds_refresh_enabled()}
 
 
-async def automatic_odds_refresh(app, interval=3600):
+async def automatic_odds_refresh(app, interval=60):
     try:
         while True:
             if odds_configured():
                 current = today_et()
                 try:
-                    await app.state.moneylines.refresh(current, force=True)
+                    await odds_client(app.state.dashboard.p.store).sync_budgets()
                 except Exception:
-                    pass
+                    logger.warning('Odds balance sync failed; using last known balances')
                 try:
-                    await app.state.first_period_odds.refresh(current, force=True)
+                    await app.state.moneylines.refresh(current)
                 except Exception:
-                    pass
-                try:
-                    await app.state.player_props.view(current, refresh=True)
-                except Exception:
-                    pass
+                    logger.warning('Automatic moneyline refresh failed')
+                slot = expensive_refresh_after()
+                if slot is not None:
+                    try:
+                        await app.state.first_period_odds.refresh(current, refresh_after=slot)
+                    except Exception:
+                        logger.warning('Automatic first-period odds refresh failed')
+                    try:
+                        await app.state.player_props.view(current, refresh=True, refresh_after=slot)
+                    except Exception:
+                        logger.warning('Automatic player props refresh failed')
             await asyncio.sleep(interval)
     except asyncio.CancelledError:
         raise
@@ -154,7 +164,7 @@ async def player_props(date: Date | None = None, game_id: int | None = None):
 @app.post('/api/player-props/refresh')
 async def player_props_refresh(date: Date | None = None, game_id: int | None = None):
     require_manual_odds_refresh()
-    return odds_refresh_payload(await app.state.player_props.view(date.isoformat() if date else today_et(), game_id, refresh=True))
+    return odds_refresh_payload(await app.state.player_props.view(date.isoformat() if date else today_et(), game_id, refresh=True, force=True))
 
 
 @app.get('/api/first-period')
@@ -189,6 +199,37 @@ async def stanley_cup():
 async def stanley_cup_refresh():
     require_manual_odds_refresh()
     return await app.state.stanley_cup.view(refresh=True)
+
+
+def require_odds_admin(authorization):
+    token = os.environ.get('NHL_ODDS_ADMIN_TOKEN', '')
+    if not token:
+        raise HTTPException(503, 'Odds admin token is not configured')
+    if not hmac.compare_digest((authorization or '').encode(), ('Bearer ' + token).encode()):
+        raise HTTPException(403, 'Invalid odds admin token')
+
+
+@app.get('/api/admin/odds/budget', include_in_schema=False)
+async def odds_budget(authorization: str | None = Header(default=None)):
+    require_odds_admin(authorization)
+    return await odds_client(app.state.dashboard.p.store).sync_budgets()
+
+
+@app.post('/api/admin/odds/refresh', include_in_schema=False)
+async def admin_odds_refresh(feed: Literal['moneylines', 'props', 'first-period', 'all'] = 'moneylines',
+                             date: Date | None = None, game_id: int | None = None,
+                             authorization: str | None = Header(default=None)):
+    require_odds_admin(authorization)
+    day = date.isoformat() if date else today_et()
+    result = {}
+    if feed in ['moneylines', 'all']:
+        result['moneylines'] = await app.state.moneylines.refresh(day, force=True)
+    if feed in ['first-period', 'all']:
+        result['first-period'] = await app.state.first_period_odds.refresh(day, force=True)
+    if feed in ['props', 'all']:
+        result['props'] = await app.state.player_props.view(day, game_id, refresh=True, force=True)
+    result['budget'] = odds_client(app.state.dashboard.p.store).status()
+    return result
 
 
 @app.get('/api/matchups/{game_id}')

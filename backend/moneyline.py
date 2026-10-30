@@ -8,10 +8,11 @@ from zoneinfo import ZoneInfo
 
 from .first_period_odds import event_game, NAMES, SOURCE
 from .odds_fees import effective_american, net_decimal
-from .odds_client import odds_client, odds_configured
+from .odds_client import OddsError, odds_client, odds_configured
 from .odds_config import market_params, odds_scope
 from .stats import normalized_name, number
 from .game_totals import total_price
+from .odds_policy import MONEYLINE_TTL, refresh_due
 
 
 def moneyline_prices(event, game):
@@ -67,7 +68,7 @@ class Moneylines:
         row = self.p.store.db.execute('SELECT body,fetched,attempted,error FROM moneyline_odds WHERE date=?', (date,)).fetchone()
         configured = odds_configured()
         data = json.loads(row[0]) if row and row[0] else {'prices': {}}
-        fresh = bool(row and row[0] and time.time() - row[1] < 3600)
+        fresh = bool(row and row[0] and time.time() - row[1] < MONEYLINE_TTL)
         return {**data, 'totals': data.get('totals', {}), 'totals_loaded': 'totals' in data,
                 'date': date, 'configured': configured, 'source': SOURCE,
                 'retrieved_at': datetime.fromtimestamp(row[1], timezone.utc).isoformat() if row and row[1] else None,
@@ -78,11 +79,11 @@ class Moneylines:
     async def refresh(self, date, force=False):
         async with self.lock:
             cached = self.cached(date)
-            if not cached['configured'] or (cached['status'] == 'available' and cached['totals_loaded'] and not force):
+            if not cached['configured']:
                 return cached
-            row = self.p.store.db.execute('SELECT attempted FROM moneyline_odds WHERE date=?', (date,)).fetchone()
+            row = self.p.store.db.execute('SELECT body,fetched,attempted,error FROM moneyline_odds WHERE date=?', (date,)).fetchone()
             now = time.time()
-            if row and now - row[0] < 600 and not force:
+            if not refresh_due(row, MONEYLINE_TTL, force=force, now=now):
                 return cached
             try:
                 schedule = await self.p.nhl(f'score/{date}', 600)
@@ -119,8 +120,8 @@ class Moneylines:
                         'odds_scope': scope}
                 self.p.store.db.execute('INSERT OR REPLACE INTO moneyline_odds VALUES(?,?,?,?,NULL)',
                                        (date, json.dumps(body), now, now))
-            except (ValueError, KeyError, TypeError):
-                error = 'Odds quota exhausted' if time.time() < self.client.exhausted_until else 'Moneylines and totals unavailable; check configuration or provider availability'
+            except (ValueError, KeyError, TypeError) as exc:
+                error = str(exc) if isinstance(exc, OddsError) else 'Odds quota exhausted' if time.time() < self.client.exhausted_until else 'Moneylines and totals unavailable; check configuration or provider availability'
                 self.p.store.db.execute('''INSERT INTO moneyline_odds VALUES(?,NULL,0,?,?)
                     ON CONFLICT(date) DO UPDATE SET attempted=excluded.attempted,error=excluded.error''', (date, now, error))
             self.p.store.db.commit()

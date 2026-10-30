@@ -1,4 +1,4 @@
-"""Shared event/player-ID prop cache. Paid requests refresh hourly as needed."""
+"""Shared event/player-ID prop cache with scheduled, deduplicated refreshes."""
 import asyncio
 import json
 import logging
@@ -12,6 +12,7 @@ from .odds_fees import effective_american
 from .player_identity import resolve_player
 from .service import display_name
 from .stats import number
+from .odds_policy import refresh_due
 
 BOOKS = ('ballybet', 'betonlineag', 'draftkings', 'fanatics', 'fanduel',
          'kalshi', 'novig', 'prophetx', 'williamhill_us')
@@ -21,7 +22,6 @@ MARKETS = {
     'player_shots_on_goal': ('shots', False), 'player_shots_on_goal_alternate': ('shots', True),
     'player_goals': ('goals', False), 'player_goals_alternate': ('goals', True),
     'player_goal_scorer_anytime': ('anytime', False),
-    'player_goal_scorer_first': ('first_goal', False),
 }
 VERSION = '1:' + ','.join(BOOKS)
 logger = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ def normalize_props(event, roster, aliases=None):
                 price = number(outcome.get('price'))
                 side = str(outcome.get('name', '')).lower()
                 point = number(outcome.get('point'))
-                binary = family in ['anytime', 'first_goal']
+                binary = family == 'anytime'
                 if (price is None or not math.isfinite(price) or abs(price) < 100
                     or not float(price).is_integer() or side not in (['yes', 'no'] if binary else ['over', 'under'])
                     or (not binary and (point is None or not math.isfinite(point) or point < 0))):
@@ -102,6 +102,9 @@ class PlayerProps:
         row = self.p.store.db.execute('SELECT body,fetched,attempted,error FROM player_prop_odds WHERE game_id=? AND version=?',
                                       (game['id'], VERSION)).fetchone()
         body = json.loads(row[0]) if row and row[0] else {'players': {}, 'unmatched_names': []}
+        # Keep useful cached markets while suppressing retired first-scorer quotes.
+        for player in body.get('players', {}).values():
+            player.get('markets', {}).pop('first_goal', None)
         stale = bool(row and row[0] and (row[3] or time.time() - row[1] >= 3600))
         return {**body, 'game_id': game['id'], 'eligible': eligible(game),
                 **({'players': {}} if game.get('gameScheduleState') in ['PPD', 'CNCL'] else {}),
@@ -154,7 +157,7 @@ class PlayerProps:
         except (ValueError, KeyError, TypeError, AttributeError):
             self.failure(game, 'Props response schema invalid; cached prices retained when available')
 
-    async def view(self, date, game_id=None, refresh=False):
+    async def view(self, date, game_id=None, refresh=False, force=False, refresh_after=None):
         schedule = await self.p.nhl(f'score/{date}', 600)
         configured = odds_configured()
         result = {'date': date, 'configured': configured, 'games': {}, 'books': list(BOOKS),
@@ -170,8 +173,8 @@ class PlayerProps:
             async with self.lock:
                 pending = []
                 for game in games:
-                    row = self.p.store.db.execute('SELECT attempted FROM player_prop_odds WHERE game_id=? AND version=?', (game['id'], VERSION)).fetchone()
-                    if eligible(game) and (refresh or self.cached(game)['status'] != 'available') and (refresh or not row or time.time() - row[0] >= 600):
+                    row = self.p.store.db.execute('SELECT body,fetched,attempted,error FROM player_prop_odds WHERE game_id=? AND version=?', (game['id'], VERSION)).fetchone()
+                    if eligible(game) and refresh_due(row, 6 * 3600, force=force, refresh_after=refresh_after):
                         pending.append(game)
                 if pending:
                     try:

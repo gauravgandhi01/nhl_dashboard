@@ -1,17 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from datetime import datetime, timezone
 
-import httpx
-
-from .odds_client import OddsError, odds_api_keys
+from .odds_client import OddsError, odds_client
 from .providers import ALIASES, Providers, TEAM_NAMES
 from .service import display_name, latest_sources
 from .stats import advanced_summary, card_team_stats, normalized_name, number
 
-ODDS_URL = 'https://api.the-odds-api.com/v4/sports/icehockey_nhl_championship_winner/odds/'
 BOOKMAKER = 'fanduel'
 CACHE_TTL = 3600
 
@@ -29,6 +27,8 @@ def american(value):
 class StanleyCup:
     def __init__(self, providers: Providers):
         self.p = providers
+        self.client = odds_client(providers.store)
+        self.lock = asyncio.Lock()
         self.p.store.db.execute("""
             CREATE TABLE IF NOT EXISTS stanley_cup_odds (
                 id TEXT PRIMARY KEY, body TEXT, fetched REAL, attempted REAL
@@ -51,40 +51,15 @@ class StanleyCup:
         return body if isinstance(body, dict) else {}, fetched, status
 
     async def fetch_odds(self):
-        keys = odds_api_keys()
-        if not keys:
-            raise OddsError('Odds key not configured in keys.json or /etc/secrets/keys.json')
-        last_reason = 'Odds provider returned no usable Stanley Cup prices'
-        for key in keys:
-            try:
-                async with self.p.store.limit:
-                    response = await self.p.store.client.get(ODDS_URL, params={
-                        'apiKey': key,
-                        'markets': 'outrights',
-                        'bookmakers': BOOKMAKER,
-                        'oddsFormat': 'american',
-                    })
-            except (httpx.TimeoutException, httpx.HTTPError):
-                last_reason = 'Odds provider connection failed'
-                continue
-            if response.status_code != 200:
-                try:
-                    payload = response.json()
-                    code = payload.get('error_code') if isinstance(payload, dict) else None
-                except ValueError:
-                    code = None
-                if code == 'OUT_OF_USAGE_CREDITS':
-                    last_reason = 'Odds quota insufficient for this request; check remaining credits'
-                    continue
-                if code in ['INVALID_KEY', 'MISSING_KEY'] or response.status_code == 401:
-                    last_reason = 'Odds API key rejected; check configured keys file'
-                    continue
-                last_reason = f'Odds provider returned HTTP {response.status_code}'
-                continue
-            try:
-                data = response.json()
-            except ValueError:
-                raise OddsError('Odds provider returned invalid JSON') from None
+        async with self.lock:
+            row = self.p.store.db.execute('SELECT attempted FROM stanley_cup_odds WHERE id=?', ('fanduel',)).fetchone()
+            if row and time.time() - row[0] < 600:
+                return self.cached_odds()
+            self.p.store.db.execute("""INSERT INTO stanley_cup_odds VALUES(?,NULL,0,?)
+                ON CONFLICT(id) DO UPDATE SET attempted=excluded.attempted""", ('fanduel', time.time()))
+            self.p.store.db.commit()
+            data = await self.client.request('/odds/', {'markets': 'outrights',
+                'bookmakers': BOOKMAKER, 'oddsFormat': 'american'}, sport='icehockey_nhl_championship_winner')
             prices = {}
             for event in data if isinstance(data, list) else []:
                 for book in event.get('bookmakers', []):
@@ -111,7 +86,7 @@ class StanleyCup:
                 )
                 self.p.store.db.commit()
                 return prices, datetime.fromtimestamp(now, timezone.utc).isoformat(), 'fresh'
-        raise OddsError(last_reason)
+        raise OddsError('Odds provider returned no usable Stanley Cup prices')
 
     async def view(self, refresh=False):
         standings = await self.p.nhl('standings/now', 600)

@@ -2627,3 +2627,8 @@ tr:hover td {
 .line-scoring { display: flex; gap: 5px; margin-left: auto; }
 .line-scoring > span { display: inline-flex; align-items: baseline; gap: 2px; font-size: 9px; font-variant-numeric: tabular-nums; }
 .line-scoring b { font-size: 8px; }
+
+.odds-admin { position: fixed; inset: 15vh auto auto 50%; transform: translateX(-50%); z-index: 100; width: min(480px, 90vw); padding: 20px; color: var(--text, #eee); background: #202225; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 10px 60px #000a; }
+.odds-admin label { display: block; margin: 14px 0; }
+.odds-admin input, .odds-admin select { display: block; width: 100%; margin-top: 6px; }
+.odds-admin p { font-size: 12px; line-height: 1.5; }

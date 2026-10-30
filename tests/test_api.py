@@ -217,6 +217,8 @@ def test_manual_odds_refresh_gate_defaults_on_and_can_disable_posts(tmp_path, mo
 
 
 def test_automatic_odds_refresh_includes_player_props(monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
     calls = []
 
     class Moneylines:
@@ -225,19 +227,19 @@ def test_automatic_odds_refresh_includes_player_props(monkeypatch):
             raise RuntimeError('moneyline failed')
 
     class FirstPeriod:
-        async def refresh(self, date, force=False):
-            calls.append(('first_period', date, force))
+        async def refresh(self, date, force=False, refresh_after=None):
+            calls.append(('first_period', date, force, refresh_after))
 
     class Props:
-        async def view(self, date, game_id=None, refresh=False):
-            calls.append(('props', date, game_id, refresh))
+        async def view(self, date, game_id=None, refresh=False, refresh_after=None):
+            calls.append(('props', date, game_id, refresh, refresh_after))
 
-    fake_app = type('App', (), {})()
-    fake_app.state = type('State', (), {
-        'moneylines': Moneylines(),
-        'first_period_odds': FirstPeriod(),
-        'player_props': Props(),
-    })()
+    budget = SimpleNamespace(sync_budgets=AsyncMock())
+    fake_app = SimpleNamespace(state=SimpleNamespace(
+        moneylines=Moneylines(), first_period_odds=FirstPeriod(), player_props=Props(),
+        dashboard=SimpleNamespace(p=SimpleNamespace(store=None))))
+    monkeypatch.setattr('backend.app.odds_client', lambda store: budget)
+    monkeypatch.setattr('backend.app.expensive_refresh_after', lambda: 12345)
 
     async def stop(_interval):
         raise asyncio.CancelledError
@@ -248,7 +250,7 @@ def test_automatic_odds_refresh_includes_player_props(monkeypatch):
     async def once(configured):
         monkeypatch.setattr('backend.app.odds_configured', lambda: configured)
         try:
-            await automatic_odds_refresh(fake_app, interval=3600)
+            await automatic_odds_refresh(fake_app, interval=60)
         except asyncio.CancelledError:
             return
         raise AssertionError('refresh loop should stop after one pass')
@@ -257,13 +259,15 @@ def test_automatic_odds_refresh_includes_player_props(monkeypatch):
         await once(False)
         assert calls == []
         await once(True)
+        assert calls == [('moneylines', '2026-10-05', False),
+            ('first_period', '2026-10-05', False, 12345),
+            ('props', '2026-10-05', None, True, 12345)]
+        calls.clear()
+        monkeypatch.setattr('backend.app.expensive_refresh_after', lambda: None)
+        await once(True)
+        assert calls == [('moneylines', '2026-10-05', False)]
 
     asyncio.run(scenario())
-    assert calls == [
-        ('moneylines', '2026-10-05', True),
-        ('first_period', '2026-10-05', True),
-        ('props', '2026-10-05', None, True),
-    ]
 
 
 def test_pagination_advances_by_actual_page_size(tmp_path):
@@ -428,3 +432,28 @@ def test_last_ten_excludes_live_game_and_preserves_advanced_coverage():
         assert result['goalies'][0]['summary']['advanced_games'] == 8
         assert result['goalies'][0]['summary']['gsax'] == 4
     asyncio.run(scenario())
+
+
+def test_hidden_odds_admin_requires_token_and_works_when_public_refresh_is_disabled(tmp_path, monkeypatch):
+    from unittest.mock import AsyncMock
+    monkeypatch.setenv('NHL_DASHBOARD_DB', str(tmp_path / 'admin.sqlite3'))
+    monkeypatch.setenv('NHL_AUTOMATIC_ODDS_REFRESH_ENABLED', 'false')
+    monkeypatch.setenv('NHL_MANUAL_ODDS_REFRESH_ENABLED', 'false')
+    monkeypatch.delenv('NHL_ODDS_ADMIN_TOKEN', raising=False)
+    with TestClient(app) as client:
+        assert client.post('/api/admin/odds/refresh').status_code == 503
+        monkeypatch.setenv('NHL_ODDS_ADMIN_TOKEN', 'PRIVATE_ADMIN')
+        for headers in [{}, {'Authorization': 'Bearer wrong'}]:
+            assert client.post('/api/admin/odds/refresh', headers=headers).status_code == 403
+            assert client.get('/api/admin/odds/budget', headers=headers).status_code == 403
+        refresh = AsyncMock(return_value={'prices': {}, 'status': 'available'})
+        monkeypatch.setattr(app.state.moneylines, 'refresh', refresh)
+        result = client.post('/api/admin/odds/refresh?feed=moneylines&date=2026-10-30',
+                             headers={'Authorization': 'Bearer PRIVATE_ADMIN'})
+        assert result.status_code == 200
+        refresh.assert_awaited_once_with('2026-10-30', force=True)
+        assert 'budget' in result.json()
+        assert 'PRIVATE_ADMIN' not in result.text
+        assert client.post('/api/odds/moneyline/refresh').status_code == 403
+        schema = client.get('/openapi.json').json()['paths']
+        assert '/api/admin/odds/refresh' not in schema and '/api/admin/odds/budget' not in schema

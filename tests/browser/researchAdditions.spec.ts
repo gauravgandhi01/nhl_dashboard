@@ -108,7 +108,7 @@ test("a player link expands that skater and shows appearance counts", async ({ p
     await expect(shotsGroup).toContainText("3/5");
     await shotsGroup.getByRole("button", { name: "Next Shots on goal line" }).click();
     await expect(shotsGroup).toContainText("1/5 · 2 pushes");
-    await expect(page.getByRole("group", { name: "First goalscorer" })).not.toContainText("L5");
+    await expect(page.getByRole("group", { name: "First goalscorer" })).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   }
   await page.goto(`/players?date=${date}&player=404`);

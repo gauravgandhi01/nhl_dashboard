@@ -39,6 +39,7 @@ import { Goalies } from "./Goalies";
 import { FirstPeriod } from "./FirstPeriod";
 import { Streaks } from "./Streaks";
 import { StanleyCup } from "./StanleyCup";
+import { OddsAdmin } from "./OddsAdmin";
 import { usePlayerProps, PropsControls, PropsRefreshButton, CompactProps, type PropsState } from "./PlayerProps";
 import { useMoneylines, MoneylineControls, TeamMoneyline, GameTotal } from "./Moneylines";
 import { et, todayEt, formatDate, formatTimestamp } from "./dates";
@@ -1588,6 +1589,7 @@ function TopbarBrand() {
 function App() {
   return (
     <BrowserRouter>
+      <OddsAdmin />
       <div className="topbar">
         <TopbarBrand />
         <TopbarDateControls />

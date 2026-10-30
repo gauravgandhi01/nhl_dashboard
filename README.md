@@ -197,12 +197,13 @@ launching locally, or mount the same JSON as Render secret file
 `/etc/secrets/keys.json`. The application reads the `api_keys` array from those
 files, or from `NHL_ODDS_KEYS_PATH` if set, and does not read
 `firstperiodstats/key.json` or any other legacy credential file.
-The tab reads cached prices without making provider requests. **Load odds** is
-the only action that requests current `totals_p1` event markets. By default odds
+The tab reads cached prices without making provider requests. Current `totals_p1`
+event markets are requested by the three daily automatic refresh slots or an
+explicit authorized refresh. By default odds
 requests use the configured US regions (`us,us2,us_ex`). Edit
 `config/odds.json` and set `"bookmakers": ["fanduel", "draftkings", "kalshi"]`
-to request only specific supported bookmaker keys instead. It uses a 30-minute cache, serializes refreshes, stops on
-exhausted quota and skips started, postponed and canceled games. No subscriptions
+to request only specific supported bookmaker keys instead. Refreshes are serialized and deduplicated, stop on
+exhausted quota and skip started, postponed and canceled games. No subscriptions
 or keys are required for stats.
 Prices show the actual paired market total (prefer 1.5) and update timestamp;
 another total is never presented as a 1.5 line. No historical odds are fetched.
@@ -270,7 +271,7 @@ shows its book; integer totals can push. Unpaired and mismatched lines are exclu
 
 Use **Moneylines + totals** for the selected date. Both markets share one
 provider request and cache; old moneyline-only snapshots show totals as not loaded
-until refreshed. Navigation reads the one-hour
+until refreshed. Navigation reads the 30-minute
 SQLite cache only; there is no automatic polling or quota spend. Missing, stale,
 and pregame-snapshot prices are labeled. Market favorites use a separate highlight
 from statistical advantages.
@@ -285,9 +286,13 @@ from `/etc/secrets/keys.json` at runtime:
 }
 ```
 
-Restart the backend after changing the file. The backend chooses from the
-configured key pool and can try another key when one is rejected, rate-limited,
-or out of credits. No key is included in frontend assets, source, cached URLs,
+Restart the backend after changing the file. The backend checks every configured key through the free `/sports` endpoint
+(at most once per key per day), records quota headers after requests, and selects
+keys with sufficient remaining balance, rotating equal balances. It can try another
+key when one is rejected, rate-limited, or out of credits. When no individual key
+can cover a request but the pool can, it splits markets and bookmaker groups into
+single-credit requests and merges their quotes. Hashed key identifiers, per-key
+balances, and charged requests persist in SQLite; raw keys are never stored there. No key is included in frontend assets, source, cached URLs,
 or application logs. First Period uses the same key file. Manual odds refresh
 buttons are enabled by default; set `NHL_MANUAL_ODDS_REFRESH_ENABLED=false` to
 disable the POST refresh routes while keeping cached odds reads available.
@@ -307,7 +312,7 @@ player-prop coverage, quota costs, and identity caveats.
 ## Shared Player Props
 
 Player odds appear in expanded Players rows (assists, goals/anytime, points,
-shots on goal, and first goalscorer), compact Lines tiles, and the relevant
+shots on goal), compact Lines tiles, and the relevant
 On-slate skater Streaks rows. League-wide streaks and goalie boards do not load
 player props. Goalies remain outside this skater integration.
 
@@ -319,9 +324,9 @@ or first-period configuration. Prices may be missing at any of these books.
 **Load game props** fetches one event; **Load slate props** fetches uncached
 eligible games for the selected date. Navigation/expansion only reads the shared
 SQLite cache. When `NHL_AUTOMATIC_ODDS_REFRESH_ENABLED` is on, today's eligible
-games are also fetched at startup and every hour. Ten requested markets across nine books cost at most ten credits
-per game with nonempty coverage; each load button's tooltip gives an upper bound.
-Prices cache for 30 minutes, concurrent refreshes deduplicate, failures back off
+games are refreshed at 11:00, 15:00, and 18:00 Eastern. Nine requested markets across nine books cost at most nine credits
+per game with nonempty coverage. First goalscorer is no longer requested or shown.
+Cached prices are shared between views; scheduled refreshes reuse the current slot across process restarts. Concurrent and repeated manual refreshes deduplicate for five minutes; failures back off
 for ten minutes, and last-good quotes remain visibly stale. Started games do
 not fetch new prices. Postponed/canceled games suppress cached player quotes.
 
@@ -354,7 +359,7 @@ assists, or goals line in last 5, last 10, and the season. Anytime goal and
 goals Over 0.5 use the same goals count. The figure is appearances over the
 line, with pushes separated on integer lines. It is a count of regular-season
 appearances before the selected date, not a probability. A missing stat drops
-that game from that count only. First goalscorer has no count. On-slate skater
+that game from that count only. On-slate skater
 streaks show the price only. Goalie rows and league-wide streaks do not show
 player odds.
 
@@ -408,10 +413,22 @@ Optional build/runtime settings:
   `api_keys` array enables moneylines, player props, and first-period odds.
 - `NHL_MANUAL_ODDS_REFRESH_ENABLED=false` disables manual odds refresh requests.
   The default is enabled.
-- `NHL_AUTOMATIC_ODDS_REFRESH_ENABLED=true` refreshes today's moneylines,
-  first-period odds, and player props once at startup and then every hour.
-  The default is off. Started games are not requested. Stanley Cup odds stay
-  on their own fetch.
+- `NHL_AUTOMATIC_ODDS_REFRESH_ENABLED=true` checks today's odds once a minute,
+  refreshing moneylines + totals only when their 30-minute cache expires.
+  First-period odds and player props refresh at 11:00, 15:00, and 18:00 Eastern.
+  On startup after a slot, only missing/outdated snapshots are fetched. Before
+  11:00 no automatic props or first-period calls are made. The default is off.
+  Started games are not requested. Stanley Cup odds use the same key pool and ledger.
+- `NHL_ODDS_ADMIN_TOKEN` enables the hidden admin trigger (Alt+Shift+O).
+  The panel requires this token, keeps it in memory only, and clears it on close.
+  It can check all key balances for free and refresh one feed or all three feeds
+  for the selected date even when public manual refresh is disabled. Requests
+  still observe the five-minute refresh cooldown, ten-minute failure backoff,
+  and daily spending cap. Escape closes the panel.
+- `NHL_ODDS_DAILY_BUDGET` optionally overrides the automatic daily credit cap.
+  By default it allocates 90% of the pool's monthly allowance across the days
+  of the month, reducing the cap further when remaining balance is low. Daily
+  accounting and the monthly reset use UTC. Set to `0` to stop paid requests.
 
 Daily Faceoff access can differ between your machine and the hosted server.
 In direct mode, a failed `robots.txt` request is logged and the page fetch is
@@ -419,8 +436,12 @@ still attempted; an explicit robots disallow prevents the fetch. The app
 retains a dated last-good projection when available; otherwise Lines shows an
 explicit NHL roster-only fallback, not inferred line assignments. Server logs
 identify the failing stage and HTTP status when available.
-The default `/tmp` database does not survive instance replacement; preserving
-last-good feeds across deployments requires a persistent mounted database path.
+The default `/tmp` database does not survive instance replacement. Set
+`NHL_DASHBOARD_DB` to a persistent mounted path (for example
+`/var/data/dashboard.sqlite3`) to preserve odds snapshots, refresh cooldowns,
+per-key budgets, usage history, and last-good feeds across deployments. The
+header balance check still recovers provider balances after a cache loss, but
+the local daily-spend ledger cannot be recovered from provider totals alone.
 
 If Render cannot fetch lineups, use the [laptop lineup uploader](docs/lineup-uploader.md).
 It collects all 32 teams and starting-goalie pages for yesterday, today, and
@@ -484,3 +505,27 @@ Lineup TOI is joined by NHL player ID using the shared verified name aliases (in
 Gabe/Gabriel Perreault). Missing TOI labels distinguish unmatched lineup names, no
 prior regular-season appearances, NHL feed failures, and missing MoneyPuck 5v5
 coverage. Hover a missing-value label for details.
+
+### Odds refresh operations
+
+For the hosted refresh policy, keep these Render settings:
+
+```text
+NHL_AUTOMATIC_ODDS_REFRESH_ENABLED=true
+NHL_MANUAL_ODDS_REFRESH_ENABLED=false
+NHL_ODDS_ADMIN_TOKEN=<a private random token>
+```
+
+After deploying the code and setting the token, press **Alt+Shift+O** (Option+Shift+O
+on Mac) anywhere on the site, enter the token, and choose **Check budget** or a
+feed to refresh. Budget inspection shows the number of configured and checked
+keys so the deployed secret file can be compared with the local pool. All keys
+in the selected `api_keys` file participate; duplicate key strings count once.
+`NHL_ODDS_KEYS_PATH` takes precedence over the workspace and Render paths.
+
+The hidden endpoints are `GET /api/admin/odds/budget` and
+`POST /api/admin/odds/refresh?feed=moneylines|props|first-period|all&date=YYYY-MM-DD`.
+Both require `Authorization: Bearer <NHL_ODDS_ADMIN_TOKEN>`. Props optionally
+accept `game_id` for a single game. Public odds reads remain cache-only except
+for the existing initial Stanley Cup load. The admin panel uses no paid odds
+while closed or when opened; only the explicit refresh action requests prices.

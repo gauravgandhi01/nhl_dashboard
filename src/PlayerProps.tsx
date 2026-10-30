@@ -397,7 +397,6 @@ function MarketRow({
   const selected = lines.find((l) => l.id === choice) || lines.find((l) => !l.alternate) || lines[0];
   const line = selected;
   const binary = selected?.point == null;
-  const showUnder = family !== "first_goal";
   const index = selected ? lines.findIndex((l) => l.id === selected.id) : -1;
   const caption = selected ? lineLabel(selected) : "";
   const showLine = (next: number) => {
@@ -437,7 +436,7 @@ function MarketRow({
           <Price quote={bestQuote(line, binary ? "yes" : "over")} />
         </span>
         <span className="prop-side under">
-          {showUnder && <Price quote={bestQuote(line, binary ? "no" : "under")} />}
+          <Price quote={bestQuote(line, binary ? "no" : "under")} />
         </span>
         <WindowCells log={log} family={family} point={line?.point ?? null} active={lines.length > 0} />
       </div>
@@ -482,7 +481,6 @@ export function PlayerPropPanel({
         ["scorer", "Goals"],
         ["points", "Points"],
         ["shots", "Shots on goal"],
-        ["first_goal", "First goalscorer"],
       ].map(([family, label]) => (
         <MarketRow
           key={`${gameId}-${playerId}-${family}`}
