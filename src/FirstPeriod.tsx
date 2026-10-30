@@ -356,18 +356,30 @@ function ComparisonRow({
     </div>
   );
 }
+function SeasonCountRank({ rank }: { rank: number | undefined }) {
+  const label = rank == null
+    ? "Season 2+ count rank unavailable"
+    : `Season 2+ count: league rank ${rank}. Ties share a rank.`;
+  return (
+    <span className="fp-season-rank" title={label} aria-label={label}>
+      {rank == null ? "—" : `#${rank}`}
+    </span>
+  );
+}
 function PeriodCard({
   m,
   window,
   date,
   odds,
   ranks,
+  seasonRanks,
 }: {
   m: Matchup;
   window: Window;
   date: string;
   odds: Odds | null;
   ranks: Record<string, Map<number, number>>;
+  seasonRanks: Map<number, number>;
 }) {
   const a = m.away.windows[window],
     h = m.home.windows[window];
@@ -399,11 +411,13 @@ function PeriodCard({
       <div>
         <div className="card-matchup">
           <div>
+            <SeasonCountRank rank={seasonRanks.get(m.game.away.id)} />
             <Logo team={m.game.away} />
             <strong>{m.game.away.abbrev}</strong>
           </div>
           <span className="eyebrow">FIRST PERIOD</span>
           <div>
+            <SeasonCountRank rank={seasonRanks.get(m.game.home.id)} />
             <Logo team={m.game.home} />
             <strong>{m.game.home.abbrev}</strong>
           </div>
@@ -1222,6 +1236,7 @@ function PeriodContent({
                   <div className="slate fp-slate">
                     {(() => {
                       const ranks = teamMetricRanks(data.rankings, window);
+                      const seasonRanks = new Map(data.rankings.map((team) => [team.id, team.rank]));
                       return data.matchups.map((m) => (
                         <PeriodCard
                           key={m.game.id}
@@ -1230,6 +1245,7 @@ function PeriodContent({
                           date={date}
                           odds={odds}
                           ranks={ranks}
+                          seasonRanks={seasonRanks}
                         />
                       ));
                     })()}

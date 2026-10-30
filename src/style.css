@@ -2144,6 +2144,16 @@ tr:hover td {
 .fp-card .card-matchup {
   margin-bottom: 6px;
 }
+.fp-card .card-matchup > div {
+  grid-template-columns: auto 24px auto;
+}
+.fp-season-rank {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 .fp-card .card-metric {
   grid-template-columns: minmax(0, 1fr) 116px minmax(0, 1fr);
 }
