@@ -4,6 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import {
   ArrowDown,
   ArrowUp,
+  ChevronDown,
   ChevronRight,
   RefreshCw,
   Search,
@@ -70,6 +71,26 @@ const clock = (n: number | null | undefined) =>
   n == null
     ? "--"
     : `${Math.floor(Math.round(n) / 60)}:${String(Math.round(n) % 60).padStart(2, "0")}`;
+type Compare = ">" | "<";
+type ColumnFilter = { op: Compare; value: string };
+
+/** TOI/G is stored in seconds and shown as a clock, so its threshold is minutes. */
+function measured(key: string, value: number) {
+  return key === "toi_pg" ? value / 60 : value;
+}
+
+function matchesColumnFilters(stats: Stats, filters: Record<string, ColumnFilter>) {
+  return Object.entries(filters).every(([key, filter]) => {
+    if (filter.value.trim() === "") return true;
+    const threshold = Number(filter.value);
+    if (!Number.isFinite(threshold)) return true;
+    const value = stats[key];
+    if (value == null || !Number.isFinite(value)) return false;
+    const actual = measured(key, value);
+    return filter.op === ">" ? actual > threshold : actual < threshold;
+  });
+}
+
 const columns = [
   {
     key: "games",
@@ -154,6 +175,8 @@ export function Players() {
   const [team, setTeam] = useState("all");
   const [position, setPosition] = useState("all");
   const [sort, setSort] = useState({ key: "points_pg", desc: true });
+  const [filters, setFilters] = useState<Record<string, ColumnFilter>>({});
+  const [openFilter, setOpenFilter] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const appliedPlayer = useRef<string | null>(null);
@@ -222,9 +245,30 @@ export function Players() {
     setTeam("all");
     setPosition("all");
     setSearch("");
+    setFilters({});
+    setOpenFilter(null);
     const earliest = [...matches].sort((a, b) => (a.game_id ?? Number.MAX_SAFE_INTEGER) - (b.game_id ?? Number.MAX_SAFE_INTEGER))[0];
     setExpanded(`${earliest.game_id}-${earliest.id}`);
   }, [data, date, requestedId]);
+  useEffect(() => {
+    if (!openFilter) return;
+    const root = document.querySelector(`[data-column-filter="${CSS.escape(openFilter)}"]`);
+    const input = root?.querySelector("input");
+    input?.focus();
+    const close = (event: MouseEvent) => {
+      if (root?.contains(event.target as Node)) return;
+      setOpenFilter(null);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpenFilter(null);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [openFilter]);
   const choosePlayer = (id: number | null, key: string | null) => {
     appliedPlayer.current = `${date}:${id ?? ""}`;
     setExpanded(key);
@@ -246,7 +290,8 @@ export function Players() {
             (teamValue === "all" || p.team === teamValue) &&
             (position === "all" ||
               (position === "D" ? p.position === "D" : p.position !== "D")) &&
-            `${p.name} ${p.team}`.toLowerCase().includes(search.toLowerCase()),
+            `${p.name} ${p.team}`.toLowerCase().includes(search.toLowerCase()) &&
+            matchesColumnFilters(p.windows[window], filters),
         )
         .sort((a, b) => {
           const av = a.windows[window][sort.key],
@@ -261,8 +306,26 @@ export function Players() {
             (sort.desc ? bv - av : av - bv) || a.name.localeCompare(b.name)
           );
         }),
-    [data, teamValue, position, search, sort, window],
+    [data, teamValue, position, search, sort, window, filters],
   );
+  const setColumnFilter = (key: string, patch: Partial<ColumnFilter>) => {
+    setFilters((current) => {
+      const previous = current[key] ?? { op: ">" as Compare, value: "" };
+      return { ...current, [key]: { ...previous, ...patch } };
+    });
+  };
+  const filtersActive =
+    search !== "" ||
+    team !== "all" ||
+    position !== "all" ||
+    Object.values(filters).some((filter) => filter.value.trim() !== "");
+  const resetFilters = () => {
+    setSearch("");
+    setTeam("all");
+    setPosition("all");
+    setFilters({});
+    setOpenFilter(null);
+  };
   const format = (
     key: string,
     n: number | null | undefined,
@@ -334,6 +397,15 @@ export function Players() {
             <option value="F">Forwards</option>
             <option value="D">Defense</option>
           </select>
+          <button
+            type="button"
+            className="text-button compact-text-button filter-reset"
+            aria-label="Reset player filters"
+            disabled={!filtersActive}
+            onClick={resetFilters}
+          >
+            Reset
+          </button>
           <div className="refresh-actions" role="group" aria-label="Refresh data">
             <RefreshButton label="Stats" ariaLabel="Refresh players"
               description="Reload player stats and rosters for this date. Cached sources refresh when due."
@@ -416,23 +488,68 @@ export function Players() {
                               : "none"
                           }
                         >
-                          <button
-                            title={scope === "league" ? c.help.replaceAll("nightly", "league") : c.help}
-                            onClick={() =>
-                              setSort({
-                                key: c.key,
-                                desc: sort.key === c.key ? !sort.desc : true,
-                              })
-                            }
-                          >
-                            {c.label}
-                            {sort.key === c.key &&
-                              (sort.desc ? (
-                                <ArrowDown size={10} />
-                              ) : (
-                                <ArrowUp size={10} />
-                              ))}
-                          </button>
+                          <div className="column-head" data-column-filter={c.key}>
+                            <button
+                              title={scope === "league" ? c.help.replaceAll("nightly", "league") : c.help}
+                              onClick={() =>
+                                setSort({
+                                  key: c.key,
+                                  desc: sort.key === c.key ? !sort.desc : true,
+                                })
+                              }
+                            >
+                              {c.label}
+                              {sort.key === c.key &&
+                                (sort.desc ? (
+                                  <ArrowDown size={10} />
+                                ) : (
+                                  <ArrowUp size={10} />
+                                ))}
+                            </button>
+                            <button
+                              type="button"
+                              className={`column-filter-toggle${filters[c.key]?.value.trim() ? " is-set" : ""}`}
+                              aria-label={`Filter ${c.label}`}
+                              aria-expanded={openFilter === c.key}
+                              onClick={() =>
+                                setOpenFilter((current) => (current === c.key ? null : c.key))
+                              }
+                            >
+                              <ChevronDown size={9} />
+                            </button>
+                            {openFilter === c.key && (
+                              <div className="column-filter">
+                                <select
+                                  aria-label={`${c.label} comparison`}
+                                  value={filters[c.key]?.op ?? ">"}
+                                  onChange={(e) =>
+                                    setColumnFilter(c.key, { op: e.target.value as Compare })
+                                  }
+                                >
+                                  <option value=">">&gt;</option>
+                                  <option value="<">&lt;</option>
+                                </select>
+                                <input
+                                  type="number"
+                                  inputMode="decimal"
+                                  step="any"
+                                  aria-label={
+                                    c.key === "toi_pg"
+                                      ? `${c.label} threshold in minutes`
+                                      : `${c.label} threshold`
+                                  }
+                                  title={
+                                    c.key === "toi_pg"
+                                      ? "Average minutes per game"
+                                      : `Keep skaters whose ${c.label} is above or below this number`
+                                  }
+                                  value={filters[c.key]?.value ?? ""}
+                                  onChange={(e) => setColumnFilter(c.key, { value: e.target.value })}
+                                  onWheel={(e) => e.currentTarget.blur()}
+                                />
+                              </div>
+                            )}
+                          </div>
                         </th>
                       ))}
                     </tr>

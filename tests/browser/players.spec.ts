@@ -112,6 +112,103 @@ test("players empty dates and outages", async ({ page }) => {
   await expect(page.getByText("Source unavailable")).toBeVisible();
 });
 
+test("stat columns filter with a comparison and a number", async ({ page }) => {
+  const source = { source: "NHL", url: "", retrieved_at: null, status: "available" as const };
+  const stats = (pointsPg: number, toiSeconds: number, attempts: number | null) => ({
+    games: 10, goals: 2, assists: 2, points: pointsPg * 10, points_pg: pointsPg,
+    shots: 20, shots_pg: 2, toi_pg: toiSeconds, powerPlayPoints: 1, point_games_pct: 50,
+    attempts_pg: attempts, attempts60: attempts, shots60: 6, points60: 1, ixg60: 0.4, hd60: 1,
+    advanced_games: attempts == null ? null : 10,
+  });
+  const skater = (
+    id: number, name: string,
+    seasonPg: number, recentPg: number, toiSeconds: number, attempts: number | null,
+  ) => ({
+    id, name, position: "C", team: "NJD", logo: "", game_id: 2026010001,
+    opponent: "BOS", opponent_logo: null, home: true, season_label: "2026-27",
+    windows: {
+      season: stats(seasonPg, toiSeconds, attempts),
+      last10: stats(seasonPg, toiSeconds, attempts),
+      last5: stats(recentPg, toiSeconds, attempts),
+    },
+    log: null, recent_games: [],
+    stats_source: source, advanced_source: source, roster_source: source,
+  });
+  await page.route("**/api/players?*", (route) => route.fulfill({ json: {
+    date: "2026-11-10", as_of: "2026-11-10", periods: [], sources: [], error: null,
+    ready: true, games: [{ id: 2026010001 }],
+    players: [
+      skater(1, "High Scorer", 2, 0.4, 1200, 8),
+      skater(2, "Low Scorer", 0.4, 1.6, 600, null),
+      skater(3, "Even Scorer", 1, 1, 900, 3),
+    ],
+  } }));
+  await page.route("**/api/player-props**", (route) => route.fulfill({
+    json: { date: "2026-11-10", configured: false, manual_refresh_enabled: false, error: null, games: {} },
+  }));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/players?date=2026-11-10");
+  const names = async () => (await page.locator(".player-name").allTextContents()).map((name) => name.trim());
+  const reset = page.getByRole("button", { name: "Reset player filters", exact: true });
+  await expect(page.locator(".player-name")).toHaveCount(3);
+  await expect(reset).toBeDisabled();
+  await expect(page.getByLabel("Player comparison")).toHaveCount(0);
+  await expect(page.getByLabel("Matchup comparison")).toHaveCount(0);
+  await expect(page.getByRole("spinbutton", { name: "P/G threshold", exact: true })).toHaveCount(0);
+  const openPoints = () => page.getByRole("button", { name: "Filter P/G", exact: true }).click();
+  await openPoints();
+  const points = page.getByRole("spinbutton", { name: "P/G threshold", exact: true });
+  await expect(points).toBeVisible();
+  await points.fill("1");
+  await expect.poll(names).toEqual(["High Scorer"]);
+  await page.keyboard.press("Escape");
+  await expect(points).toHaveCount(0);
+  await expect.poll(names).toEqual(["High Scorer"]);
+  await reset.click();
+  await expect.poll(names).toEqual(["High Scorer", "Even Scorer", "Low Scorer"]);
+  await expect(reset).toBeDisabled();
+  await expect(page.locator(".column-filter-toggle.is-set")).toHaveCount(0);
+  await openPoints();
+  await points.fill("1");
+  await page.getByLabel("P/G comparison").selectOption("<");
+  await expect.poll(names).toEqual(["Low Scorer"]);
+  await points.fill("1.0");
+  await expect(page.getByRole("button", { name: "Even Scorer" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Last 5", exact: true }).click();
+  await expect.poll(names).toEqual(["High Scorer"]);
+  await page.getByRole("button", { name: "Season", exact: true }).click();
+  await openPoints();
+  await points.fill("");
+  await expect(page.locator(".player-name")).toHaveCount(3);
+  await page.getByRole("button", { name: "Filter TOI/G", exact: true }).click();
+  await page.getByRole("spinbutton", { name: "TOI/G threshold in minutes", exact: true }).fill("15");
+  await expect.poll(names).toEqual(["High Scorer"]);
+  await page.getByRole("spinbutton", { name: "TOI/G threshold in minutes", exact: true }).fill("");
+  await page.getByRole("button", { name: "Filter iCF/G", exact: true }).click();
+  await page.getByRole("spinbutton", { name: "iCF/G threshold", exact: true }).fill("0");
+  await expect(page.getByRole("button", { name: "Low Scorer" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "High Scorer" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Even Scorer" })).toBeVisible();
+  await page.getByRole("spinbutton", { name: "iCF/G threshold", exact: true }).fill("99");
+  await expect(page.getByText("No matching skaters.")).toBeVisible();
+  await page.getByLabel("Search players").fill("zz");
+  await page.getByLabel("Player position", { exact: true }).selectOption("D");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  await reset.click();
+  await expect(page.getByLabel("Search players")).toHaveValue("");
+  await expect(page.getByLabel("Player position", { exact: true })).toHaveValue("all");
+  await expect(page.getByRole("spinbutton", { name: "iCF/G threshold", exact: true })).toHaveCount(0);
+  await expect.poll(names).toEqual(["High Scorer", "Even Scorer", "Low Scorer"]);
+  await page.setViewportSize({ width: 375, height: 800 });
+  await page.getByRole("button", { name: "Filter P/G", exact: true }).click();
+  await expect(points).toBeVisible();
+  await points.fill("1");
+  await page.getByLabel("P/G comparison").selectOption(">");
+  await expect(page.getByRole("button", { name: "High Scorer" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Low Scorer" })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+});
+
 test("on slate is the default and hides skaters who are not playing", async ({ page }) => {
   const source = { source: "NHL", url: "", retrieved_at: null, status: "available" as const };
   const stats = {

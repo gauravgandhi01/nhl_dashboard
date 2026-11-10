@@ -46,9 +46,12 @@ It opens on **On slate**: skaters whose current teams play that night, excluding
 postponed and canceled games. **All players** lists every forward and defenseman
 on a current NHL roster. On slate is not a confirmed lineup, particularly during
 preseason; goalies are on the Goalies tab. A skater who is not playing has no
-matchup link and no odds. Search, team/position filters, sortable columns, and
-Last 5 / Last 10 / Season controls are available. Expanding a player compares all
-three windows together.
+matchup link and no odds. Search, team and position filters, sortable columns, and
+Last 5 / Last 10 / Season controls are available. Each stat header has a small arrow
+that opens a greater-than or less-than box. A column box applies to the selected
+window. TOI/G is minutes. An empty box does not filter, and a missing value does not pass.
+Reset clears the search, team, position, and every column box.
+Expanding a player compares all three windows together.
 Scoring totals, points/shots per game, average TOI, power-play points and point-game
 frequency come from official NHL regular-season appearance logs, across teams.
 Season is the default window. Season colors rank scoring, usage and advanced
